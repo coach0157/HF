@@ -3,11 +3,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { RlsInterceptor } from './rls/rls.interceptor';
 import { HealthController } from './health/health.controller';
+import { AuditModule } from './audit/audit.module';
+import { FileStorageModule } from './storage/file-storage.module';
 
 /**
  * Cross-cutting infrastructure shared by every feature module:
@@ -27,6 +30,8 @@ import { HealthController } from './health/health.controller';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    AuditModule,
+    FileStorageModule,
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
@@ -48,6 +53,10 @@ import { HealthController } from './health/health.controller';
         limit: 120,
       },
     ]),
+    // Enables @Cron()/@Interval() decorators app-wide — used by
+    // entry-log/sensitive-photo-cleanup.service.ts (spec 3.4's 90-day
+    // ID-photo retention job).
+    ScheduleModule.forRoot(),
   ],
   controllers: [HealthController],
   providers: [

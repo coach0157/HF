@@ -153,6 +153,7 @@ model Village {
   facilities           Facility[]
   bills                Bill[]
   auditLogs            AuditLog[]
+  refreshTokens        RefreshToken[]
 
   @@map("villages")
 }
@@ -190,6 +191,7 @@ model User {
   maintenanceTickets     MaintenanceTicket[]  @relation("MaintenanceTicketCreatedBy")
   bookings               Booking[]
   auditLogs              AuditLog[]
+  refreshTokens          RefreshToken[]
 
   // Same phone number cannot be registered twice within the same village.
   // (A person living in two different villages could reuse a phone number —
@@ -218,6 +220,7 @@ model House {
   maintenanceTickets   MaintenanceTicket[]
   bookings             Booking[]
   bills                Bill[]
+  announcementTargets  AnnouncementTarget[]
 
   @@unique([villageId, houseNo])
   @@index([villageId, zone])
@@ -304,15 +307,42 @@ model Announcement {
   content           String
   level             AnnouncementLevel        @default(NORMAL)
   targetScope       AnnouncementTargetScope  @map("target_scope")
+  // Only meaningful when targetScope = ZONE. Not in the spec's literal ER
+  // (spec 3.2 lists target_scope but no column carries WHICH zone/house) —
+  // added here as a Dev-agent schema extension. Zone is a simple string on
+  // `houses.zone`, so a single nullable column is enough; HOUSE-scope needs
+  // to target multiple specific houses, which is why that case gets its own
+  // join table (`AnnouncementTarget`) instead of overloading this column.
+  targetZone        String?                  @map("target_zone")
   imageUrl          String?                  @map("image_url")
   createdAt         DateTime                 @default(now()) @map("created_at")
 
-  village   Village            @relation(fields: [villageId], references: [id], onDelete: Cascade)
-  createdBy User               @relation("AnnouncementCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  village   Village              @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  createdBy User                 @relation("AnnouncementCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
   reads     AnnouncementRead[]
+  targets   AnnouncementTarget[]
 
   @@index([villageId, createdAt])
   @@map("announcements")
+}
+
+/// Join table resolving target_scope = HOUSE to specific house(s). Schema
+/// addition beyond spec 3.2's literal ER (see comment on Announcement.targetZone
+/// above for why ZONE didn't need one of these but HOUSE does).
+model AnnouncementTarget {
+  id             String @id @default(uuid()) @db.Uuid
+  // Denormalized for RLS even though `announcement_id`/`house_id` already
+  // scope this row indirectly — see docs/ARCHITECTURE.md "ADR-002".
+  villageId      String @map("village_id") @db.Uuid
+  announcementId String @map("announcement_id") @db.Uuid
+  houseId        String @map("house_id") @db.Uuid
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  house        House        @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, houseId])
+  @@index([villageId])
+  @@map("announcement_targets")
 }
 
 model AnnouncementRead {
@@ -523,6 +553,31 @@ model Payment {
 
   @@index([villageId, billId])
   @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Refresh tokens (Epic 1 — "Refresh token: จัดเก็บ + rotation + revoke เมื่อ
+// logout"). Not in spec 3.2's literal ER — added here so refresh tokens can
+// actually be revoked server-side (a stateless-only refresh JWT can't be
+// revoked before its natural expiry, which the backlog explicitly asks for).
+// Only a hash of the token is stored, never the raw token.
+// ---------------------------------------------------------------------------
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  villageId String    @map("village_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([villageId, userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
 }
 
 // ---------------------------------------------------------------------------

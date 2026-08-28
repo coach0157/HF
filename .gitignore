@@ -45,3 +45,7 @@ apps/admin-web/dist-ssr/
 # --- Docker ---
 # (nothing yet — postgres data lives in a named Docker volume, not a bind
 # mount, so there is no local data directory to ignore)
+
+# --- Local file storage (dev-only stand-in for S3/R2, see
+# common/storage/file-storage.service.ts) ---
+apps/backend/uploads/

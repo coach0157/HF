@@ -37,11 +37,11 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'users', 'houses', 'house_members',
     'visitor_passes', 'entry_logs',
-    'announcements', 'announcement_reads',
+    'announcements', 'announcement_reads', 'announcement_targets',
     'sos_alerts', 'guard_shifts',
     'chat_rooms', 'chat_participants', 'chat_messages',
     'maintenance_tickets', 'facilities', 'bookings',
-    'bills', 'payments'
+    'bills', 'payments', 'refresh_tokens', 'audit_logs'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);

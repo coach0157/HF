@@ -1,0 +1,19 @@
+-- Grants the minimal-privilege auth-lookup role (created in
+-- infra/postgres/init/01-init.sql, before any table exists) read access to
+-- exactly the columns apps/backend/src/modules/auth/auth.service.ts needs
+-- for the cross-tenant phone->village lookup during login. This has to be a
+-- migration (not part of 01-init.sql) because it must run AFTER `users`
+-- exists — see the comment in 01-init.sql for why the grant can't live
+-- there.
+--
+-- `village_app_auth_lookup` already has BYPASSRLS (grants RLS-bypassing
+-- read access), so this GRANT is what actually limits its blast radius: it
+-- can read these 6 columns of `users` and nothing else anywhere in the
+-- database — no password_hash, no other table, no writes.
+--
+-- IF THIS ROLE DOES NOT EXIST (e.g. a database that was never bootstrapped
+-- via 01-init.sql — shouldn't happen via docker-compose, but could on a
+-- manually-provisioned staging/prod Postgres), this migration will fail.
+-- Create the role first (see 01-init.sql for the exact statement) before
+-- applying migrations against such a database.
+GRANT SELECT (id, village_id, phone, role, house_id, name) ON "users" TO village_app_auth_lookup;
