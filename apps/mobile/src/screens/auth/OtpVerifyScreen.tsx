@@ -2,25 +2,43 @@
  * Step 2 of login. Receives `{ phone }` from PhoneLoginScreen via
  * AuthStackParamList (src/navigation/types.ts).
  *
- * Dev agent TODO:
- *  - 6-digit OTP input (matches LoginDto's `@Matches(/^\d{6}$/)`).
- *  - Call `api.post('/auth/login', { phone, otp })`
- *    (apps/backend's `AuthService.login()` returns
- *    `{ accessToken, refreshToken, user: { id, villageId, role, houseId,
- *    name, phone } }`).
- *  - Reject the response client-side if `user.role === 'ADMIN'` (this app
- *    only serves RESIDENT/GUARD — admin-web's LoginPage does the inverse
- *    check).
- *  - `await setSession(...)` (src/lib/auth.ts) with the mapped
- *    `MobileSession` shape, then update `AuthContext`'s session state so
- *    `RootNavigator` switches to ResidentApp or GuardApp based on
- *    `user.role`.
- *  - Resend-OTP affordance (re-call `POST /auth/otp/request`), respecting
- *    the backend's 5-req/60s throttle on that endpoint.
+ * On success: rejects an ADMIN-role response (this app only serves
+ * RESIDENT/GUARD — admin-web's LoginPage does the inverse check), persists
+ * the session via `setSession()` (SecureStore) and updates AuthContext so
+ * `RootNavigator` swaps to ResidentApp/GuardApp.
  */
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import type { RouteProp } from "@react-navigation/native";
 import type { AuthStackParamList } from "../../navigation/types";
+import { api, ApiError } from "../../lib/api";
+import { setSession } from "../../lib/auth";
+import { useAuth } from "../../context/AuthContext";
+
+const OTP_RE = /^\d{6}$/;
+const RESEND_COOLDOWN_S = 60;
+
+interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    name: string;
+    phone: string;
+    role: "RESIDENT" | "GUARD" | "ADMIN";
+    villageId: string;
+    houseId: string | null;
+  };
+}
 
 export function OtpVerifyScreen({
   route,
@@ -28,19 +46,134 @@ export function OtpVerifyScreen({
   route: RouteProp<AuthStackParamList, "OtpVerify">;
 }) {
   const { phone } = route.params;
+  const { setSession: setContextSession } = useAuth();
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  function startCooldown() {
+    setCooldown(RESEND_COOLDOWN_S);
+    timerRef.current = setInterval(() => {
+      setCooldown((s) => {
+        if (s <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
+  async function handleResend() {
+    if (cooldown > 0) return;
+    setError(null);
+    try {
+      await api.post<void>("/auth/otp/request", { phone });
+      startCooldown();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "ส่ง OTP ซ้ำไม่สำเร็จ");
+    }
+  }
+
+  async function handleSubmit() {
+    if (!OTP_RE.test(otp) || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post<LoginResponse>("/auth/login", { phone, otp });
+      if (res.user.role === "ADMIN") {
+        setError("บัญชีนี้เป็นผู้ดูแลระบบ กรุณาใช้เว็บแอดมินแทน");
+        return;
+      }
+      const session = {
+        accessToken: res.accessToken,
+        refreshToken: res.refreshToken,
+        role: res.user.role as "RESIDENT" | "GUARD",
+        villageId: res.user.villageId,
+        userId: res.user.id,
+        houseId: res.user.houseId,
+        name: res.user.name,
+        phone: res.user.phone,
+      };
+      await setSession(session);
+      setContextSession(session);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "ยืนยัน OTP ไม่สำเร็จ ลองใหม่อีกครั้ง");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <Text style={styles.title}>ยืนยัน OTP</Text>
-      <Text style={styles.todo}>
-        TODO: กรอก OTP 6 หลักที่ส่งไปเบอร์ {phone} → เรียก POST /auth/login →
-        เก็บ session (SecureStore) → เข้าแอปตาม role — ดู doc comment ของไฟล์นี้
-      </Text>
-    </View>
+      <Text style={styles.subtitle}>กรอกรหัส 6 หลักที่ส่งไปยังเบอร์ {phone}</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="000000"
+        keyboardType="number-pad"
+        maxLength={6}
+        value={otp}
+        onChangeText={(t) => setOtp(t.replace(/[^0-9]/g, ""))}
+        editable={!loading}
+        autoFocus
+      />
+
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      <TouchableOpacity
+        style={[styles.button, (!OTP_RE.test(otp) || loading) && styles.buttonDisabled]}
+        onPress={handleSubmit}
+        disabled={!OTP_RE.test(otp) || loading}
+      >
+        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>ยืนยัน</Text>}
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.resend} onPress={handleResend} disabled={cooldown > 0}>
+        <Text style={[styles.resendText, cooldown > 0 && styles.resendDisabled]}>
+          {cooldown > 0 ? `ส่งรหัสอีกครั้งใน ${cooldown} วินาที` : "ส่งรหัส OTP อีกครั้ง"}
+        </Text>
+      </TouchableOpacity>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 12 },
-  todo: { textAlign: "center", color: "#666" },
+  container: { flex: 1, justifyContent: "center", padding: 24 },
+  title: { fontSize: 24, fontWeight: "800", textAlign: "center" },
+  subtitle: { textAlign: "center", color: "#666", marginTop: 4, marginBottom: 32 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 24,
+    letterSpacing: 8,
+    textAlign: "center",
+  },
+  error: { color: "#c0392b", marginTop: 12, textAlign: "center" },
+  button: {
+    backgroundColor: "#1d6f42",
+    borderRadius: 10,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 24,
+  },
+  buttonDisabled: { opacity: 0.5 },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  resend: { marginTop: 20, alignItems: "center" },
+  resendText: { color: "#1d6f42", fontSize: 14 },
+  resendDisabled: { color: "#999" },
 });

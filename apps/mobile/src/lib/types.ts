@@ -45,10 +45,12 @@ export interface Announcement {
   targetHouseIds: string[];
   imageUrl: string | null;
   createdAt: string;
-  // Dev agent TODO: confirm whether GET /announcements already annotates
-  // per-caller read state, or whether the feed screen must cross-reference
-  // POST /announcements/:id/read separately (see announcement.service.ts).
-  readAt?: string | null;
+  // Confirmed against announcement.service.ts's list(): for a RESIDENT/GUARD
+  // caller (not ADMIN) the query includes `reads: { where: { userId:
+  // claims.userId } } }`, and flattenTargetHouseIds() only strips `targets`
+  // — so `reads` passes through as-is (0 or 1 element, since it's filtered
+  // to the caller's own userId). ADMIN callers never get this field.
+  reads?: { readAt: string }[];
 }
 
 export type SosStatus = "PENDING" | "ACKNOWLEDGED" | "RESOLVED";

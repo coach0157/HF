@@ -6,20 +6,17 @@
  * between three destinations instead of two since one app codebase serves
  * both roles (see docs/ARCHITECTURE.md's mobile section for why one app).
  *
- * Dev agent TODO:
- *  - On mount, call `getSession()` (src/lib/auth.ts) to restore a
- *    previously-stored session instead of always starting logged out.
- *  - Call `setOnSessionExpired(...)` (src/lib/api.ts) once, on mount, so an
- *    unrecoverable 401 anywhere in the app clears `session` here too — see
- *    api.ts's doc comment for why this indirection exists (no
- *    `window.location` on native).
- *  - Implement `login`/`logout` to actually call the auth endpoints
- *    (`POST /auth/otp/request`, `POST /auth/login`, `POST /auth/logout`)
- *    and persist via `setSession`/`clearSession`.
+ * On mount: restore a previously-stored session from SecureStore
+ * (src/lib/auth.ts's getSession()) so a relaunch doesn't force a re-login,
+ * and register an `onSessionExpired` callback with `lib/api.ts` so an
+ * unrecoverable 401 anywhere in the app (refresh token rotation failed)
+ * clears `session` here too, which flips RootNavigator back to the Auth
+ * stack.
  */
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { MobileSession } from "../lib/auth";
+import { getSession, type MobileSession } from "../lib/auth";
+import { setOnSessionExpired } from "../lib/api";
 
 interface AuthContextValue {
   session: MobileSession | null;
@@ -31,9 +28,24 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSessionState] = useState<MobileSession | null>(null);
-  // TODO(dev agent): true until the mount-time getSession() restore above is
-  // implemented, then flip to false once that resolves either way.
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSession()
+      .then((restored) => {
+        if (!cancelled) setSessionState(restored);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    setOnSessionExpired(() => setSessionState(null));
+    return () => {
+      cancelled = true;
+      setOnSessionExpired(null);
+    };
+  }, []);
 
   const value = useMemo(
     () => ({ session, loading, setSession: setSessionState }),

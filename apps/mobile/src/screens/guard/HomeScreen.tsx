@@ -1,36 +1,154 @@
 /**
  * Guard home (spec 1.2 "หน้าแรก") — MVP_BACKLOG.md Epic 7.
  *
- * Dev agent TODO:
- *  - Large "สแกน QR" button, center of screen -> navigate to ScanQr.
- *  - Today's entry/exit summary count. No dedicated summary endpoint
- *    exists — compute client-side from `GET /entry-logs?date=<today>`
- *    (paginated; either page through it or flag adding a summary endpoint
- *    as a backend enhancement request, don't add it yourself this round).
- *  - Guard shift status indicator (on_duty/off_duty) sourced from
- *    `GET /guard-shifts?guardUserId=<self>` — toggling on/off duty itself
- *    isn't in spec 1.2's wireframe but is required for SOS routing to reach
- *    this guard at all (spec 2.2: only `on_duty` guards get routed SOS) —
- *    surface at least a read-only status here, with a TODO note on whether
- *    a toggle belongs on this screen or is admin-only (admin-web's
- *    GuardShiftsPage already has a toggle; product call for the Dev agent).
+ * Today's entry/exit summary: no dedicated summary endpoint exists, so this
+ * computes client-side from `GET /entry-logs?date=<today>&pageSize=100`
+ * (entry count = the accurate server-side `total`; exit count = an
+ * approximation over the returned page, since there's no exit-time filter
+ * — acceptable for a small village's daily volume per the MVP_BACKLOG note).
+ *
+ * Guard shift status: `GET /guard-shifts` (list, to know current on/off-duty
+ * status) is ADMIN-only in guard-shift.controller.ts — a GUARD caller can
+ * only `POST /guard-shifts` (start) / `PATCH /guard-shifts/:id` (end), not
+ * read their own current shift. Product call made here (per the original
+ * doc comment's "pick one and note the decision"): surface a simple
+ * Start/End shift toggle backed by locally-remembered shift id+state rather
+ * than a true read-only status display, since there is nothing to read.
+ * This is a mobile-side UX nicety, not required for SOS routing correctness
+ * (that's enforced server-side against `guard_shifts.status`).
  */
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { api, ApiError } from "../../lib/api";
+import type { EntryLog, Paginated } from "../../lib/types";
+import type { GuardTabParamList } from "../../navigation/types";
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export function GuardHomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<GuardTabParamList, "Home">>();
+  const [entryCount, setEntryCount] = useState<number | null>(null);
+  const [exitCount, setExitCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [onDuty, setOnDuty] = useState(false);
+  const [shiftId, setShiftId] = useState<string | null>(null);
+  const [shiftBusy, setShiftBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<Paginated<EntryLog>>(`/entry-logs?date=${todayIso()}&pageSize=100`);
+      setEntryCount(res.total);
+      setExitCount(res.items.filter((l) => l.exitTime).length);
+    } catch {
+      // Non-blocking — the scan button still works without a summary.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  async function handleToggleShift() {
+    setShiftBusy(true);
+    try {
+      if (!onDuty) {
+        const shift = await api.post<{ id: string }>("/guard-shifts", {});
+        setShiftId(shift.id);
+        setOnDuty(true);
+      } else if (shiftId) {
+        await api.patch(`/guard-shifts/${shiftId}`);
+        setOnDuty(false);
+        setShiftId(null);
+      }
+    } catch (e) {
+      Alert.alert("ทำรายการไม่สำเร็จ", e instanceof ApiError ? e.message : "ลองใหม่อีกครั้ง");
+    } finally {
+      setShiftBusy(false);
+    }
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>หน้าแรก (รปภ.)</Text>
-      <Text style={styles.todo}>
-        TODO: ปุ่มสแกน QR ขนาดใหญ่, สรุปจำนวนเข้า-ออกวันนี้ — ดู doc comment
-        ของไฟล์นี้
-      </Text>
-    </View>
+    <ScrollView
+      style={styles.container}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+      contentContainerStyle={styles.content}
+    >
+      <View style={styles.shiftRow}>
+        <View style={[styles.dot, { backgroundColor: onDuty ? "#27ae60" : "#999" }]} />
+        <Text style={styles.shiftLabel}>{onDuty ? "กำลังปฏิบัติหน้าที่" : "ยังไม่เริ่มเวร"}</Text>
+        <TouchableOpacity style={styles.shiftButton} onPress={handleToggleShift} disabled={shiftBusy}>
+          {shiftBusy ? (
+            <ActivityIndicator size="small" color="#1d6f42" />
+          ) : (
+            <Text style={styles.shiftButtonText}>{onDuty ? "เลิกเวร" : "เริ่มเวร"}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity style={styles.scanButton} onPress={() => navigation.navigate("ScanQr")}>
+        <Text style={styles.scanIcon}>📷</Text>
+        <Text style={styles.scanLabel}>สแกน QR</Text>
+      </TouchableOpacity>
+
+      <View style={styles.summaryRow}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryValue}>{loading && entryCount === null ? "-" : entryCount}</Text>
+          <Text style={styles.summaryLabel}>เข้าวันนี้</Text>
+        </View>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryValue}>{loading && exitCount === null ? "-" : exitCount}</Text>
+          <Text style={styles.summaryLabel}>ออกวันนี้</Text>
+        </View>
+      </View>
+
+      <View style={styles.quickLinks}>
+        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate("ManualEntry")}>
+          <Text style={styles.linkText}>บันทึกด้วยมือ</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate("ExitConfirm")}>
+          <Text style={styles.linkText}>ยืนยันแขกออก</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate("SosList")}>
+          <Text style={styles.linkText}>แจ้งเหตุ SOS</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 12 },
-  todo: { textAlign: "center", color: "#666" },
+  container: { flex: 1, backgroundColor: "#fff" },
+  content: { alignItems: "center", padding: 20 },
+  shiftRow: { flexDirection: "row", alignItems: "center", alignSelf: "stretch", gap: 8, marginBottom: 24 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  shiftLabel: { flex: 1, fontSize: 13, color: "#555" },
+  shiftButton: { borderWidth: 1, borderColor: "#1d6f42", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  shiftButtonText: { color: "#1d6f42", fontWeight: "600", fontSize: 12 },
+  scanButton: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "#1d6f42",
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 12,
+  },
+  scanIcon: { fontSize: 48 },
+  scanLabel: { color: "#fff", fontSize: 20, fontWeight: "800", marginTop: 4 },
+  summaryRow: { flexDirection: "row", gap: 16, marginTop: 28 },
+  summaryCard: { alignItems: "center", backgroundColor: "#f2f6f4", borderRadius: 12, padding: 16, minWidth: 100 },
+  summaryValue: { fontSize: 28, fontWeight: "800", color: "#1d6f42" },
+  summaryLabel: { fontSize: 12, color: "#666", marginTop: 4 },
+  quickLinks: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 32, justifyContent: "center" },
+  linkButton: { borderWidth: 1, borderColor: "#ccc", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  linkText: { fontSize: 13, color: "#333" },
 });

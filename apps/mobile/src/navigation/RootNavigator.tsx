@@ -5,6 +5,7 @@
  * section for why this is one Expo app with role-based navigation instead
  * of two separate apps.
  */
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../context/AuthContext";
@@ -16,7 +17,17 @@ import type { RootStackParamList } from "./types";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    // Restoring a persisted session from SecureStore (AuthContext's mount
+    // effect) — avoid flashing the login screen before that resolves.
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>
@@ -32,3 +43,7 @@ export function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
+});

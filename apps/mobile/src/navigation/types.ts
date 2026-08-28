@@ -3,10 +3,15 @@
  * recommended pattern) so a screen can import its own params without
  * reaching into a sibling navigator's file.
  *
- * Dev agent TODO: add real params as screens are implemented (e.g.
- * `QrDisplay: { passId: string }`, `ExitConfirm: { entryLogId: string }`) —
- * left as `undefined` placeholders for now since this round is scaffold-only.
+ * QrDisplay takes the full `VisitorPass` object (not just an id) because
+ * there is no resident-callable "get one pass" endpoint — `GET
+ * /visitor-passes/:token` is GUARD-only (it's the scan endpoint). The
+ * resident-side pass object always comes from either `POST
+ * /visitor-passes` (create) or `GET /visitor-passes` (list), both of which
+ * already return the full record, so it's just carried through nav params.
  */
+
+import type { VisitorPass } from "../lib/types";
 
 export type AuthStackParamList = {
   PhoneLogin: undefined;
@@ -16,7 +21,7 @@ export type AuthStackParamList = {
 export type ResidentTabParamList = {
   Home: undefined;
   InviteGuest: undefined;
-  QrDisplay: undefined;
+  QrDisplay: { pass: VisitorPass };
   EntryHistory: undefined;
   Announcements: undefined;
   Profile: undefined;
