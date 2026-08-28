@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -18,10 +19,18 @@ export class HouseService {
     });
   }
 
-  async findOne(id: string) {
+  /**
+   * `claims` is omitted by internal/admin-only callers; house.controller.ts
+   * passes it on the RESIDENT/GUARD/ADMIN-reachable `GET /houses/:id` route
+   * so a resident can be confined to their own house_id only.
+   */
+  async findOne(id: string, claims?: TenantClaims) {
     const tx = getTenantPrismaClient<PrismaClient>();
     const house = await tx.house.findUnique({ where: { id } });
     if (!house) throw new NotFoundException("House not found");
+    if (claims?.role === "RESIDENT" && house.id !== claims.houseId) {
+      throw new ForbiddenException("You can only view your own house");
+    }
     return house;
   }
 

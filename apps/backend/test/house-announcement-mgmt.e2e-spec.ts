@@ -263,6 +263,35 @@ describe("House module + Announcement PATCH/DELETE (API-driven e2e)", () => {
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(houseA2);
     });
+
+    // Mobile Dev-agent round: backend gap flagged in MVP_BACKLOG.md Epic 6
+    // ("GET /houses/:id เป็น GUARD/ADMIN-only วันนี้") — resident's own
+    // ProfileScreen needs house_no/zone. Opened to RESIDENT, scoped to their
+    // own house only (house.service.ts's findOne()).
+    it("a resident can fetch their own house by id", async () => {
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const res = await api(baseUrl, "GET", `/houses/${villageA.houseId}`, {
+        token: residentToken,
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(villageA.houseId);
+    });
+
+    it("a resident cannot fetch a different house in the same village (403)", async () => {
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const res = await api(baseUrl, "GET", `/houses/${houseA2}`, {
+        token: residentToken,
+      });
+      expect(res.status).toBe(403);
+    });
   });
 
   describe("PATCH /announcements/:id — RBAC + cross-tenant isolation", () => {

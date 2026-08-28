@@ -150,6 +150,58 @@ describe("Security & acceptance-criteria flows (API-driven e2e)", () => {
       expect(res.status).toBe(404);
     });
 
+    // Mobile Dev-agent round: backend gap flagged in MVP_BACKLOG.md Epic 7
+    // ("GET /users/:id เป็น ADMIN-only วันนี้" — Guard SOS list needs the
+    // caller's phone for the callback button). Opened to GUARD (any user in
+    // the village) and RESIDENT (own record only, see users.service.ts).
+    it("a guard can fetch any resident's user record (SOS callback lookup)", async () => {
+      const guardToken = await loginToken(
+        baseUrl,
+        villageA.guardOnDuty.phone,
+        villageA.villageId,
+      );
+      const res = await api(
+        baseUrl,
+        "GET",
+        `/users/${villageA.resident.id}`,
+        { token: guardToken },
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(villageA.resident.id);
+      expect(res.body.phone).toBe(villageA.resident.phone);
+    });
+
+    it("a resident can fetch their own user record", async () => {
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const res = await api(
+        baseUrl,
+        "GET",
+        `/users/${villageA.resident.id}`,
+        { token: residentToken },
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(villageA.resident.id);
+    });
+
+    it("a resident cannot fetch another user's record in the same village (403)", async () => {
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const res = await api(
+        baseUrl,
+        "GET",
+        `/users/${villageA.guardOnDuty.id}`,
+        { token: residentToken },
+      );
+      expect(res.status).toBe(403);
+    });
+
     it("village B cannot see or read village A entry logs", async () => {
       const residentAToken = await loginToken(
         baseUrl,
@@ -504,6 +556,76 @@ describe("Security & acceptance-criteria flows (API-driven e2e)", () => {
       expect(first.status).toBe(200);
       expect(second.status).toBe(200);
       expect(second.body.status).toBe("REVOKED");
+    });
+  });
+
+  // Mobile Dev-agent round: backend gap flagged in MVP_BACKLOG.md Epic 6
+  // ("ไม่มี GET /visitor-passes (list-by-resident)") — the Resident app's
+  // InviteGuestScreen "รายการ QR ที่สร้างไว้" list needed this endpoint.
+  describe("GET /visitor-passes (resident's own list)", () => {
+    it("a resident only sees passes they created, never another resident's", async () => {
+      const residentAToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      await api(baseUrl, "POST", "/visitor-passes", {
+        token: residentAToken,
+        body: passBody("MyGuest"),
+      });
+
+      // A second resident in village A, so there is another villager's pass
+      // in the same tenant that must NOT show up in residentA's list.
+      const otherResident = await withVillageContext(
+        villageA.villageId,
+        (tx) =>
+          tx.user.create({
+            data: {
+              villageId: villageA.villageId,
+              name: "Other Resident A",
+              phone: nextPhone("93"),
+              role: "RESIDENT",
+              houseId: villageA.houseId,
+            },
+          }),
+      );
+      const otherResidentToken = await loginToken(
+        baseUrl,
+        otherResident.phone,
+        villageA.villageId,
+      );
+      await api(baseUrl, "POST", "/visitor-passes", {
+        token: otherResidentToken,
+        body: passBody("OtherGuest"),
+      });
+
+      const res = await api(baseUrl, "GET", "/visitor-passes", {
+        token: residentAToken,
+      });
+      expect(res.status).toBe(200);
+      expect(
+        res.body.items.every(
+          (p: any) => p.createdByUserId === villageA.resident.id,
+        ),
+      ).toBe(true);
+      expect(
+        res.body.items.some((p: any) => p.visitorName === "OtherGuest"),
+      ).toBe(false);
+      expect(
+        res.body.items.some((p: any) => p.visitorName === "MyGuest"),
+      ).toBe(true);
+    });
+
+    it("guard/admin cannot call the resident-only list endpoint (403)", async () => {
+      const guardToken = await loginToken(
+        baseUrl,
+        villageA.guardOnDuty.phone,
+        villageA.villageId,
+      );
+      const res = await api(baseUrl, "GET", "/visitor-passes", {
+        token: guardToken,
+      });
+      expect(res.status).toBe(403);
     });
   });
 

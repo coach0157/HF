@@ -40,10 +40,17 @@ export class UsersController {
     return this.usersService.list({ role });
   }
 
-  @Roles("ADMIN")
+  // Dev-agent addition (backend gap flagged in MVP_BACKLOG.md Epic 7): the
+  // Guard app's SOS list needs the triggering resident's phone number for
+  // the "โทรกลับ" callback button, and the Resident app's ProfileScreen
+  // needs its own record. Ownership is enforced in the service, not just
+  // here: RESIDENT may only fetch their own id (403 otherwise); GUARD may
+  // fetch any user in the village (RLS already confines this to the same
+  // village); ADMIN unrestricted, as before.
+  @Roles("ADMIN", "GUARD", "RESIDENT")
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param("id") id: string, @CurrentUser() user: TenantClaims) {
+    return this.usersService.findOne(id, user);
   }
 
   @Roles("ADMIN")

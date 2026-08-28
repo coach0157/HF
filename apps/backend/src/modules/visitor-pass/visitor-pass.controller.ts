@@ -30,6 +30,27 @@ export class VisitorPassController {
     return this.visitorPassService.create(dto, user);
   }
 
+  // Dev-agent addition (backend gap flagged in MVP_BACKLOG.md Epic 6): the
+  // Resident mobile app's InviteGuestScreen "รายการ QR ที่สร้างไว้" list has
+  // no way to fetch its own passes without this — resident-only, always
+  // scoped to the caller's own `created_by_user_id` (never another
+  // resident's passes, checked in the service, not just via @Roles()).
+  @Roles("RESIDENT")
+  @Get()
+  list(
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined,
+    @CurrentUser() user: TenantClaims,
+  ) {
+    return this.visitorPassService.listMine(
+      {
+        page: Math.max(1, Number(page) || 1),
+        pageSize: Math.min(100, Math.max(1, Number(pageSize) || 20)),
+      },
+      user,
+    );
+  }
+
   // Owner-or-admin (checked in the service, since admin-revoking-someone-
   // else's-pass is a distinct, audit-logged path — see visitor-pass.service.ts).
   @Roles("RESIDENT", "ADMIN")

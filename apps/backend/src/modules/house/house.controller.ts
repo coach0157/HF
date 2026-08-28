@@ -21,10 +21,15 @@ export class HouseController {
     return this.houseService.list({ zone });
   }
 
-  @Roles("ADMIN", "GUARD")
+  // Dev-agent addition (backend gap flagged in MVP_BACKLOG.md Epic 6): the
+  // Resident app's ProfileScreen needs house_no/zone for the caller's own
+  // house. RESIDENT added here, but NOT to the `list()` route above — a
+  // resident must never browse other houses in the village, only fetch
+  // their own by id (ownership enforced in the service).
+  @Roles("ADMIN", "GUARD", "RESIDENT")
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.houseService.findOne(id);
+  findOne(@Param("id") id: string, @CurrentUser() user: TenantClaims) {
+    return this.houseService.findOne(id, user);
   }
 
   @Roles("ADMIN")

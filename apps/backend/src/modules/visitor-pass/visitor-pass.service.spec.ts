@@ -26,6 +26,8 @@ describe("VisitorPassService", () => {
     visitorPass: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
       update: jest.Mock;
       findUniqueOrThrow: jest.Mock;
     };
@@ -43,6 +45,8 @@ describe("VisitorPassService", () => {
       visitorPass: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findMany: jest.fn(),
+        count: jest.fn(),
         update: jest.fn(),
         findUniqueOrThrow: jest.fn(),
       },
@@ -212,6 +216,39 @@ describe("VisitorPassService", () => {
       const result = await service.markEntered("pass-1");
 
       expect(result).toBe(updated);
+    });
+  });
+
+  describe("listMine", () => {
+    it("happy path: scopes the query to the caller's own createdByUserId only", async () => {
+      const claims = mockClaims({ userId: "resident-1" });
+      const items = [{ id: "pass-1", createdByUserId: "resident-1" }];
+      tx.visitorPass.findMany.mockResolvedValue(items);
+      tx.visitorPass.count.mockResolvedValue(1);
+
+      const result = await service.listMine({ page: 1, pageSize: 20 }, claims);
+
+      expect(result).toEqual({ items, total: 1, page: 1, pageSize: 20 });
+      expect(tx.visitorPass.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { createdByUserId: "resident-1" },
+        }),
+      );
+      expect(tx.visitorPass.count).toHaveBeenCalledWith({
+        where: { createdByUserId: "resident-1" },
+      });
+    });
+
+    it("edge case: never leaks another resident's passes even if villageId matches", async () => {
+      const claims = mockClaims({ userId: "resident-1" });
+      tx.visitorPass.findMany.mockResolvedValue([]);
+      tx.visitorPass.count.mockResolvedValue(0);
+
+      await service.listMine({ page: 1, pageSize: 20 }, claims);
+
+      const calledWhere = tx.visitorPass.findMany.mock.calls[0][0].where;
+      expect(calledWhere).not.toHaveProperty("villageId");
+      expect(calledWhere.createdByUserId).toBe("resident-1");
     });
   });
 });

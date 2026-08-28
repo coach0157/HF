@@ -1,10 +1,12 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma, PrismaClient, UserRole } from "@prisma/client";
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
+import type { TenantClaims } from "../../common/rls/tenant-context";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
@@ -26,10 +28,20 @@ export class UsersService {
     });
   }
 
-  async findOne(id: string) {
+  /**
+   * `claims` is omitted by internal callers (update()/remove()'s existence
+   * checks below) that already sit behind @Roles('ADMIN') at the controller
+   * — the ownership check only applies to the RESIDENT/GUARD-reachable
+   * `GET /users/:id` path (users.controller.ts), where it matters: a
+   * resident must only ever see their own record, never another house's.
+   */
+  async findOne(id: string, claims?: TenantClaims) {
     const tx = getTenantPrismaClient<PrismaClient>();
     const user = await tx.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException("User not found");
+    if (claims?.role === "RESIDENT" && user.id !== claims.userId) {
+      throw new ForbiddenException("You can only view your own user record");
+    }
     return user;
   }
 

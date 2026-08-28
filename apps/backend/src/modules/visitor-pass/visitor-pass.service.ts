@@ -271,6 +271,35 @@ export class VisitorPassService {
   }
 
   /**
+   * Resident's own "รายการ QR ที่สร้างไว้" list (spec 1.1, InviteGuestScreen)
+   * — backend gap flagged in MVP_BACKLOG.md Epic 6 ("ไม่มี GET /visitor-passes
+   * (list-by-resident)"). Always scoped to `claims.userId` regardless of any
+   * client input — there is no filter param that could leak another
+   * resident's passes.
+   */
+  async listMine(
+    filters: { page: number; pageSize: number },
+    claims: TenantClaims,
+  ) {
+    const tx = getTenantPrismaClient<PrismaClient>();
+    const where: Prisma.VisitorPassWhereInput = {
+      createdByUserId: claims.userId,
+    };
+
+    const [items, total] = await Promise.all([
+      tx.visitorPass.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (filters.page - 1) * filters.pageSize,
+        take: filters.pageSize,
+      }),
+      tx.visitorPass.count({ where }),
+    ]);
+
+    return { items, total, page: filters.page, pageSize: filters.pageSize };
+  }
+
+  /**
    * Stub for the future offline Guard app sync list (spec 3.4 "Offline scan
    * กับ revocation" — no UI this round, just the endpoint shape per backlog
    * Epic 2). NOTE: VisitorPass has no `updated_at` column in the current
