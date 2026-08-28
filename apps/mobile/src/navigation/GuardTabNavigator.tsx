@@ -10,6 +10,7 @@ import { ScanQrScreen } from "../screens/guard/ScanQrScreen";
 import { ManualEntryScreen } from "../screens/guard/ManualEntryScreen";
 import { ExitConfirmScreen } from "../screens/guard/ExitConfirmScreen";
 import { SosListScreen } from "../screens/guard/SosListScreen";
+import { GuardProfileScreen } from "../screens/guard/ProfileScreen";
 import type { GuardTabParamList } from "./types";
 
 const Tab = createBottomTabNavigator<GuardTabParamList>();
@@ -30,6 +31,7 @@ export function GuardTabNavigator() {
         options={{ title: "ยืนยันแขกออก" }}
       />
       <Tab.Screen name="SosList" component={SosListScreen} options={{ title: "SOS" }} />
+      <Tab.Screen name="Profile" component={GuardProfileScreen} options={{ title: "โปรไฟล์" }} />
     </Tab.Navigator>
   );
 }

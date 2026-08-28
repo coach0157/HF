@@ -33,6 +33,7 @@ export type GuardTabParamList = {
   ManualEntry: undefined;
   ExitConfirm: undefined;
   SosList: undefined;
+  Profile: undefined;
 };
 
 export type RootStackParamList = {
