@@ -75,5 +75,19 @@ export function getChatSocket(): Socket {
 }
 
 export function disconnectChatSocket(): void {
+  // Discard the singleton, not just disconnect it. socket.io-client's
+  // `disconnect()` does NOT clear `sendBuffer`/`receiveBuffer` (see
+  // socket.io-client's `Socket.prototype.onclose` — it resets `connected`
+  // and fires the `disconnect` event but leaves both buffers untouched); any
+  // event queued via `emit()` while briefly offline (e.g. `send_message`
+  // during a network blip right before logout) would otherwise still be
+  // sitting in `sendBuffer` and get silently flushed on the NEXT `connect` —
+  // which, on a shared device, could be a different user logging in right
+  // after, with the previous user's buffered message posted under the NEW
+  // user's authenticated identity. Dropping the instance so
+  // `getChatSocket()` builds a fresh one next login is the only way to
+  // guarantee no state (buffers, listeners, in-flight acks) survives across
+  // a user switch on the same device.
   socket?.disconnect();
+  socket = null;
 }

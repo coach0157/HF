@@ -23,13 +23,21 @@ describe("UsersService", () => {
 
   beforeEach(() => {
     service = new UsersService();
-    tx = { user: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } };
+    tx = {
+      user: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
     (getTenantPrismaClient as jest.Mock).mockReturnValue(tx);
   });
 
   describe("list — Epic 8 staff-directory restriction for non-admin callers", () => {
     it("ADMIN gets the unrestricted list, respecting any role filter", async () => {
-      await service.list({ role: "RESIDENT" as any }, mockClaims({ role: "ADMIN", houseId: null }));
+      await service.list(
+        { role: "RESIDENT" },
+        mockClaims({ role: "ADMIN", houseId: null }),
+      );
       expect(tx.user.findMany).toHaveBeenCalledWith({
         where: { role: "RESIDENT" },
         orderBy: { createdAt: "desc" },
@@ -53,7 +61,10 @@ describe("UsersService", () => {
     });
 
     it("RESIDENT explicitly asking for role=RESIDENT is silently coerced to staff-only", async () => {
-      await service.list({ role: "RESIDENT" as any }, mockClaims({ role: "RESIDENT" }));
+      await service.list(
+        { role: "RESIDENT" },
+        mockClaims({ role: "RESIDENT" }),
+      );
       expect(tx.user.findMany).toHaveBeenCalledWith({
         where: { role: { in: ["ADMIN", "GUARD"] } },
         orderBy: { createdAt: "desc" },
@@ -61,7 +72,7 @@ describe("UsersService", () => {
     });
 
     it("RESIDENT asking for role=GUARD gets exactly GUARD (a valid staff sub-filter)", async () => {
-      await service.list({ role: "GUARD" as any }, mockClaims({ role: "RESIDENT" }));
+      await service.list({ role: "GUARD" }, mockClaims({ role: "RESIDENT" }));
       expect(tx.user.findMany).toHaveBeenCalledWith({
         where: { role: "GUARD" },
         orderBy: { createdAt: "desc" },
@@ -95,9 +106,9 @@ describe("UsersService", () => {
         name: "Other Resident",
       });
 
-      await expect(
-        service.findOne("resident-2", claims),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne("resident-2", claims)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it("happy path: a guard can fetch any user's record (e.g. SOS caller lookup for callback)", async () => {

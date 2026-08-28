@@ -577,3 +577,229 @@ verify:
   should be closed alongside the device/emulator pass above, since a test
   renderer only becomes meaningful once there's a device/emulator target
   to validate it against.
+
+---
+
+## QA pass 4 — Phase 2: Chat (Epic 8, deep dive), Maintenance + Transport
+Directory (Epic 9/10, code-review pass)
+
+**Scope:** first independent QA pass on Phase 2. All three modules were
+implemented and self-tested by Dev already; this pass is the "someone else
+verifies it" step the MVP round had (QA pass 1-3 above) and Chat had not yet
+had. Chat got the deep dive per the task brief (it's the first WebSocket
+surface in the codebase and the highest architectural-risk module in Phase
+2 per `PHASE2_BACKLOG.md` §3); Maintenance and Transport Directory got a
+shorter code-review-only pass (no new tests written for those two — existing
+coverage was read and judged adequate).
+
+**Environment:** local Docker Postgres 16 (already running, healthy, 14h
+uptime — reused, not restarted), Node v24, npm workspaces, same as prior
+passes.
+
+### 1. Build / lint / test — full run, root + backend + mobile
+
+| Check | Result |
+|---|---|
+| `npm run build` (root: `build:backend` + `build:admin`) | **Pass** — `nest build` clean, `tsc -b && vite build` clean |
+| `npm run typecheck:mobile` | **Pass** — zero `tsc --noEmit` errors |
+| `npm run lint` (backend, `eslint --fix`) | **Pass** — 0 errors, 12 pre-existing style warnings (`require-await`, unused-var, floating-promise), none in changed files' logic, none new from this pass |
+| `npm test` (backend unit, `apps/backend`) | **Pass** — 13 suites / 129 tests, all green |
+| `npm run test:e2e` (backend, `apps/backend`) | **Pass** — 8 suites / 150 tests, all green, including the full 36-test `chat.e2e-spec.ts`. No regression in any MVP/Transport Directory/Maintenance suite. |
+
+One non-blocking observation: running the full e2e suite together (not
+`chat.e2e-spec.ts` in isolation) prints `A worker process has failed to
+exit gracefully... Active timers can also cause this`. Isolated re-runs
+confirm the warning only appears when `chat.e2e-spec.ts` is included —
+likely the Socket.io/engine.io server or an open client handle not fully
+drained on `app.close()` in that spec's `afterAll`. All assertions pass
+regardless (it's a Jest teardown warning, not a test failure), so this
+does not block anything, but it's worth a follow-up look before adding
+more WS e2e specs on top of this one, in case it compounds into real CI
+flakiness later.
+
+### 2. Chat (Epic 8) — deep-dive code review against the 6 flagged risk points
+
+Reviewed `chat.gateway.ts`, `chat.service.ts`, `chat.controller.ts`,
+`chat-ws-exception.filter.ts`, `ws-rate-limiter.service.ts`, all 7 chat
+DTOs, `common/rls/tenant-transaction.ts`, `common/rls/ws-rls.interceptor.ts`,
+and `test/chat.e2e-spec.ts` line by line against ADR-004/005 and
+`PHASE2_BACKLOG.md` Epic 8's AC.
+
+1. **Room-level authorization — correct, no gap.** `ChatService.assertMembership()`
+   (queries `ChatParticipant` by `(chatRoomId, userId)`) is called from
+   every read/write path: `join_room` (via `assertCanJoin`), `send_message`,
+   `mark_read`, `GET /chat-rooms/:id/messages`, `PATCH /chat-rooms/:id/read`,
+   and the image-upload endpoint — nothing bypasses it. It always throws
+   `ForbiddenException` regardless of whether the room doesn't exist, is in
+   another village, or just isn't the caller's room, deliberately collapsing
+   all three into one answer (documented reasoning in the method's own doc
+   comment) so a caller can't distinguish "wrong village" from "wrong room"
+   from probing responses. Confirmed covered end-to-end in
+   `chat.e2e-spec.ts` ("a non-participant in the SAME village is rejected
+   with 403" for both REST messages and WS `join_room`/`send_message`).
+2. **Cross-tenant isolation over WebSocket — correct, no gap.** `WsRlsInterceptor`
+   opens a real RLS-scoped transaction per `@SubscribeMessage` event via the
+   one shared `runInTenantTransaction()` helper (same function `RlsInterceptor`
+   uses for REST) — there is exactly one implementation of the `SET LOCAL`
+   sequence, not a hand-rolled copy in the gateway, matching ADR-005 point 3's
+   explicit requirement. Room-level membership is checked *on top of*, not
+   instead of, RLS — verified both layers are actually exercised together in
+   `chat.e2e-spec.ts`'s "cross-village join is rejected" test (a village-B
+   user's `ChatParticipant` row for a village-A room can't even be found
+   because RLS hides the row entirely before the membership check runs).
+3. **`residentsCanPost` enforcement — correct, no gap.** `ChatService.sendMessage()`
+   gates only `RESIDENT` role in a `GROUP` room with `residentsCanPost=false`;
+   `ADMIN`/`GUARD` always post, `DIRECT` rooms ignore the flag entirely (both
+   participants can always post — correct per spec 2.3 and ADR §8.4). Fully
+   covered e2e over the real WebSocket (`residentsCanPost=false` rejects
+   resident post / admin broadcast still works / flips open and resident can
+   then post) and in `chat.service.spec.ts` unit tests.
+4. **JWT handshake — correct, no gap.** `handleConnection()` disconnects
+   immediately (`client.disconnect(true)`) on missing token or a
+   `verifyAsync()` failure (expired/invalid/wrong-secret), before any event
+   handler can ever run for that socket — matches ADR-005 point 1's
+   "decode-and-reject in one place" design (no separate guard stage exists
+   for WS the way `JwtAuthGuard` exists for REST, so this is correctly the
+   only gate). Covered e2e for both no-token and garbage-token cases.
+5. **Rate limiting — correct, no gap.** `WsRateLimiterService.allow()` is an
+   in-memory per-key sliding window (20 msgs / 10s per userId), checked
+   before persisting in `onSendMessage` and throwing a real `WsException`
+   (not silently dropping/silently allowing) on the 21st+ message in the
+   window. Covered e2e by bursting 25 messages and asserting an `exception`
+   event with `"Too many messages"` fires. Noted as single-process-only by
+   its own doc comment (consistent with ADR-004's already-documented
+   single-instance-deployment assumption for Phase 2 — not a new gap).
+6. **Direct-room privacy — correct, no gap, and explicitly not
+   ID-obscurity-based.** The membership check in point 1 above is what
+   actually enforces this — a DIRECT room's `chatRoomId` grants zero access
+   on its own, proven directly by the e2e test that connects as a *known,
+   authenticated* second resident in the *same village* who is simply not a
+   participant, and gets a clean 403 on both the WS `join_room` attempt and
+   the REST history read despite having a real, valid room ID in hand. This
+   is the strongest version of the test (an insider with a valid ID and a
+   valid session, not just "can't guess a UUID"), and it already exists in
+   `chat.e2e-spec.ts` — no gap to fill.
+
+**Conclusion: all 6 flagged risk points check out with no implementation
+gaps.** `test/chat.e2e-spec.ts` (36 tests) already covers every one of them
+at the transport level Dev claimed, including a case (point 6) that goes
+beyond what the backlog literally asked for. No new e2e tests were added —
+writing near-duplicates of what's already there would not have added
+coverage, only churn. This is the one part of the brief where the answer is
+"already done correctly," not "found and closed a gap."
+
+### 3. `disconnectChatSocket()` at logout — bug found and fixed
+
+Traced the full lifecycle: `getChatSocket()` in both
+`apps/admin-web/src/lib/chat.ts` and `apps/mobile/src/lib/chat.ts` is a
+module-level singleton (`let socket: Socket | null`), created once with
+`autoConnect: false` and an `auth` **callback function** (not a static
+object) so every `(re)connect` reads the *current* session fresh — this
+part is correct and is exactly why switching users on the same device
+picks up the new user's token on the next connect.
+
+The bug: `disconnectChatSocket()` (called from both `ProfileScreen.tsx` and
+`GuardProfileScreen.tsx` on mobile logout) only called `socket?.disconnect()`
+— it never reset the module-level `socket` variable to `null`. Confirmed
+directly against the installed `socket.io-client` source
+(`node_modules/socket.io-client/build/cjs/socket.js`): `Socket.prototype.onclose()`
+(invoked by both a client-initiated and server-initiated disconnect) resets
+`connected`/fires the `disconnect` event but **does not clear
+`sendBuffer`/`receiveBuffer`** — only `emitBuffered()`, called from
+`onconnect()` on the *next* successful connection, drains and clears
+`sendBuffer`. Net effect: if a user emits `send_message` (or any event)
+while the socket happens to be mid-reconnect/offline, then logs out
+immediately after (before the socket manages to reconnect and flush), the
+packet sits in `sendBuffer` on the *retained* singleton. If a **different**
+user then logs into the same device and the socket successfully connects
+(now authenticated as the new user, per the `auth` callback), `emitBuffered()`
+would silently flush and send the *old* user's queued message under the
+*new* user's identity — a message the new user never typed, posted as if
+they sent it. Narrow (needs a network blip timed right before logout) but
+real, and squarely the scenario the task brief asked to verify ("ปิด
+connection เก่าก่อน ไม่ leak connection เดิมค้างไว้เวลา login ใหม่ด้วย user
+อื่นบนเครื่องเดียวกัน").
+
+**Fixed** in both `apps/admin-web/src/lib/chat.ts` and
+`apps/mobile/src/lib/chat.ts`: `disconnectChatSocket()` now sets
+`socket = null` after `disconnect()`, so `getChatSocket()` constructs a
+brand-new `Socket` instance (empty buffers, no stale listeners/in-flight
+acks) on the next call — guaranteeing no state survives a user switch on
+the same device. No existing test broke (no frontend unit-test harness
+exists for either app's `lib/`, consistent with the MVP-round finding that
+`apps/mobile` has none — not introduced as new scope here); `npm run build`
+and `npm run typecheck:mobile` both still pass after the change.
+
+### 4. Maintenance (Epic 9) — short code-review pass
+
+No independent QA record existed yet; read `maintenance.service.ts`,
+`maintenance.controller.ts`, `maintenance.service.spec.ts`, and
+`test/maintenance.e2e-spec.ts` (already passing, part of the 150 e2e above).
+
+- **Ticket numbering is genuinely race-safe:** `nextTicketNumber()` uses one
+  atomic `INSERT ... ON CONFLICT (village_id) DO UPDATE ... RETURNING`
+  statement inside the same RLS transaction as the ticket insert — Postgres
+  row-locks the counter row for the duration, so concurrent creators from
+  the same village get distinct sequence numbers by database serialization,
+  not application-level locking. Matches ARCHITECTURE.md §8.3's documented
+  design and rejected the naive `COUNT(*)+1` approach for the right reason.
+- **Forward-only status transitions are correctly narrow:** `updateStatus()`
+  only ever accepts `IN_PROGRESS -> DONE`; `OPEN -> IN_PROGRESS` is only
+  reachable via `assign()` (deliberately, so a ticket can't become
+  "in progress" without an assigned team/date) — any other requested
+  transition, including a same-status no-op or a skip straight to `DONE`,
+  is rejected with 400. `assign()` itself is blocked once a ticket is
+  `DONE`. No skip/reverse path found.
+- **Resident scoping is correct and not client-trusted:** `houseId` for
+  ticket creation and the resident's own-house filter in `list()`/`findOne()`
+  both come exclusively from `claims` (JWT-derived), never from request
+  body/query — consistent with every other MVP module's pattern.
+- No bugs found; no changes made.
+
+### 5. Transport Directory (Epic 10) — short code-review pass
+
+No independent QA record existed yet; read `transport-provider.service.ts`,
+`transport-provider.controller.ts`, and `test/transport-provider.e2e-spec.ts`
+(already passing).
+
+- **`isActive` filtering is enforced server-side, not client-trusted:**
+  non-admin callers get `where.isActive = true` unconditionally; only an
+  authenticated `ADMIN` can pass `?active=` to see inactive rows too. This
+  is correctly implemented as an authorization rule (in the service), not a
+  UI-only convenience filter.
+- Flat CRUD, no state machine, no real-time surface — matches
+  ARCHITECTURE.md §8.5's "deliberately the simplest module" framing. No
+  security-relevant logic beyond the active-filter above, and that one is
+  correct.
+- No bugs found; no changes made.
+
+### 6. Go/No-Go — Phase 2 (Chat + Maintenance + Transport Directory)
+
+**GO**, with the same one standing caveat carried forward from QA pass 3
+(unchanged by this pass, not re-litigated here): **no mobile screen —
+including the three new Phase 2 ones (`ChatListScreen`, `ChatRoomScreen`,
+maintenance/transport screens)** has ever been rendered on a real device or
+emulator. Everything in this pass, like pass 3, verifies source-code logic
+and server-side behavior, not on-device UX (camera/image-picker permission
+flows, Socket.io reconnection behavior on real flaky wifi, layout on an
+actual screen).
+
+Specific to this pass:
+- Chat (Epic 8), the highest-risk module in Phase 2 by the backlog's own
+  assessment, passes deep adversarial review on all 6 flagged risk points
+  with zero implementation gaps — room-level authorization, cross-tenant
+  WS isolation, `residentsCanPost` enforcement, JWT handshake rejection,
+  rate limiting, and direct-room privacy (verified as membership-based, not
+  ID-obscurity-based) are all correctly implemented and already covered by
+  a thorough existing 36-test e2e suite exercising a real Socket.io client
+  against the live gateway.
+- One real (if narrow) bug found and fixed: `disconnectChatSocket()` not
+  clearing the retained Socket.io singleton's send buffer on logout, which
+  could under a specific race let a stale queued message from a previous
+  user get posted under the next logged-in user's identity on a shared
+  device. Fixed in both `admin-web` and `mobile`'s `lib/chat.ts`.
+- Maintenance and Transport Directory hold up under a shorter code review;
+  no bugs found in either.
+- `npm run build`, `npm run lint` (backend), full unit suite (129 tests),
+  and full e2e suite (150 tests, including all of Chat's 36) all pass with
+  zero regressions against MVP + this phase's other two modules.

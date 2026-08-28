@@ -71,7 +71,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     residentB2Phone = nextPhone("91");
     await withVillageContext(villageA.villageId, async (tx) => {
       const house2 = await tx.house.create({
-        data: { villageId: villageA.villageId, houseNo: "CHT-A-2", zone: "QA-ZONE" },
+        data: {
+          villageId: villageA.villageId,
+          houseNo: "CHT-A-2",
+          zone: "QA-ZONE",
+        },
       });
       const resident2 = await tx.user.create({
         data: {
@@ -101,33 +105,59 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("GET /users — resident/guard staff-directory only, never a resident directory", () => {
     it("a resident sees admin/guard rows but never another resident", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "GET", "/users", { token: residentToken });
       expect(res.status).toBe(200);
       expect(res.body.length).toBeGreaterThan(0);
-      expect(res.body.every((u: any) => u.role === "ADMIN" || u.role === "GUARD")).toBe(true);
+      expect(
+        res.body.every((u: any) => u.role === "ADMIN" || u.role === "GUARD"),
+      ).toBe(true);
       expect(res.body.some((u: any) => u.id === residentB2Id)).toBe(false);
     });
 
     it("a resident's ?role=RESIDENT filter is ignored server-side (still staff-only)", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const res = await api(baseUrl, "GET", "/users?role=RESIDENT", { token: residentToken });
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const res = await api(baseUrl, "GET", "/users?role=RESIDENT", {
+        token: residentToken,
+      });
       expect(res.status).toBe(200);
       expect(res.body.every((u: any) => u.role !== "RESIDENT")).toBe(true);
     });
 
     it("a guard is also restricted to the staff-only view", async () => {
-      const guardToken = await loginToken(baseUrl, villageA.guardOnDuty.phone, villageA.villageId);
+      const guardToken = await loginToken(
+        baseUrl,
+        villageA.guardOnDuty.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "GET", "/users", { token: guardToken });
       expect(res.status).toBe(200);
-      expect(res.body.every((u: any) => u.role === "ADMIN" || u.role === "GUARD")).toBe(true);
+      expect(
+        res.body.every((u: any) => u.role === "ADMIN" || u.role === "GUARD"),
+      ).toBe(true);
     });
 
     it("an admin still gets the full unrestricted list", async () => {
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
-      const res = await api(baseUrl, "GET", "/users?role=RESIDENT", { token: adminToken });
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
+      const res = await api(baseUrl, "GET", "/users?role=RESIDENT", {
+        token: adminToken,
+      });
       expect(res.status).toBe(200);
-      expect(res.body.some((u: any) => u.id === villageA.resident.id)).toBe(true);
+      expect(res.body.some((u: any) => u.id === villageA.resident.id)).toBe(
+        true,
+      );
     });
   });
 
@@ -138,8 +168,16 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("POST /chat-rooms — DIRECT find-or-create + role-pair validation", () => {
     it("resident<->admin: creates a DIRECT room; a second call returns the same room", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       void adminToken;
 
       const first = await api(baseUrl, "POST", "/chat-rooms", {
@@ -158,7 +196,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("resident<->guard: creates a DIRECT room", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.guardOnDuty.id },
@@ -168,7 +210,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("resident<->resident is rejected with 400", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: residentB2Id },
@@ -177,7 +223,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("admin<->guard is rejected with 400", async () => {
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "POST", "/chat-rooms", {
         token: adminToken,
         body: { type: "DIRECT", targetUserId: villageA.guardOnDuty.id },
@@ -186,7 +236,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("targetUserId from another village 404s (RLS-scoped user lookup)", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageB.admin.id },
@@ -195,7 +249,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("GROUP creation is admin-only (guard/resident get 403)", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "GROUP", name: "ทดสอบ" },
@@ -204,7 +262,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("admin can create an extra GROUP room", async () => {
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       const res = await api(baseUrl, "POST", "/chat-rooms", {
         token: adminToken,
         body: { type: "GROUP", name: "กลุ่มทดสอบ", residentsCanPost: true },
@@ -224,42 +286,84 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("GET /chat-rooms — lazy village-group provisioning + participant scoping", () => {
     it("auto-provisions and includes the village GROUP room on first call", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const res = await api(baseUrl, "GET", "/chat-rooms", { token: residentToken });
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const res = await api(baseUrl, "GET", "/chat-rooms", {
+        token: residentToken,
+      });
       expect(res.status).toBe(200);
-      expect(res.body.some((r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน")).toBe(true);
+      expect(
+        res.body.some(
+          (r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน",
+        ),
+      ).toBe(true);
     });
 
     it("village A's rooms are never visible to village B (RLS)", async () => {
-      const residentAToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const roomsA = await api(baseUrl, "GET", "/chat-rooms", { token: residentAToken });
+      const residentAToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const roomsA = await api(baseUrl, "GET", "/chat-rooms", {
+        token: residentAToken,
+      });
       const roomIdsA = new Set(roomsA.body.map((r: any) => r.id));
 
-      const residentBToken = await loginToken(baseUrl, villageB.resident.phone, villageB.villageId);
-      const roomsB = await api(baseUrl, "GET", "/chat-rooms", { token: residentBToken });
+      const residentBToken = await loginToken(
+        baseUrl,
+        villageB.resident.phone,
+        villageB.villageId,
+      );
+      const roomsB = await api(baseUrl, "GET", "/chat-rooms", {
+        token: residentBToken,
+      });
       expect(roomsB.body.some((r: any) => roomIdsA.has(r.id))).toBe(false);
     });
 
     it("a resident does not see a DIRECT room they aren't a participant of", async () => {
       const directRoom = await api(baseUrl, "POST", "/chat-rooms", {
-        token: await loginToken(baseUrl, villageA.resident.phone, villageA.villageId),
+        token: await loginToken(
+          baseUrl,
+          villageA.resident.phone,
+          villageA.villageId,
+        ),
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
       });
 
-      const resident2Token = await loginToken(baseUrl, residentB2Phone, villageA.villageId);
-      const rooms = await api(baseUrl, "GET", "/chat-rooms", { token: resident2Token });
-      expect(rooms.body.some((r: any) => r.id === directRoom.body.id)).toBe(false);
+      const resident2Token = await loginToken(
+        baseUrl,
+        residentB2Phone,
+        villageA.villageId,
+      );
+      const rooms = await api(baseUrl, "GET", "/chat-rooms", {
+        token: resident2Token,
+      });
+      expect(rooms.body.some((r: any) => r.id === directRoom.body.id)).toBe(
+        false,
+      );
     });
   });
 
   describe("GET /chat-rooms/:id/messages — room-membership authorization (ADR-005 point 4)", () => {
     it("a non-participant in the SAME village is rejected with 403", async () => {
       const directRoom = await api(baseUrl, "POST", "/chat-rooms", {
-        token: await loginToken(baseUrl, villageA.resident.phone, villageA.villageId),
+        token: await loginToken(
+          baseUrl,
+          villageA.resident.phone,
+          villageA.villageId,
+        ),
         body: { type: "DIRECT", targetUserId: villageA.guardOffDuty.id },
       });
 
-      const outsiderToken = await loginToken(baseUrl, residentB2Phone, villageA.villageId);
+      const outsiderToken = await loginToken(
+        baseUrl,
+        residentB2Phone,
+        villageA.villageId,
+      );
       const res = await api(
         baseUrl,
         "GET",
@@ -271,11 +375,19 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
     it("a user from ANOTHER village is rejected (RLS hides the participant row entirely)", async () => {
       const directRoom = await api(baseUrl, "POST", "/chat-rooms", {
-        token: await loginToken(baseUrl, villageA.resident.phone, villageA.villageId),
+        token: await loginToken(
+          baseUrl,
+          villageA.resident.phone,
+          villageA.villageId,
+        ),
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
       });
 
-      const villageBAdminToken = await loginToken(baseUrl, villageB.admin.phone, villageB.villageId);
+      const villageBAdminToken = await loginToken(
+        baseUrl,
+        villageB.admin.phone,
+        villageB.villageId,
+      );
       const res = await api(
         baseUrl,
         "GET",
@@ -286,8 +398,16 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("a participant can read paginated history", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
@@ -305,16 +425,28 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("unauthenticated request is rejected with 401", async () => {
-      const res = await api(baseUrl, "GET", "/chat-rooms/00000000-0000-0000-0000-000000000000/messages");
+      const res = await api(
+        baseUrl,
+        "GET",
+        "/chat-rooms/00000000-0000-0000-0000-000000000000/messages",
+      );
       expect(res.status).toBe(401);
     });
   });
 
   describe("PATCH /chat-rooms/:id — admin-only residentsCanPost toggle", () => {
     it("resident is rejected with 403", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const rooms = await api(baseUrl, "GET", "/chat-rooms", { token: residentToken });
-      const groupRoom = rooms.body.find((r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน");
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const rooms = await api(baseUrl, "GET", "/chat-rooms", {
+        token: residentToken,
+      });
+      const groupRoom = rooms.body.find(
+        (r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน",
+      );
 
       const res = await api(baseUrl, "PATCH", `/chat-rooms/${groupRoom.id}`, {
         token: residentToken,
@@ -324,9 +456,17 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("admin can flip residentsCanPost on the default GROUP room", async () => {
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
-      const rooms = await api(baseUrl, "GET", "/chat-rooms", { token: adminToken });
-      const groupRoom = rooms.body.find((r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน");
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
+      const rooms = await api(baseUrl, "GET", "/chat-rooms", {
+        token: adminToken,
+      });
+      const groupRoom = rooms.body.find(
+        (r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน",
+      );
 
       const res = await api(baseUrl, "PATCH", `/chat-rooms/${groupRoom.id}`, {
         token: adminToken,
@@ -337,8 +477,16 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
 
     it("rejects updating a DIRECT room with 400", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
@@ -354,28 +502,50 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("PATCH /chat-rooms/:id/read", () => {
     it("a participant can mark a room read", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.guardOnDuty.id },
       });
 
-      const res = await api(baseUrl, "PATCH", `/chat-rooms/${room.body.id}/read`, {
-        token: residentToken,
-      });
+      const res = await api(
+        baseUrl,
+        "PATCH",
+        `/chat-rooms/${room.body.id}/read`,
+        {
+          token: residentToken,
+        },
+      );
       expect(res.status).toBe(200);
       expect(res.body.lastReadAt).not.toBeNull();
     });
 
     it("a non-participant is rejected with 403", async () => {
       const room = await api(baseUrl, "POST", "/chat-rooms", {
-        token: await loginToken(baseUrl, villageA.resident.phone, villageA.villageId),
+        token: await loginToken(
+          baseUrl,
+          villageA.resident.phone,
+          villageA.villageId,
+        ),
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
       });
-      const outsiderToken = await loginToken(baseUrl, residentB2Phone, villageA.villageId);
-      const res = await api(baseUrl, "PATCH", `/chat-rooms/${room.body.id}/read`, {
-        token: outsiderToken,
-      });
+      const outsiderToken = await loginToken(
+        baseUrl,
+        residentB2Phone,
+        villageA.villageId,
+      );
+      const res = await api(
+        baseUrl,
+        "PATCH",
+        `/chat-rooms/${room.body.id}/read`,
+        {
+          token: outsiderToken,
+        },
+      );
       expect(res.status).toBe(403);
     });
   });
@@ -385,16 +555,25 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
     it("a participant can upload an image and gets back a URL", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
       });
 
-      const res = await api(baseUrl, "POST", `/chat-rooms/${room.body.id}/image`, {
-        token: residentToken,
-        body: { photoDataUrl: TINY_PNG_DATA_URL },
-      });
+      const res = await api(
+        baseUrl,
+        "POST",
+        `/chat-rooms/${room.body.id}/image`,
+        {
+          token: residentToken,
+          body: { photoDataUrl: TINY_PNG_DATA_URL },
+        },
+      );
       expect(res.status).toBe(201);
       expect(typeof res.body.imageUrl).toBe("string");
       expect(res.body.imageUrl).toContain("village-entry-logs");
@@ -402,14 +581,27 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
     it("a non-participant is rejected with 403", async () => {
       const room = await api(baseUrl, "POST", "/chat-rooms", {
-        token: await loginToken(baseUrl, villageA.resident.phone, villageA.villageId),
+        token: await loginToken(
+          baseUrl,
+          villageA.resident.phone,
+          villageA.villageId,
+        ),
         body: { type: "DIRECT", targetUserId: villageA.guardOnDuty.id },
       });
-      const outsiderToken = await loginToken(baseUrl, residentB2Phone, villageA.villageId);
-      const res = await api(baseUrl, "POST", `/chat-rooms/${room.body.id}/image`, {
-        token: outsiderToken,
-        body: { photoDataUrl: TINY_PNG_DATA_URL },
-      });
+      const outsiderToken = await loginToken(
+        baseUrl,
+        residentB2Phone,
+        villageA.villageId,
+      );
+      const res = await api(
+        baseUrl,
+        "POST",
+        `/chat-rooms/${room.body.id}/image`,
+        {
+          token: outsiderToken,
+          body: { photoDataUrl: TINY_PNG_DATA_URL },
+        },
+      );
       expect(res.status).toBe(403);
     });
   });
@@ -426,7 +618,10 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
         forceNew: true,
         reconnection: false,
       });
-      const timer = setTimeout(() => reject(new Error("connect timeout")), 5000);
+      const timer = setTimeout(
+        () => reject(new Error("connect timeout")),
+        5000,
+      );
       socket.on("connect", () => {
         clearTimeout(timer);
         resolve(socket);
@@ -439,7 +634,10 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
   }
 
   /** Waits for a `disconnect` event (or resolves false on timeout, meaning it stayed connected). */
-  function waitForDisconnect(socket: Socket, timeoutMs = 2000): Promise<boolean> {
+  function waitForDisconnect(
+    socket: Socket,
+    timeoutMs = 2000,
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       let done = false;
       socket.on("disconnect", () => {
@@ -457,7 +655,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
   }
 
-  function waitForEvent<T = any>(socket: Socket, event: string, timeoutMs = 5000): Promise<T> {
+  function waitForEvent<T = any>(
+    socket: Socket,
+    event: string,
+    timeoutMs = 5000,
+  ): Promise<T> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
         () => reject(new Error(`timed out waiting for "${event}"`)),
@@ -470,7 +672,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     });
   }
 
-  function emitAck<T = any>(socket: Socket, event: string, payload: unknown): Promise<T> {
+  function emitAck<T = any>(
+    socket: Socket,
+    event: string,
+    payload: unknown,
+  ): Promise<T> {
     return new Promise((resolve) => {
       socket.emit(event, payload, (ack: T) => resolve(ack));
     });
@@ -478,7 +684,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("WS handshake auth (ADR-005 point 1)", () => {
     it("connects and stays connected with a valid access token", async () => {
-      const token = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const token = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const socket = await connect(token);
       expect(socket.connected).toBe(true);
       socket.close();
@@ -513,17 +723,27 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("WS room-level authorization (ADR-005 point 4) + real-time delivery", () => {
     it("join_room succeeds for a participant, and a room-membership error is emitted for a non-participant", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.guardOnDuty.id },
       });
 
       const residentSocket = await connect(residentToken);
-      const joinAck = await emitAck(residentSocket, "join_room", { chatRoomId: room.body.id });
+      const joinAck = await emitAck(residentSocket, "join_room", {
+        chatRoomId: room.body.id,
+      });
       expect(joinAck).toMatchObject({ ok: true, chatRoomId: room.body.id });
 
-      const outsiderToken = await loginToken(baseUrl, residentB2Phone, villageA.villageId);
+      const outsiderToken = await loginToken(
+        baseUrl,
+        residentB2Phone,
+        villageA.villageId,
+      );
       const outsiderSocket = await connect(outsiderToken);
       const exceptionPromise = waitForEvent(outsiderSocket, "exception");
       outsiderSocket.emit("join_room", { chatRoomId: room.body.id });
@@ -538,13 +758,21 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     }, 15_000);
 
     it("cross-village join is rejected (RLS hides the participant row entirely)", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
       });
 
-      const villageBToken = await loginToken(baseUrl, villageB.resident.phone, villageB.villageId);
+      const villageBToken = await loginToken(
+        baseUrl,
+        villageB.resident.phone,
+        villageB.villageId,
+      );
       const villageBSocket = await connect(villageBToken);
       const exceptionPromise = waitForEvent(villageBSocket, "exception");
       villageBSocket.emit("join_room", { chatRoomId: room.body.id });
@@ -555,8 +783,16 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
     }, 15_000);
 
     it("send_message persists and broadcasts in real time to every socket that joined the room", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
@@ -580,23 +816,42 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
       });
 
       // History via REST matches what was delivered over the socket.
-      const history = await api(baseUrl, "GET", `/chat-rooms/${room.body.id}/messages`, {
-        token: adminToken,
-      });
-      expect(history.body.items.some((m: any) => m.id === received.id)).toBe(true);
+      const history = await api(
+        baseUrl,
+        "GET",
+        `/chat-rooms/${room.body.id}/messages`,
+        {
+          token: adminToken,
+        },
+      );
+      expect(history.body.items.some((m: any) => m.id === received.id)).toBe(
+        true,
+      );
 
       residentSocket.close();
       adminSocket.close();
     }, 15_000);
 
     it("residentsCanPost=false rejects a resident posting in the GROUP room; admin broadcast still works", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
 
       // Ensure the default group room is (re)set to read-only for this test,
       // independent of the earlier PATCH test's mutation.
-      const rooms = await api(baseUrl, "GET", "/chat-rooms", { token: adminToken });
-      const groupRoom = rooms.body.find((r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน");
+      const rooms = await api(baseUrl, "GET", "/chat-rooms", {
+        token: adminToken,
+      });
+      const groupRoom = rooms.body.find(
+        (r: any) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน",
+      );
       await api(baseUrl, "PATCH", `/chat-rooms/${groupRoom.id}`, {
         token: adminToken,
         body: { residentsCanPost: false },
@@ -606,17 +861,29 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
       await emitAck(residentSocket, "join_room", { chatRoomId: groupRoom.id });
 
       const exceptionPromise = waitForEvent(residentSocket, "exception");
-      residentSocket.emit("send_message", { chatRoomId: groupRoom.id, message: "แอบโพสต์" });
+      residentSocket.emit("send_message", {
+        chatRoomId: groupRoom.id,
+        message: "แอบโพสต์",
+      });
       const exception = await exceptionPromise;
       expect(exception).toMatchObject({ status: "error", statusCode: 403 });
 
       // Admin can still broadcast.
       const adminSocket = await connect(adminToken);
       await emitAck(adminSocket, "join_room", { chatRoomId: groupRoom.id });
-      const residentReceivedPromise = waitForEvent(residentSocket, "new_message");
-      adminSocket.emit("send_message", { chatRoomId: groupRoom.id, message: "ประกาศจากนิติบุคคล" });
+      const residentReceivedPromise = waitForEvent(
+        residentSocket,
+        "new_message",
+      );
+      adminSocket.emit("send_message", {
+        chatRoomId: groupRoom.id,
+        message: "ประกาศจากนิติบุคคล",
+      });
       const received = await residentReceivedPromise;
-      expect(received).toMatchObject({ message: "ประกาศจากนิติบุคคล", senderId: villageA.admin.id });
+      expect(received).toMatchObject({
+        message: "ประกาศจากนิติบุคคล",
+        senderId: villageA.admin.id,
+      });
 
       // Flip it open and confirm the resident can now post.
       await api(baseUrl, "PATCH", `/chat-rooms/${groupRoom.id}`, {
@@ -624,17 +891,31 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
         body: { residentsCanPost: true },
       });
       const adminReceivedPromise = waitForEvent(adminSocket, "new_message");
-      residentSocket.emit("send_message", { chatRoomId: groupRoom.id, message: "ขอบคุณครับ" });
+      residentSocket.emit("send_message", {
+        chatRoomId: groupRoom.id,
+        message: "ขอบคุณครับ",
+      });
       const openReceived = await adminReceivedPromise;
-      expect(openReceived).toMatchObject({ message: "ขอบคุณครับ", senderId: villageA.resident.id });
+      expect(openReceived).toMatchObject({
+        message: "ขอบคุณครับ",
+        senderId: villageA.resident.id,
+      });
 
       residentSocket.close();
       adminSocket.close();
     }, 20_000);
 
     it("mark_read updates lastReadAt and broadcasts a read_receipt to the room", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
@@ -645,10 +926,16 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
       await emitAck(residentSocket, "join_room", { chatRoomId: room.body.id });
       await emitAck(adminSocket, "join_room", { chatRoomId: room.body.id });
 
-      const residentReceivedPromise = waitForEvent(residentSocket, "read_receipt");
+      const residentReceivedPromise = waitForEvent(
+        residentSocket,
+        "read_receipt",
+      );
       adminSocket.emit("mark_read", { chatRoomId: room.body.id });
       const receipt = await residentReceivedPromise;
-      expect(receipt).toMatchObject({ chatRoomId: room.body.id, userId: villageA.admin.id });
+      expect(receipt).toMatchObject({
+        chatRoomId: room.body.id,
+        userId: villageA.admin.id,
+      });
 
       residentSocket.close();
       adminSocket.close();
@@ -657,7 +944,11 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("WS send_message rate limiting", () => {
     it("rejects a burst beyond the per-user limit with a WsException", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
@@ -669,10 +960,16 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
       // expect at least one exception event for exceeding the limit.
       const exceptionSeen = waitForEvent(socket, "exception", 8000);
       for (let i = 0; i < 25; i++) {
-        socket.emit("send_message", { chatRoomId: room.body.id, message: `flood ${i}` });
+        socket.emit("send_message", {
+          chatRoomId: room.body.id,
+          message: `flood ${i}`,
+        });
       }
       const exception = await exceptionSeen;
-      expect(exception).toMatchObject({ status: "error", message: expect.stringContaining("Too many messages") });
+      expect(exception).toMatchObject({
+        status: "error",
+        message: expect.stringContaining("Too many messages"),
+      });
 
       socket.close();
     }, 15_000);
@@ -680,8 +977,16 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
 
   describe("WS typing event", () => {
     it("re-broadcasts typing to other room members but not back to the sender", async () => {
-      const residentToken = await loginToken(baseUrl, villageA.resident.phone, villageA.villageId);
-      const adminToken = await loginToken(baseUrl, villageA.admin.phone, villageA.villageId);
+      const residentToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const adminToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
       const room = await api(baseUrl, "POST", "/chat-rooms", {
         token: residentToken,
         body: { type: "DIRECT", targetUserId: villageA.admin.id },
@@ -700,7 +1005,10 @@ describe("Chat (Epic 8) — API + WebSocket e2e", () => {
       const adminReceivedTyping = waitForEvent(adminSocket, "typing");
       residentSocket.emit("typing", { chatRoomId: room.body.id });
       const typingPayload = await adminReceivedTyping;
-      expect(typingPayload).toMatchObject({ chatRoomId: room.body.id, userId: villageA.resident.id });
+      expect(typingPayload).toMatchObject({
+        chatRoomId: room.body.id,
+        userId: villageA.resident.id,
+      });
 
       await new Promise((r) => setTimeout(r, 200));
       expect(residentSawOwnTyping).toBe(false);

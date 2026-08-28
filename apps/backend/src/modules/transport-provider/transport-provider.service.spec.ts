@@ -123,7 +123,7 @@ describe("TransportProviderService", () => {
       const claims = mockClaims({ role: "RESIDENT" });
       tx.transportProvider.findMany.mockResolvedValue([]);
 
-      await service.list(claims, { type: "TAXI" as any });
+      await service.list(claims, { type: "TAXI" });
 
       expect(tx.transportProvider.findMany).toHaveBeenCalledWith({
         where: { isActive: true, type: "TAXI" },
@@ -149,7 +149,7 @@ describe("TransportProviderService", () => {
         isActive: false,
       });
 
-      const result = await service.update("tp-1", { isActive: false } as any);
+      const result = await service.update("tp-1", { isActive: false });
 
       expect(tx.transportProvider.update).toHaveBeenCalledWith({
         where: { id: "tp-1" },

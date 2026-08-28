@@ -76,7 +76,9 @@ export class ChatService {
     }
 
     await tx.chatParticipant.upsert({
-      where: { chatRoomId_userId: { chatRoomId: room.id, userId: claims.userId } },
+      where: {
+        chatRoomId_userId: { chatRoomId: room.id, userId: claims.userId },
+      },
       update: {},
       create: {
         villageId: claims.villageId,
@@ -111,7 +113,9 @@ export class ChatService {
       include: { chatRoom: true },
     });
     if (!participant) {
-      throw new ForbiddenException("You are not a participant of this chat room");
+      throw new ForbiddenException(
+        "You are not a participant of this chat room",
+      );
     }
     return participant.chatRoom;
   }
@@ -140,7 +144,11 @@ export class ChatService {
             messages: { orderBy: { createdAt: "desc" }, take: 1 },
             participants: {
               where: { userId: { not: claims.userId } },
-              include: { user: { select: { id: true, name: true, phone: true, role: true } } },
+              include: {
+                user: {
+                  select: { id: true, name: true, phone: true, role: true },
+                },
+              },
             },
           },
         },
@@ -162,7 +170,10 @@ export class ChatService {
           lastMessage: messages[0] ?? null,
           lastReadAt: p.lastReadAt,
           unreadCount,
-          otherUser: room.type === ChatRoomType.DIRECT ? (participants[0]?.user ?? null) : null,
+          otherUser:
+            room.type === ChatRoomType.DIRECT
+              ? (participants[0]?.user ?? null)
+              : null,
         };
       }),
     );
@@ -177,7 +188,9 @@ export class ChatService {
 
     if (dto.type === ChatRoomType.GROUP) {
       if (claims.role !== "ADMIN") {
-        throw new ForbiddenException("Only an admin can create a group chat room");
+        throw new ForbiddenException(
+          "Only an admin can create a group chat room",
+        );
       }
       // NOTE: deliberately NOT defaulting an unnamed room to
       // ChatService.DEFAULT_GROUP_ROOM_NAME — that name is reserved for the
@@ -194,14 +207,20 @@ export class ChatService {
         },
       });
       await tx.chatParticipant.create({
-        data: { villageId: claims.villageId, chatRoomId: room.id, userId: claims.userId },
+        data: {
+          villageId: claims.villageId,
+          chatRoomId: room.id,
+          userId: claims.userId,
+        },
       });
       return room;
     }
 
     // DIRECT
     if (!dto.targetUserId) {
-      throw new BadRequestException("targetUserId is required for a DIRECT chat room");
+      throw new BadRequestException(
+        "targetUserId is required for a DIRECT chat room",
+      );
     }
     if (dto.targetUserId === claims.userId) {
       throw new BadRequestException("Cannot start a direct chat with yourself");
@@ -209,7 +228,9 @@ export class ChatService {
 
     // RLS already scopes this lookup to the caller's own village — a
     // targetUserId from another village simply won't be found.
-    const targetUser = await tx.user.findUnique({ where: { id: dto.targetUserId } });
+    const targetUser = await tx.user.findUnique({
+      where: { id: dto.targetUserId },
+    });
     if (!targetUser) {
       throw new NotFoundException("Target user not found");
     }
@@ -220,8 +241,10 @@ export class ChatService {
     // opening it up would need its own product decision this backlog item
     // doesn't make.
     const isResidentAdminOrGuardPair =
-      (claims.role === "RESIDENT" && (targetUser.role === "ADMIN" || targetUser.role === "GUARD")) ||
-      (targetUser.role === "RESIDENT" && (claims.role === "ADMIN" || claims.role === "GUARD"));
+      (claims.role === "RESIDENT" &&
+        (targetUser.role === "ADMIN" || targetUser.role === "GUARD")) ||
+      (targetUser.role === "RESIDENT" &&
+        (claims.role === "ADMIN" || claims.role === "GUARD"));
     if (!isResidentAdminOrGuardPair) {
       throw new BadRequestException(
         "Direct chat is only supported between a resident and an admin/guard",
@@ -265,9 +288,15 @@ export class ChatService {
    * UpdateChatRoomDto's doc comment for why this endpoint exists beyond the
    * literal backlog checklist.
    */
-  async updateRoom(chatRoomId: string, dto: UpdateChatRoomDto, claims: TenantClaims) {
+  async updateRoom(
+    chatRoomId: string,
+    dto: UpdateChatRoomDto,
+    claims: TenantClaims,
+  ) {
     if (claims.role !== "ADMIN") {
-      throw new ForbiddenException("Only an admin can update a chat room's settings");
+      throw new ForbiddenException(
+        "Only an admin can update a chat room's settings",
+      );
     }
 
     const tx = getTenantPrismaClient<PrismaClient>();
@@ -285,7 +314,9 @@ export class ChatService {
     return tx.chatRoom.update({
       where: { id: chatRoomId },
       data: {
-        ...(dto.residentsCanPost !== undefined ? { residentsCanPost: dto.residentsCanPost } : {}),
+        ...(dto.residentsCanPost !== undefined
+          ? { residentsCanPost: dto.residentsCanPost }
+          : {}),
         ...(dto.name !== undefined ? { name: dto.name } : {}),
       },
     });
@@ -375,7 +406,11 @@ export class ChatService {
    * ID-card-sensitive). Requires membership so a non-participant can't use
    * this endpoint to stash arbitrary uploads under someone else's room.
    */
-  async attachImage(chatRoomId: string, photoDataUrl: string, claims: TenantClaims) {
+  async attachImage(
+    chatRoomId: string,
+    photoDataUrl: string,
+    claims: TenantClaims,
+  ) {
     const tx = getTenantPrismaClient<PrismaClient>();
     await this.assertMembership(tx, chatRoomId, claims.userId);
 
@@ -393,7 +428,10 @@ export class ChatService {
    * verify membership before calling `socket.join()`, without needing a
    * second DB round trip for message-sending afterward.
    */
-  async assertCanJoin(chatRoomId: string, claims: TenantClaims): Promise<ChatRoom> {
+  async assertCanJoin(
+    chatRoomId: string,
+    claims: TenantClaims,
+  ): Promise<ChatRoom> {
     const tx = getTenantPrismaClient<PrismaClient>();
     return this.assertMembership(tx, chatRoomId, claims.userId);
   }

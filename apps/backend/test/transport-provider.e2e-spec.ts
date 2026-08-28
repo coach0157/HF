@@ -180,16 +180,12 @@ describe("Transport Directory (Epic 10) — API-driven e2e", () => {
         { token: residentToken },
       );
       expect(residentListBefore.status).toBe(200);
-      expect(
-        residentListBefore.body.some((p: any) => p.id === id),
-      ).toBe(true);
+      expect(residentListBefore.body.some((p: any) => p.id === id)).toBe(true);
 
-      const toggle = await api(
-        baseUrl,
-        "PATCH",
-        `/transport-providers/${id}`,
-        { token: adminToken, body: { isActive: false } },
-      );
+      const toggle = await api(baseUrl, "PATCH", `/transport-providers/${id}`, {
+        token: adminToken,
+        body: { isActive: false },
+      });
       expect(toggle.status).toBe(200);
       expect(toggle.body.isActive).toBe(false);
 
@@ -200,16 +196,11 @@ describe("Transport Directory (Epic 10) — API-driven e2e", () => {
         { token: residentToken },
       );
       expect(residentListAfter.status).toBe(200);
-      expect(
-        residentListAfter.body.some((p: any) => p.id === id),
-      ).toBe(false);
+      expect(residentListAfter.body.some((p: any) => p.id === id)).toBe(false);
 
-      const adminListAfter = await api(
-        baseUrl,
-        "GET",
-        "/transport-providers",
-        { token: adminToken },
-      );
+      const adminListAfter = await api(baseUrl, "GET", "/transport-providers", {
+        token: adminToken,
+      });
       expect(adminListAfter.status).toBe(200);
       expect(adminListAfter.body.some((p: any) => p.id === id)).toBe(true);
     });
@@ -275,9 +266,7 @@ describe("Transport Directory (Epic 10) — API-driven e2e", () => {
       });
       expect(res.status).toBe(200);
       expect(res.body.some((p: any) => p.id === activeId)).toBe(true);
-      expect(res.body.some((p: any) => p.id === inactive.body.id)).toBe(
-        false,
-      );
+      expect(res.body.some((p: any) => p.id === inactive.body.id)).toBe(false);
     });
 
     it("?type= filter narrows results for every role", async () => {
@@ -292,14 +281,14 @@ describe("Transport Directory (Epic 10) — API-driven e2e", () => {
         villageA.villageId,
       );
 
-      await createProvider(adminToken, { name: "Van Filter Test", type: "VAN" });
+      await createProvider(adminToken, {
+        name: "Van Filter Test",
+        type: "VAN",
+      });
 
-      const res = await api(
-        baseUrl,
-        "GET",
-        "/transport-providers?type=VAN",
-        { token: residentToken },
-      );
+      const res = await api(baseUrl, "GET", "/transport-providers?type=VAN", {
+        token: residentToken,
+      });
       expect(res.status).toBe(200);
       expect(res.body.every((p: any) => p.type === "VAN")).toBe(true);
       expect(res.body.length).toBeGreaterThan(0);
@@ -326,9 +315,7 @@ describe("Transport Directory (Epic 10) — API-driven e2e", () => {
         token: adminAToken,
       });
       expect(res.status).toBe(200);
-      expect(
-        res.body.some((p: any) => p.id === bProvider.body.id),
-      ).toBe(false);
+      expect(res.body.some((p: any) => p.id === bProvider.body.id)).toBe(false);
     });
 
     it("unauthenticated request is rejected with 401", async () => {
@@ -439,9 +426,9 @@ describe("Transport Directory (Epic 10) — API-driven e2e", () => {
       const listRes = await api(baseUrl, "GET", "/transport-providers", {
         token: adminToken,
       });
-      expect(
-        listRes.body.some((p: any) => p.id === created.body.id),
-      ).toBe(false);
+      expect(listRes.body.some((p: any) => p.id === created.body.id)).toBe(
+        false,
+      );
     });
 
     it("resident is rejected with 403", async () => {
@@ -491,9 +478,9 @@ describe("Transport Directory (Epic 10) — API-driven e2e", () => {
       const listRes = await api(baseUrl, "GET", "/transport-providers", {
         token: adminAToken,
       });
-      expect(
-        listRes.body.some((p: any) => p.id === created.body.id),
-      ).toBe(true);
+      expect(listRes.body.some((p: any) => p.id === created.body.id)).toBe(
+        true,
+      );
     });
   });
 });

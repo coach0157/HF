@@ -109,7 +109,12 @@ export class MaintenanceService {
       // PHASE2_BACKLOG.md AC) — never trust a house scope from the client,
       // there isn't one to trust here in the first place.
       if (!claims.houseId) {
-        return { items: [], total: 0, page: filters.page, pageSize: filters.pageSize };
+        return {
+          items: [],
+          total: 0,
+          page: filters.page,
+          pageSize: filters.pageSize,
+        };
       }
       where.houseId = claims.houseId;
     }

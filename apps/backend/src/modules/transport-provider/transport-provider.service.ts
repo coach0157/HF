@@ -1,5 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma, PrismaClient, TransportProviderType, UserRole } from "@prisma/client";
+import {
+  Prisma,
+  PrismaClient,
+  TransportProviderType,
+  UserRole,
+} from "@prisma/client";
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
 import { CreateTransportProviderDto } from "./dto/create-transport-provider.dto";

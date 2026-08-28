@@ -98,5 +98,12 @@ export function getChatSocket(): Socket {
 }
 
 export function disconnectChatSocket(): void {
+  // Discard the singleton, not just disconnect it — see mobile's
+  // lib/chat.ts (identical fix, identical reasoning) for the full write-up.
+  // In short: socket.io-client's `disconnect()` never clears `sendBuffer`,
+  // so any `emit()` queued while briefly offline could get flushed on the
+  // NEXT `connect()` under whichever session logs in next on this device.
+  // Dropping the instance guarantees a clean slate per login.
   socket?.disconnect();
+  socket = null;
 }

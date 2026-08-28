@@ -1,4 +1,10 @@
-import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 /**
  * `PATCH /chat-rooms/:id` — ADMIN-only. Not explicitly itemized in

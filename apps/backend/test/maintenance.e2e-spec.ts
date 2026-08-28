@@ -193,9 +193,9 @@ describe("Maintenance (Epic 9) — API-driven e2e", () => {
       expect(
         list.body.items.every((t: any) => t.houseId === villageA.houseId),
       ).toBe(true);
-      expect(
-        list.body.items.some((t: any) => t.id === created.body.id),
-      ).toBe(true);
+      expect(list.body.items.some((t: any) => t.id === created.body.id)).toBe(
+        true,
+      );
     });
 
     it("admin sees every ticket in the village", async () => {
@@ -217,9 +217,9 @@ describe("Maintenance (Epic 9) — API-driven e2e", () => {
         token: adminToken,
       });
       expect(list.status).toBe(200);
-      expect(
-        list.body.items.some((t: any) => t.id === created.body.id),
-      ).toBe(true);
+      expect(list.body.items.some((t: any) => t.id === created.body.id)).toBe(
+        true,
+      );
     });
 
     it("guard cannot list maintenance tickets (403) — not a guard concern per spec 2.4", async () => {
@@ -284,9 +284,9 @@ describe("Maintenance (Epic 9) — API-driven e2e", () => {
         token: adminAToken,
       });
       expect(res.status).toBe(200);
-      expect(
-        res.body.items.some((t: any) => t.id === bTicket.body.id),
-      ).toBe(false);
+      expect(res.body.items.some((t: any) => t.id === bTicket.body.id)).toBe(
+        false,
+      );
     });
 
     it("unauthenticated request is rejected with 401", async () => {
@@ -390,7 +390,10 @@ describe("Maintenance (Epic 9) — API-driven e2e", () => {
         `/maintenance-tickets/${id}/assign`,
         {
           token: adminToken,
-          body: { assignedTo: "ทีมช่างไฟฟ้า A", scheduledDate: "2026-09-05T09:00:00.000Z" },
+          body: {
+            assignedTo: "ทีมช่างไฟฟ้า A",
+            scheduledDate: "2026-09-05T09:00:00.000Z",
+          },
         },
       );
       expect(assignRes.status).toBe(200);

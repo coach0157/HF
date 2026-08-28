@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { MaintenanceService } from "./maintenance.service";
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
@@ -75,7 +79,9 @@ describe("MaintenanceService", () => {
 
     it("uploads the photo to the general entry-logs bucket (not the sensitive-id bucket) when provided", async () => {
       const claims = mockClaims();
-      fileStorage.savePhoto.mockResolvedValue("local://village-entry-logs/village-1/x.jpg");
+      fileStorage.savePhoto.mockResolvedValue(
+        "local://village-entry-logs/village-1/x.jpg",
+      );
       tx.maintenanceTicket.create.mockResolvedValue({ id: "ticket-1" });
 
       await service.create(
@@ -138,7 +144,12 @@ describe("MaintenanceService", () => {
       const claims = mockClaims({ role: "ADMIN", houseId: null });
 
       await service.list(
-        { page: 1, pageSize: 20, status: "OPEN" as any, category: "ROAD" as any },
+        {
+          page: 1,
+          pageSize: 20,
+          status: "OPEN",
+          category: "ROAD",
+        },
         claims,
       );
 
@@ -200,11 +211,17 @@ describe("MaintenanceService", () => {
         id: "t1",
         status: "OPEN",
       });
-      tx.maintenanceTicket.update.mockResolvedValue({ id: "t1", status: "IN_PROGRESS" });
+      tx.maintenanceTicket.update.mockResolvedValue({
+        id: "t1",
+        status: "IN_PROGRESS",
+      });
 
       await service.assign(
         "t1",
-        { assignedTo: "Team A", scheduledDate: "2026-09-01T00:00:00.000Z" } as any,
+        {
+          assignedTo: "Team A",
+          scheduledDate: "2026-09-01T00:00:00.000Z",
+        },
         mockClaims({ role: "ADMIN" }),
       );
 
@@ -226,7 +243,10 @@ describe("MaintenanceService", () => {
 
       await service.assign(
         "t1",
-        { assignedTo: "Team B", scheduledDate: "2026-09-02T00:00:00.000Z" } as any,
+        {
+          assignedTo: "Team B",
+          scheduledDate: "2026-09-02T00:00:00.000Z",
+        },
         mockClaims({ role: "ADMIN" }),
       );
 
@@ -263,7 +283,10 @@ describe("MaintenanceService", () => {
         id: "t1",
         status: "IN_PROGRESS",
       });
-      tx.maintenanceTicket.update.mockResolvedValue({ id: "t1", status: "DONE" });
+      tx.maintenanceTicket.update.mockResolvedValue({
+        id: "t1",
+        status: "DONE",
+      });
 
       const result = await service.updateStatus(
         "t1",
@@ -285,7 +308,11 @@ describe("MaintenanceService", () => {
       });
 
       await expect(
-        service.updateStatus("t1", { status: "DONE" } as any, mockClaims({ role: "ADMIN" })),
+        service.updateStatus(
+          "t1",
+          { status: "DONE" } as any,
+          mockClaims({ role: "ADMIN" }),
+        ),
       ).rejects.toThrow(BadRequestException);
       expect(tx.maintenanceTicket.update).not.toHaveBeenCalled();
     });
@@ -326,7 +353,11 @@ describe("MaintenanceService", () => {
       tx.maintenanceTicket.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updateStatus("missing", { status: "DONE" } as any, mockClaims({ role: "ADMIN" })),
+        service.updateStatus(
+          "missing",
+          { status: "DONE" } as any,
+          mockClaims({ role: "ADMIN" }),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });

@@ -37,9 +37,6 @@ export async function runInTenantTransaction<T>(
     await tx.$executeRaw`SELECT set_config('app.current_user_id', ${claims.userId}, true)`;
     await tx.$executeRaw`SELECT set_config('app.current_role', ${claims.role}, true)`;
 
-    return tenantRequestStorage.run(
-      { ...claims, tx: tx as unknown as PrismaClient },
-      fn,
-    );
+    return tenantRequestStorage.run({ ...claims, tx: tx }, fn);
   });
 }

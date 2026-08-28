@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { ChatService } from "./chat.service";
 import { CreateChatRoomDto } from "./dto/create-chat-room.dto";

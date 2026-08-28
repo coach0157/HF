@@ -42,7 +42,10 @@ export class UsersController {
   // service, not just here).
   @Roles("ADMIN", "RESIDENT", "GUARD")
   @Get()
-  list(@Query("role") role: UserRole | undefined, @CurrentUser() user: TenantClaims) {
+  list(
+    @Query("role") role: UserRole | undefined,
+    @CurrentUser() user: TenantClaims,
+  ) {
     return this.usersService.list({ role }, user);
   }
 

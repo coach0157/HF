@@ -28,7 +28,8 @@ export class ChatWsExceptionFilter extends BaseWsExceptionFilter {
       const message =
         typeof response === "string"
           ? response
-          : ((response as { message?: string | string[] })?.message ?? exception.message);
+          : ((response as { message?: string | string[] })?.message ??
+            exception.message);
       client.emit("exception", {
         status: "error",
         statusCode: exception.getStatus(),
@@ -36,6 +37,6 @@ export class ChatWsExceptionFilter extends BaseWsExceptionFilter {
       });
       return;
     }
-    super.catch(exception as WsException, host);
+    super.catch(exception, host);
   }
 }

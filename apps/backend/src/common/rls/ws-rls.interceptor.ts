@@ -50,7 +50,9 @@ export class WsRlsInterceptor implements NestInterceptor {
       // Should be unreachable in practice — handleConnection() disconnects
       // any socket that never got valid claims — but fail closed rather
       // than silently running the handler outside any tenant scope.
-      throw new UnauthorizedException("WebSocket connection is not authenticated");
+      throw new UnauthorizedException(
+        "WebSocket connection is not authenticated",
+      );
     }
 
     return from(

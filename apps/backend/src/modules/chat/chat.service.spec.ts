@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { ChatService } from "./chat.service";
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
@@ -73,7 +77,11 @@ describe("ChatService", () => {
     it("creates the village GROUP room on first call, upserts the caller as a participant", async () => {
       const claims = mockClaims();
       tx.chatRoom.findFirst.mockResolvedValue(null);
-      tx.chatRoom.create.mockResolvedValue({ id: "group-1", villageId: "village-1", type: "GROUP" });
+      tx.chatRoom.create.mockResolvedValue({
+        id: "group-1",
+        villageId: "village-1",
+        type: "GROUP",
+      });
 
       await service.listRooms(claims);
 
@@ -86,9 +94,15 @@ describe("ChatService", () => {
         },
       });
       expect(tx.chatParticipant.upsert).toHaveBeenCalledWith({
-        where: { chatRoomId_userId: { chatRoomId: "group-1", userId: "resident-1" } },
+        where: {
+          chatRoomId_userId: { chatRoomId: "group-1", userId: "resident-1" },
+        },
         update: {},
-        create: { villageId: "village-1", chatRoomId: "group-1", userId: "resident-1" },
+        create: {
+          villageId: "village-1",
+          chatRoomId: "group-1",
+          userId: "resident-1",
+        },
       });
     });
 
@@ -115,7 +129,14 @@ describe("ChatService", () => {
             type: "DIRECT",
             messages: [{ id: "m2" }],
             participants: [
-              { user: { id: "admin-1", name: "Admin A", phone: "0811111111", role: "ADMIN" } },
+              {
+                user: {
+                  id: "admin-1",
+                  name: "Admin A",
+                  phone: "0811111111",
+                  role: "ADMIN",
+                },
+              },
             ],
           },
         },
@@ -147,7 +168,12 @@ describe("ChatService", () => {
         {
           chatRoomId: "room-A",
           lastReadAt: null,
-          chatRoom: { id: "room-A", type: "GROUP", messages: [], participants: [] },
+          chatRoom: {
+            id: "room-A",
+            type: "GROUP",
+            messages: [],
+            participants: [],
+          },
         },
       ]);
 
@@ -162,10 +188,16 @@ describe("ChatService", () => {
 
   describe("createRoom — DIRECT find-or-create + role-pair validation", () => {
     it("rejects a resident<->resident direct chat", async () => {
-      tx.user.findUnique.mockResolvedValue({ id: "resident-2", role: "RESIDENT" });
+      tx.user.findUnique.mockResolvedValue({
+        id: "resident-2",
+        role: "RESIDENT",
+      });
 
       await expect(
-        service.createRoom({ type: "DIRECT", targetUserId: "resident-2" } as any, mockClaims()),
+        service.createRoom(
+          { type: "DIRECT", targetUserId: "resident-2" } as any,
+          mockClaims(),
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -203,7 +235,10 @@ describe("ChatService", () => {
       tx.chatRoom.findFirst.mockResolvedValue(null);
       tx.chatRoom.create.mockResolvedValue({ id: "room-2" });
 
-      await service.createRoom({ type: "DIRECT", targetUserId: "guard-1" } as any, mockClaims());
+      await service.createRoom(
+        { type: "DIRECT", targetUserId: "guard-1" } as any,
+        mockClaims(),
+      );
 
       expect(tx.chatRoom.create).toHaveBeenCalledWith({
         data: {
@@ -221,7 +256,10 @@ describe("ChatService", () => {
 
     it("rejects creating a direct chat with yourself", async () => {
       await expect(
-        service.createRoom({ type: "DIRECT", targetUserId: "resident-1" } as any, mockClaims()),
+        service.createRoom(
+          { type: "DIRECT", targetUserId: "resident-1" } as any,
+          mockClaims(),
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -229,7 +267,10 @@ describe("ChatService", () => {
       tx.user.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.createRoom({ type: "DIRECT", targetUserId: "ghost" } as any, mockClaims()),
+        service.createRoom(
+          { type: "DIRECT", targetUserId: "ghost" } as any,
+          mockClaims(),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -241,14 +282,21 @@ describe("ChatService", () => {
 
     it("GROUP creation is admin-only", async () => {
       await expect(
-        service.createRoom({ type: "GROUP", name: "x" } as any, mockClaims({ role: "RESIDENT" })),
+        service.createRoom(
+          { type: "GROUP", name: "x" } as any,
+          mockClaims({ role: "RESIDENT" }),
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(tx.chatRoom.create).not.toHaveBeenCalled();
     });
 
     it("admin can create a GROUP room and is added as a participant", async () => {
       tx.chatRoom.create.mockResolvedValue({ id: "group-2" });
-      const adminClaims = mockClaims({ role: "ADMIN", userId: "admin-1", houseId: null });
+      const adminClaims = mockClaims({
+        role: "ADMIN",
+        userId: "admin-1",
+        houseId: null,
+      });
 
       await service.createRoom(
         { type: "GROUP", name: "ประกาศพิเศษ", residentsCanPost: true } as any,
@@ -264,7 +312,11 @@ describe("ChatService", () => {
         },
       });
       expect(tx.chatParticipant.create).toHaveBeenCalledWith({
-        data: { villageId: "village-1", chatRoomId: "group-2", userId: "admin-1" },
+        data: {
+          villageId: "village-1",
+          chatRoomId: "group-2",
+          userId: "admin-1",
+        },
       });
     });
   });
@@ -272,7 +324,11 @@ describe("ChatService", () => {
   describe("updateRoom — admin-only, GROUP rooms only", () => {
     it("rejects a non-admin", async () => {
       await expect(
-        service.updateRoom("group-1", { residentsCanPost: true } as any, mockClaims()),
+        service.updateRoom(
+          "group-1",
+          { residentsCanPost: true } as any,
+          mockClaims(),
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(tx.chatRoom.findFirst).not.toHaveBeenCalled();
     });
@@ -289,7 +345,9 @@ describe("ChatService", () => {
     });
 
     it("rejects updating a DIRECT room", async () => {
-      (tx.chatRoom as any).findUnique = jest.fn().mockResolvedValue({ id: "room-A", type: "DIRECT" });
+      (tx.chatRoom as any).findUnique = jest
+        .fn()
+        .mockResolvedValue({ id: "room-A", type: "DIRECT" });
       await expect(
         service.updateRoom(
           "room-A",
@@ -300,12 +358,16 @@ describe("ChatService", () => {
     });
 
     it("admin can flip residentsCanPost on the village GROUP room", async () => {
-      (tx.chatRoom as any).findUnique = jest.fn().mockResolvedValue({ id: "group-1", type: "GROUP" });
-      (tx.chatRoom as any).update = jest.fn().mockResolvedValue({ id: "group-1", residentsCanPost: true });
+      (tx.chatRoom as any).findUnique = jest
+        .fn()
+        .mockResolvedValue({ id: "group-1", type: "GROUP" });
+      (tx.chatRoom as any).update = jest
+        .fn()
+        .mockResolvedValue({ id: "group-1", residentsCanPost: true });
 
       const result = await service.updateRoom(
         "group-1",
-        { residentsCanPost: true } as any,
+        { residentsCanPost: true },
         mockClaims({ role: "ADMIN", houseId: null }),
       );
 
@@ -336,18 +398,31 @@ describe("ChatService", () => {
 
       const result = await service.getMessages("room-A", mockClaims(), 1, 30);
 
-      expect(result).toEqual({ items: [{ id: "m1" }], total: 1, page: 1, pageSize: 30 });
+      expect(result).toEqual({
+        items: [{ id: "m1" }],
+        total: 1,
+        page: 1,
+        pageSize: 30,
+      });
     });
 
     it("markRead rejects a non-participant and updates lastReadAt for a member", async () => {
       tx.chatParticipant.findUnique.mockResolvedValueOnce(null);
-      await expect(service.markRead("room-X", mockClaims())).rejects.toThrow(ForbiddenException);
+      await expect(service.markRead("room-X", mockClaims())).rejects.toThrow(
+        ForbiddenException,
+      );
 
-      tx.chatParticipant.findUnique.mockResolvedValueOnce({ chatRoom: { id: "room-A" } });
-      tx.chatParticipant.update.mockResolvedValue({ lastReadAt: new Date("2026-01-01") });
+      tx.chatParticipant.findUnique.mockResolvedValueOnce({
+        chatRoom: { id: "room-A" },
+      });
+      tx.chatParticipant.update.mockResolvedValue({
+        lastReadAt: new Date("2026-01-01"),
+      });
       const result = await service.markRead("room-A", mockClaims());
       expect(tx.chatParticipant.update).toHaveBeenCalledWith({
-        where: { chatRoomId_userId: { chatRoomId: "room-A", userId: "resident-1" } },
+        where: {
+          chatRoomId_userId: { chatRoomId: "room-A", userId: "resident-1" },
+        },
         data: { lastReadAt: expect.any(Date) },
       });
       expect(result.lastReadAt).toEqual(new Date("2026-01-01"));
@@ -355,22 +430,30 @@ describe("ChatService", () => {
 
     it("assertCanJoin rejects a non-participant (join_room WS event authorization)", async () => {
       tx.chatParticipant.findUnique.mockResolvedValue(null);
-      await expect(service.assertCanJoin("room-X", mockClaims())).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertCanJoin("room-X", mockClaims()),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it("attachImage rejects a non-participant before touching FileStorageService", async () => {
       tx.chatParticipant.findUnique.mockResolvedValue(null);
       await expect(
-        service.attachImage("room-X", "data:image/jpeg;base64,abc", mockClaims()),
+        service.attachImage(
+          "room-X",
+          "data:image/jpeg;base64,abc",
+          mockClaims(),
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(fileStorage.savePhoto).not.toHaveBeenCalled();
     });
 
     it("attachImage saves to the general entry-logs bucket for a participant", async () => {
-      tx.chatParticipant.findUnique.mockResolvedValue({ chatRoom: { id: "room-A" } });
-      fileStorage.savePhoto.mockResolvedValue("local://village-entry-logs/village-1/x.jpg");
+      tx.chatParticipant.findUnique.mockResolvedValue({
+        chatRoom: { id: "room-A" },
+      });
+      fileStorage.savePhoto.mockResolvedValue(
+        "local://village-entry-logs/village-1/x.jpg",
+      );
 
       const result = await service.attachImage(
         "room-A",
@@ -383,7 +466,9 @@ describe("ChatService", () => {
         "village-1",
         "data:image/jpeg;base64,abc",
       );
-      expect(result).toEqual({ imageUrl: "local://village-entry-logs/village-1/x.jpg" });
+      expect(result).toEqual({
+        imageUrl: "local://village-entry-logs/village-1/x.jpg",
+      });
     });
   });
 
@@ -410,9 +495,16 @@ describe("ChatService", () => {
       tx.chatParticipant.findUnique.mockResolvedValue({
         chatRoom: { id: "group-1", type: "GROUP", residentsCanPost: true },
       });
-      tx.chatMessage.create.mockResolvedValue({ id: "msg-1", message: "hello" });
+      tx.chatMessage.create.mockResolvedValue({
+        id: "msg-1",
+        message: "hello",
+      });
 
-      const result = await service.sendMessage("group-1", { message: "hello" }, mockClaims());
+      const result = await service.sendMessage(
+        "group-1",
+        { message: "hello" },
+        mockClaims(),
+      );
 
       expect(result).toEqual({ id: "msg-1", message: "hello" });
     });

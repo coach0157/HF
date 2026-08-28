@@ -50,7 +50,12 @@ export class UsersService {
       });
     }
 
-    const staffRole = filters.role === "GUARD" ? "GUARD" : filters.role === "ADMIN" ? "ADMIN" : undefined;
+    const staffRole =
+      filters.role === "GUARD"
+        ? "GUARD"
+        : filters.role === "ADMIN"
+          ? "ADMIN"
+          : undefined;
     return tx.user.findMany({
       where: { role: staffRole ?? { in: ["ADMIN", "GUARD"] } },
       orderBy: { createdAt: "desc" },

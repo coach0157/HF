@@ -1,4 +1,10 @@
-import { Logger, UseFilters, UseInterceptors, UsePipes, ValidationPipe } from "@nestjs/common";
+import {
+  Logger,
+  UseFilters,
+  UseInterceptors,
+  UsePipes,
+  ValidationPipe,
+} from "@nestjs/common";
 import {
   ConnectedSocket,
   MessageBody,
@@ -31,7 +37,13 @@ import { ChatWsExceptionFilter } from "./chat-ws-exception.filter";
  * this one.
  */
 @WebSocketGateway({ cors: { origin: "*" } })
-@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+@UsePipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+)
 @UseFilters(ChatWsExceptionFilter)
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
@@ -62,7 +74,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket): Promise<void> {
     const token = client.handshake.auth?.token as string | undefined;
     if (!token) {
-      this.logger.debug(`WS connection rejected: no auth token (socket ${client.id})`);
+      this.logger.debug(
+        `WS connection rejected: no auth token (socket ${client.id})`,
+      );
       client.disconnect(true);
       return;
     }
@@ -73,7 +87,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         villageId: string;
         role: TenantClaims["role"];
         houseId?: string | null;
-      }>(token, { secret: this.configService.get<string>("JWT_ACCESS_SECRET") });
+      }>(token, {
+        secret: this.configService.get<string>("JWT_ACCESS_SECRET"),
+      });
 
       const claims: TenantClaims = {
         userId: payload.sub,
