@@ -167,3 +167,208 @@ Before a real (non-pilot) production launch, close these first:
 None of the above are regressions introduced by this QA pass — they're
 pre-existing, mostly self-disclosed gaps, restated here with verification
 status so Dev/SA can prioritize before a production go-live.
+
+---
+
+## QA pass 2 — Admin Dashboard (`apps/admin-web`) + new backend surfaces it needs
+
+**Scope:** `apps/admin-web` (React+Vite, all pages/lib) against `apps/backend`,
+specifically the two backend additions Dev built solely to support the
+dashboard and that had never been through QA: `src/modules/house/*` (new
+module) and `PATCH`/`DELETE /announcements/:id` (new endpoints on an
+existing module). Two items Dev explicitly flagged for extra scrutiny:
+(1) the announcement edit form's house-selection preload, (2)
+`OTP_DEV_BYPASS_CODE`'s `NODE_ENV=production` guard.
+
+### 1. Build / lint / regression tests
+
+| Check | Result |
+|---|---|
+| `npm run build` (root — backend + admin-web) | **Pass**, no errors, before and after this pass's changes |
+| `npm run lint` (`apps/backend`) | **Pass — 0 errors**, 7 pre-existing-style warnings (`require-await`/`no-floating-promises`), same warning pattern as before this pass. (Earlier QA pass 1 reported `eslint` as not installed at all — that's since been fixed; not something this pass touched.) |
+| `npm test` (unit, `apps/backend`) | **44/44 pass**, 7 suites — no regressions from House module or announcement PATCH/DELETE |
+| `npm run test:e2e` (`apps/backend`) | **60/60 pass**, 5 suites (35 pre-existing + 2 new files added this pass, see §2) — no regressions |
+
+### 2. New backend test coverage added this pass
+
+- **`src/common/otp/otp.service.spec.ts`** (new, 4 unit tests) — exercises the
+  real `OtpService` class (not mocked) with a real `ConfigService` stub, to
+  directly prove the `NODE_ENV` gate on `OTP_DEV_BYPASS_CODE`.
+- **`test/otp-prod-bypass.e2e-spec.ts`** (new, 2 e2e tests) — boots the full
+  `AppModule` over real HTTP with `process.env.NODE_ENV = "production"` set
+  *before* `ConfigModule` compiles (and with `OTP_DEV_BYPASS_CODE=000000`
+  still present, mirroring the exact misconfiguration risk: the var leaking
+  into a prod-like environment). Calls the real `/auth/otp/request` +
+  `/auth/login` endpoints.
+- **`test/house-announcement-mgmt.e2e-spec.ts`** (new, 23 e2e tests) — the
+  requested RBAC + cross-tenant coverage for `GET/POST /houses` and
+  `PATCH/DELETE /announcements/:id`: resident/guard get 403 on admin-only
+  house/announcement mutations, unauthenticated gets 401, a village never
+  sees or can mutate another village's houses/announcements (404, not just
+  filtered out), duplicate `houseNo` is 409-scoped per-village not globally,
+  basic DTO validation (bad latitude, missing required field, bad enum) is
+  400. Also includes a regression test for the target-house-preload fix
+  (§3 below) proving the round trip is now exactly what the admin asked for.
+
+### 3. Bug found and fixed — announcement HOUSE-scope edit silently dropped previously-targeted houses
+
+**Confirmed as a real, user-impacting bug**, exactly as Dev suspected when
+flagging it, and reproduced live in a real browser (Playwright, Chromium)
+against the running admin-web + backend dev servers, not just by reading
+code:
+
+- Root cause: `AnnouncementService.list()`
+  (`apps/backend/src/modules/announcement/announcement.service.ts`) never
+  included the `AnnouncementTarget` relation, so `GET /announcements` never
+  told the frontend which houses a `targetScope=HOUSE` announcement already
+  targeted.
+- `AnnouncementsPage.tsx`'s `startEdit()` therefore always initialized the
+  edit form's `targetHouseIds` to `[]` — every house checkbox rendered
+  unchecked on edit, regardless of the announcement's real state.
+- `AnnouncementService.update()` replaces `AnnouncementTarget` rows wholesale
+  whenever `targetHouseIds` is present in the PATCH body
+  (`deleteMany` then `createMany`) — and the frontend always sends
+  `targetHouseIds` when `targetScope === 'HOUSE'` (it's a required field in
+  the form). So: admin opens edit on a HOUSE-scope announcement targeting
+  houses A+B, sees an all-unchecked house list, re-checks only the house(s)
+  they remember/notice, saves — house B (or any house they didn't
+  re-check) is silently deleted from the target list with no warning. This
+  is silent data loss on a P0 MVP screen (announcement targeting), not a
+  cosmetic UX issue.
+- **Fix applied** (small, contained, no business-logic change beyond
+  "return the data that already exists"):
+  - Backend: `AnnouncementService.list()` now `include`s
+    `targets: { select: { houseId: true } }` in both the admin and
+    resident/guard query branches, and flattens the result to a
+    `targetHouseIds: string[]` field via a new private
+    `flattenTargetHouseIds()` helper.
+  - Frontend: `lib/types.ts`'s `Announcement` interface gained
+    `targetHouseIds: string[]`; `AnnouncementsPage.tsx`'s `startEdit()` now
+    seeds `form.targetHouseIds` from `a.targetHouseIds` instead of `[]`.
+  - No change to `update()`'s "replace wholesale" semantics — that behavior
+    is fine and arguably correct *given* an accurate preload; the bug was
+    purely that the preload had no data to work with.
+- **Verified fixed live in a real browser** (Playwright/Chromium, headless,
+  driving the actual Vite dev server + Nest dev server, not a mock): logged
+  in as the seeded admin (`0800000000`), created a HOUSE-scope announcement
+  targeting 2 real houses, opened its edit form — both house checkboxes were
+  pre-checked (previously both would render unchecked). Then deliberately
+  unchecked one house and saved; re-opening edit confirmed the kept house
+  stayed checked and the removed house stayed unchecked — i.e. the admin's
+  actual intent now round-trips correctly instead of being silently
+  overwritten by whatever happened to be checked. Also confirmed via
+  `test/house-announcement-mgmt.e2e-spec.ts`'s dedicated regression test
+  (`GET /announcements` returns `targetHouseIds` matching what was created;
+  a partial PATCH re-selection produces exactly that new set, nothing more
+  dropped than what was asked).
+- Files changed: `apps/backend/src/modules/announcement/announcement.service.ts`,
+  `apps/admin-web/src/lib/types.ts`, `apps/admin-web/src/pages/AnnouncementsPage.tsx`.
+
+### 4. OTP dev-bypass code — `NODE_ENV=production` guard confirmed to work
+
+**Confirmed safe.** `OtpService.verifyOtp()`
+(`apps/backend/src/common/otp/otp.service.ts`) gates the bypass with:
+
+```ts
+const isDev = this.config.get<string>("NODE_ENV", "development") !== "production";
+const matches = entry.code === code || (isDev && devBypass && code === devBypass);
+```
+
+This is correct: the bypass is only ever considered when `NODE_ENV !==
+"production"`, regardless of whether `OTP_DEV_BYPASS_CODE` is set. Verified
+two ways, both new to this pass:
+- **Unit level** (`otp.service.spec.ts`): the real `OtpService` class,
+  wired with a real `ConfigService`, accepts the bypass code under
+  `NODE_ENV=test`/unset (defaults to development) but rejects it outright
+  under `NODE_ENV=production` — even with `OTP_DEV_BYPASS_CODE=000000`
+  still configured (the exact scenario if Dev's local `.env` value ever
+  leaked into a prod-like deploy). A non-bypass wrong code is also still
+  correctly rejected in production mode (i.e. production doesn't just
+  "reject everything" — normal OTP verification still works).
+- **HTTP/e2e level** (`otp-prod-bypass.e2e-spec.ts`): booted the real
+  `AppModule` with `process.env.NODE_ENV` actually set to `"production"`
+  for that test process (set before `ConfigModule` compiles), and drove the
+  real `POST /auth/otp/request` + `POST /auth/login` endpoints. Logging in
+  with `otp: "000000"` (the bypass value) returns `401 Unauthorized` under
+  production config, exactly like any other wrong code would.
+
+No code change was needed here — Dev's existing guard is correctly
+implemented. This closes out the specific risk flagged in the task brief.
+
+### 5. House module + Announcement PATCH/DELETE — RBAC / RLS / validation review
+
+Read `apps/backend/src/modules/house/*` end to end (new module, never
+QA'd) and the announcement PATCH/DELETE additions, plus wrote the 23 e2e
+tests in §2 to adversarially confirm each claim below:
+
+- **RBAC**: `HouseController` — `GET /houses`, `GET /houses/:id` are
+  `@Roles("ADMIN", "GUARD")`; `POST /houses` is `@Roles("ADMIN")` only.
+  `AnnouncementController`'s new `PATCH`/`DELETE /announcements/:id` are
+  both `@Roles("ADMIN")`. All match MVP_BACKLOG.md Epic 5's intent (admin
+  manages houses/announcements; guard only needs read access to houses for
+  context, e.g. SOS house-number lookups). Confirmed by test: resident gets
+  403 on all four mutating/admin-only routes; guard gets 403 on
+  `POST /houses` and both announcement mutations; unauthenticated gets 401
+  everywhere.
+- **RLS/tenant scoping**: every query in `house.service.ts` and the
+  announcement service's `update()`/`remove()` goes through
+  `getTenantPrismaClient()` — no raw/unscoped Prisma client usage found. No
+  `PrismaService` direct-access escape hatch used anywhere in either
+  module. Confirmed by test: village B cannot list, fetch-by-id, `PATCH`,
+  or `DELETE` village A's houses/announcements (404 in every case, RLS
+  hides the row rather than the app returning 403 — consistent with the
+  rest of the codebase's established pattern, see QA pass 1's RLS
+  findings). `houseNo` uniqueness is correctly scoped per-village
+  (`@@unique([villageId, houseNo])`), not globally — same string is
+  accepted in two different villages, rejected (409) only within the same
+  one.
+- **Input validation**: `CreateHouseDto` has `class-validator` decorators on
+  every field (`houseNo` required + length-bounded, `zone`/`latitude`
+  /`longitude`/`ownerUserId` optional but type/range-checked when present,
+  lat/long bounded to real-world ranges). `UpdateAnnouncementDto` mirrors
+  `CreateAnnouncementDto`'s validation with everything optional. Confirmed
+  by test: out-of-range latitude (999) → 400, missing required `houseNo` →
+  400, invalid `level` enum value on PATCH → 400, switching to
+  `targetScope=ZONE` without `targetZone` on PATCH → 400.
+- No new RBAC, RLS, or validation gaps found in either module.
+
+### 6. UI test — resident/guard rejected from Admin Dashboard
+
+Verified with the same Playwright/Chromium browser session as §3, against
+the real running admin-web + backend dev servers (not mocked):
+
+- Resident (`0811111111`) and guard (`0822222222`) logging in through the
+  real login form (phone + dev-bypass OTP) both get the frontend's
+  role-check rejection ("บัญชีนี้ไม่ใช่บัญชีแอดมิน...") and stay on
+  `/login` — `LoginPage.tsx` correctly checks `res.user.role !== 'ADMIN'`
+  and never calls `setSession()` for them.
+- Unauthenticated direct navigation to a protected route
+  (`/announcements`) redirects to `/login` — `ProtectedRoute.tsx` works.
+  Confirmed at the **real security boundary**, not just the frontend
+  convenience guard: a resident's real (valid, backend-issued) JWT was
+  manually written into `localStorage` as `village_admin_session` (as if
+  the frontend guard were somehow bypassed) — `ProtectedRoute` still
+  bounces to `/login` because it checks `session.role !== 'ADMIN'`, and
+  independently, calling `POST /announcements` directly with that resident
+  token gets `403` from the backend's `RolesGuard`, confirming the backend
+  is the actual authority and does not trust the frontend at all.
+- Admin (`0800000000`) logs in successfully and lands on the dashboard.
+
+### 7. Go/No-Go — Admin Dashboard addition to the MVP
+
+**GO.** No blocking issues found. Build, lint, all 44 unit + 60 e2e tests
+(including 29 new tests written this pass) pass. The one real bug found
+(target-house preload causing silent data loss on announcement edit) is
+fixed, verified by both an automated regression test and a live browser
+run. The specific security concern flagged (OTP dev-bypass in production)
+was verified NOT to be exploitable, at both unit and real-HTTP level, no
+code change needed. RBAC/RLS/validation on the two new backend surfaces
+(House module, announcement PATCH/DELETE) hold up under the same
+adversarial testing standard as QA pass 1's findings for the original
+modules.
+
+Nothing new to add to QA pass 1's production-readiness punch list
+(FCM/SMS wiring, OTP store → Redis, Finding A's RLS wording, sensitive-photo
+`photo_url` nulling) — this pass's scope (Admin Dashboard UI + its two new
+backend surfaces) did not touch any of those areas and found no additional
+items of that severity.

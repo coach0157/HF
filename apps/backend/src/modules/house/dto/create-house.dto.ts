@@ -1,4 +1,13 @@
-import { IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
 
 /**
  * Dev-agent addition (not in spec 3.3's literal endpoint list, which never

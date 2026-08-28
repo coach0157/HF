@@ -71,7 +71,11 @@ export function AnnouncementsPage() {
       level: a.level,
       targetScope: a.targetScope,
       targetZone: a.targetZone ?? '',
-      targetHouseIds: [],
+      // QA fix: preload the houses already targeted (from GET /announcements'
+      // targetHouseIds) instead of starting from an empty selection — leaving
+      // this empty forced admins to re-pick every house on every edit and
+      // silently dropped any they missed (data loss). See docs/QA_REPORT.md.
+      targetHouseIds: a.targetHouseIds ?? [],
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }

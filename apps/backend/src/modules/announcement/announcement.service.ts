@@ -132,12 +132,26 @@ export class AnnouncementService {
    * Feed filtered to the CALLING user's house/zone against each
    * announcement's target_scope (spec 2.2 / entry-log.module.ts-style TODO
    * on announcement.module.ts). Admins see everything (authoring/oversight).
+   *
+   * QA fix: both branches now `include: { targets }` and flatten to a
+   * `targetHouseIds: string[]` field on each returned announcement. Without
+   * this, the Admin Dashboard's edit form (AnnouncementsPage.tsx's
+   * startEdit()) had no way to preload which houses a HOUSE-scope
+   * announcement already targeted — every edit forced the admin to
+   * re-select houses from an all-unchecked list, and update()'s
+   * "replace wholesale when targetHouseIds is supplied" behavior meant an
+   * incomplete re-selection silently dropped previously-targeted houses
+   * (silent data loss). See docs/QA_REPORT.md.
    */
   async list(claims: TenantClaims) {
     const tx = getTenantPrismaClient<PrismaClient>();
 
     if (claims.role === UserRole.ADMIN) {
-      return tx.announcement.findMany({ orderBy: { createdAt: "desc" } });
+      const rows = await tx.announcement.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { targets: { select: { houseId: true } } },
+      });
+      return rows.map((a) => this.flattenTargetHouseIds(a));
     }
 
     let zone: string | null = null;
@@ -161,11 +175,22 @@ export class AnnouncementService {
       });
     }
 
-    return tx.announcement.findMany({
+    const rows = await tx.announcement.findMany({
       where: { OR: or },
       orderBy: { createdAt: "desc" },
-      include: { reads: { where: { userId: claims.userId } } },
+      include: {
+        reads: { where: { userId: claims.userId } },
+        targets: { select: { houseId: true } },
+      },
     });
+    return rows.map((a) => this.flattenTargetHouseIds(a));
+  }
+
+  private flattenTargetHouseIds<T extends { targets?: { houseId: string }[] }>(
+    a: T,
+  ): Omit<T, "targets"> & { targetHouseIds: string[] } {
+    const { targets, ...rest } = a;
+    return { ...rest, targetHouseIds: (targets ?? []).map((t) => t.houseId) };
   }
 
   /**
@@ -201,11 +226,7 @@ export class AnnouncementService {
    * AnnouncementTarget rows wholesale when targetHouseIds is supplied
    * (simpler and safer than a diff for MVP's low write-volume).
    */
-  async update(
-    id: string,
-    dto: UpdateAnnouncementDto,
-    claims: TenantClaims,
-  ) {
+  async update(id: string, dto: UpdateAnnouncementDto, claims: TenantClaims) {
     const tx = getTenantPrismaClient<PrismaClient>();
     const existing = await tx.announcement.findUnique({ where: { id } });
     if (!existing) {

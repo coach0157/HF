@@ -39,6 +39,12 @@ export interface Announcement {
   level: AnnouncementLevel;
   targetScope: AnnouncementTargetScope;
   targetZone: string | null;
+  // Populated by GET /announcements (QA fix — see announcement.service.ts's
+  // list()/flattenTargetHouseIds()): the house ids currently targeted when
+  // targetScope = HOUSE, so the edit form can preload existing selections
+  // instead of forcing the admin to re-pick from scratch (previously caused
+  // silent data loss on edit — see docs/QA_REPORT.md).
+  targetHouseIds: string[];
   imageUrl: string | null;
   createdAt: string;
 }

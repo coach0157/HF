@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
