@@ -63,7 +63,7 @@ cp apps/admin-web/.env.example apps/admin-web/.env.local
 ## Running in dev
 
 ```bash
-# Terminal 1 — backend (http://localhost:3000, Swagger at /docs)
+# Terminal 1 — backend (http://localhost:3001, Swagger at /docs)
 npm run dev:backend
 
 # Terminal 2 — admin dashboard (http://localhost:5173)
@@ -73,7 +73,7 @@ npm run dev:admin
 Smoke-test the backend once it's up:
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 # => {"status":"ok","db":"connected"}
 ```
 
