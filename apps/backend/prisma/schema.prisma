@@ -1,0 +1,554 @@
+// Village Security & Community App — Prisma schema
+// Source of truth for structure: village-security-app-spec.md section 3.2 (ER Overview)
+// Naming convention: Prisma models/fields use camelCase (idiomatic for the generated
+// TS client that Dev agents will consume); every field is @map'd to the exact
+// snake_case column name used in the spec, and every table is @@map'd to the exact
+// spec table name. Enum values are UPPER_CASE on the TS side and @map'd to the
+// lowercase string literals used in the spec (e.g. status[unused/entered/exited]).
+//
+// Multi-tenant / RLS: every model below that is NOT `Village` itself carries a
+// `villageId` column (denormalized per spec 3.2, extended here to every tenant-owned
+// table for uniform Row-Level Security coverage — see docs/ARCHITECTURE.md "ADR-002").
+// Row-Level Security policies are NOT expressed in this file (Prisma has no schema
+// syntax for RLS policies) — they live in prisma/sql/rls-policies.sql and are applied
+// as a follow-up migration. See docs/ARCHITECTURE.md for the full pattern.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  RESIDENT @map("resident")
+  GUARD    @map("guard")
+  ADMIN    @map("admin")
+
+  @@map("user_role")
+}
+
+enum VillageStatus {
+  ACTIVE    @map("active")
+  SUSPENDED @map("suspended")
+
+  @@map("village_status")
+}
+
+enum VisitorPassUsageType {
+  SINGLE @map("single")
+  MULTI  @map("multi")
+
+  @@map("visitor_pass_usage_type")
+}
+
+enum VisitorPassStatus {
+  UNUSED  @map("unused")
+  ENTERED @map("entered")
+  EXITED  @map("exited")
+  EXPIRED @map("expired")
+  REVOKED @map("revoked")
+
+  @@map("visitor_pass_status")
+}
+
+enum EntryMethod {
+  QR     @map("qr")
+  MANUAL @map("manual")
+
+  @@map("entry_method")
+}
+
+enum ExitConfirmationMethod {
+  GUARD    @map("guard")
+  RESIDENT @map("resident")
+
+  @@map("exit_confirmation_method")
+}
+
+enum AnnouncementLevel {
+  NORMAL    @map("normal")
+  IMPORTANT @map("important")
+  EMERGENCY @map("emergency")
+
+  @@map("announcement_level")
+}
+
+enum AnnouncementTargetScope {
+  ALL   @map("all")
+  ZONE  @map("zone")
+  HOUSE @map("house")
+
+  @@map("announcement_target_scope")
+}
+
+enum SosStatus {
+  PENDING      @map("pending")
+  ACKNOWLEDGED @map("acknowledged")
+  RESOLVED     @map("resolved")
+
+  @@map("sos_status")
+}
+
+enum GuardShiftStatus {
+  ON_DUTY  @map("on_duty")
+  OFF_DUTY @map("off_duty")
+
+  @@map("guard_shift_status")
+}
+
+enum ChatRoomType {
+  DIRECT @map("direct")
+  GROUP  @map("group")
+
+  @@map("chat_room_type")
+}
+
+enum MaintenanceStatus {
+  OPEN        @map("open")
+  IN_PROGRESS @map("in_progress")
+  DONE        @map("done")
+
+  @@map("maintenance_status")
+}
+
+enum BillStatus {
+  UNPAID @map("unpaid")
+  PAID   @map("paid")
+
+  @@map("bill_status")
+}
+
+// ---------------------------------------------------------------------------
+// Tenant root
+// ---------------------------------------------------------------------------
+
+/// Tenant root table. NOT subject to RLS itself (there is no "village_id" to
+/// filter by) — cross-village access to this table is controlled purely at the
+/// application layer (e.g. only a platform-level super-admin role, out of MVP
+/// scope, may list all villages).
+model Village {
+  id                String        @id @default(uuid()) @db.Uuid
+  name              String
+  address           String?
+  subscriptionPlan  String?       @map("subscription_plan")
+  status            VillageStatus @default(ACTIVE)
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  users                User[]
+  houses               House[]
+  visitorPasses        VisitorPass[]
+  entryLogs            EntryLog[]
+  announcements        Announcement[]
+  sosAlerts            SosAlert[]
+  guardShifts          GuardShift[]
+  chatRooms            ChatRoom[]
+  maintenanceTickets   MaintenanceTicket[]
+  facilities           Facility[]
+  bills                Bill[]
+  auditLogs            AuditLog[]
+
+  @@map("villages")
+}
+
+// ---------------------------------------------------------------------------
+// Users / Houses
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  villageId    String   @map("village_id") @db.Uuid
+  name         String
+  phone        String
+  role         UserRole
+  houseId      String?  @map("house_id") @db.Uuid
+  lineUserId   String?  @map("line_user_id")
+  passwordHash String?  @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  house   House?  @relation("HouseResidents", fields: [houseId], references: [id], onDelete: SetNull)
+
+  ownedHouses            House[]              @relation("HouseOwner")
+  houseMemberships       HouseMember[]
+  createdVisitorPasses   VisitorPass[]        @relation("VisitorPassCreatedBy")
+  recordedEntryLogs      EntryLog[]           @relation("EntryLogRecordedByGuard")
+  exitConfirmedEntryLogs EntryLog[]           @relation("EntryLogExitConfirmedBy")
+  createdAnnouncements   Announcement[]       @relation("AnnouncementCreatedByAdmin")
+  announcementReads      AnnouncementRead[]
+  triggeredSosAlerts     SosAlert[]           @relation("SosAlertTriggeredBy")
+  acknowledgedSosAlerts  SosAlert[]           @relation("SosAlertAcknowledgedByGuard")
+  guardShifts            GuardShift[]
+  chatParticipants       ChatParticipant[]
+  sentChatMessages       ChatMessage[]
+  maintenanceTickets     MaintenanceTicket[]  @relation("MaintenanceTicketCreatedBy")
+  bookings               Booking[]
+  auditLogs              AuditLog[]
+
+  // Same phone number cannot be registered twice within the same village.
+  // (A person living in two different villages could reuse a phone number —
+  // deliberately NOT globally unique.)
+  @@unique([villageId, phone])
+  @@index([villageId, role])
+  @@map("users")
+}
+
+model House {
+  id          String   @id @default(uuid()) @db.Uuid
+  villageId   String   @map("village_id") @db.Uuid
+  houseNo     String   @map("house_no")
+  zone        String?
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  ownerUserId String?  @map("owner_user_id") @db.Uuid
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  owner   User?   @relation("HouseOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  residents            User[]               @relation("HouseResidents")
+  members              HouseMember[]
+  entryLogs            EntryLog[]
+  sosAlerts            SosAlert[]
+  maintenanceTickets   MaintenanceTicket[]
+  bookings             Booking[]
+  bills                Bill[]
+
+  @@unique([villageId, houseNo])
+  @@index([villageId, zone])
+  @@map("houses")
+}
+
+model HouseMember {
+  id        String  @id @default(uuid()) @db.Uuid
+  villageId String  @map("village_id") @db.Uuid
+  houseId   String  @map("house_id") @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  relation  String
+
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([houseId, userId])
+  @@index([villageId])
+  @@map("house_members")
+}
+
+// ---------------------------------------------------------------------------
+// Visitor QR + Entry/Exit log (Epic 2)
+// ---------------------------------------------------------------------------
+
+model VisitorPass {
+  id            String               @id @default(uuid()) @db.Uuid
+  villageId     String               @map("village_id") @db.Uuid
+  createdByUserId String             @map("created_by_user_id") @db.Uuid
+  visitorName   String               @map("visitor_name")
+  visitorPhone  String?              @map("visitor_phone")
+  vehiclePlate  String?              @map("vehicle_plate")
+  qrToken       String               @unique @map("qr_token")
+  validFrom     DateTime             @map("valid_from")
+  validTo       DateTime             @map("valid_to")
+  usageType     VisitorPassUsageType @map("usage_type")
+  status        VisitorPassStatus    @default(UNUSED)
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  village   Village    @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  createdBy User       @relation("VisitorPassCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  entryLogs EntryLog[]
+
+  @@index([villageId, status])
+  @@map("visitor_passes")
+}
+
+model EntryLog {
+  id                      String                   @id @default(uuid()) @db.Uuid
+  villageId               String                   @map("village_id") @db.Uuid
+  passId                  String?                  @map("pass_id") @db.Uuid
+  houseId                 String                   @map("house_id") @db.Uuid
+  recordedByGuardId       String                   @map("recorded_by_guard_id") @db.Uuid
+  visitorName             String                   @map("visitor_name")
+  vehiclePlate            String?                  @map("vehicle_plate")
+  photoUrl                String?                  @map("photo_url")
+  entryTime               DateTime                 @map("entry_time")
+  exitTime                DateTime?                @map("exit_time")
+  exitConfirmedByUserId   String?                  @map("exit_confirmed_by_user_id") @db.Uuid
+  exitConfirmationMethod  ExitConfirmationMethod?   @map("exit_confirmation_method")
+  method                  EntryMethod
+  createdAt               DateTime                 @default(now()) @map("created_at")
+
+  village           Village      @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  pass              VisitorPass? @relation(fields: [passId], references: [id], onDelete: SetNull)
+  house             House        @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  recordedByGuard   User         @relation("EntryLogRecordedByGuard", fields: [recordedByGuardId], references: [id], onDelete: Restrict)
+  exitConfirmedBy   User?        @relation("EntryLogExitConfirmedBy", fields: [exitConfirmedByUserId], references: [id], onDelete: SetNull)
+
+  // Supports `GET /entry-logs?house_id=&date=` and the 6-month retention search.
+  @@index([villageId, houseId, entryTime])
+  @@map("entry_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Announcements (Epic 3)
+// ---------------------------------------------------------------------------
+
+model Announcement {
+  id                String                   @id @default(uuid()) @db.Uuid
+  villageId         String                   @map("village_id") @db.Uuid
+  createdByAdminId  String                   @map("created_by_admin_id") @db.Uuid
+  title             String
+  content           String
+  level             AnnouncementLevel        @default(NORMAL)
+  targetScope       AnnouncementTargetScope  @map("target_scope")
+  imageUrl          String?                  @map("image_url")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+
+  village   Village            @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  createdBy User               @relation("AnnouncementCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  reads     AnnouncementRead[]
+
+  @@index([villageId, createdAt])
+  @@map("announcements")
+}
+
+model AnnouncementRead {
+  id             String   @id @default(uuid()) @db.Uuid
+  villageId      String   @map("village_id") @db.Uuid
+  announcementId String   @map("announcement_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at")
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Idempotent read receipts: one row per (announcement, user).
+  @@unique([announcementId, userId])
+  @@index([villageId])
+  @@map("announcement_reads")
+}
+
+// ---------------------------------------------------------------------------
+// SOS / Emergency + Guard shifts (Epic 4)
+// ---------------------------------------------------------------------------
+
+model SosAlert {
+  id                    String    @id @default(uuid()) @db.Uuid
+  villageId             String    @map("village_id") @db.Uuid
+  triggeredByUserId     String    @map("triggered_by_user_id") @db.Uuid
+  houseId               String    @map("house_id") @db.Uuid
+  latitude              Decimal?  @db.Decimal(9, 6)
+  longitude             Decimal?  @db.Decimal(9, 6)
+  status                SosStatus @default(PENDING)
+  acknowledgedByGuardId String?   @map("acknowledged_by_guard_id") @db.Uuid
+  createdAt             DateTime  @default(now()) @map("created_at")
+  resolvedAt            DateTime? @map("resolved_at")
+
+  village          Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  triggeredBy      User    @relation("SosAlertTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: Cascade)
+  house            House   @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  acknowledgedBy   User?   @relation("SosAlertAcknowledgedByGuard", fields: [acknowledgedByGuardId], references: [id], onDelete: SetNull)
+
+  @@index([villageId, status])
+  @@map("sos_alerts")
+}
+
+model GuardShift {
+  id          String           @id @default(uuid()) @db.Uuid
+  villageId   String           @map("village_id") @db.Uuid
+  guardUserId String           @map("guard_user_id") @db.Uuid
+  shiftStart  DateTime         @map("shift_start")
+  shiftEnd    DateTime?        @map("shift_end")
+  status      GuardShiftStatus @default(OFF_DUTY)
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  guard   User    @relation(fields: [guardUserId], references: [id], onDelete: Cascade)
+
+  // Routing query for Epic 4: `WHERE village_id = ? AND status = 'on_duty'`.
+  @@index([villageId, status])
+  @@map("guard_shifts")
+}
+
+// ---------------------------------------------------------------------------
+// Chat (Phase 2 — schema included now so the table shape is stable; no chat
+// endpoints are implemented in the MVP backlog)
+// ---------------------------------------------------------------------------
+
+model ChatRoom {
+  id        String       @id @default(uuid()) @db.Uuid
+  villageId String       @map("village_id") @db.Uuid
+  type      ChatRoomType
+  name      String?
+
+  village      Village           @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+
+  @@index([villageId])
+  @@map("chat_rooms")
+}
+
+model ChatParticipant {
+  id         String @id @default(uuid()) @db.Uuid
+  villageId  String @map("village_id") @db.Uuid
+  chatRoomId String @map("chat_room_id") @db.Uuid
+  userId     String @map("user_id") @db.Uuid
+
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatRoomId, userId])
+  @@index([villageId])
+  @@map("chat_participants")
+}
+
+model ChatMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  villageId  String   @map("village_id") @db.Uuid
+  chatRoomId String   @map("chat_room_id") @db.Uuid
+  senderId   String   @map("sender_id") @db.Uuid
+  message    String?
+  imageUrl   String?  @map("image_url")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  sender   User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([villageId, chatRoomId, createdAt])
+  @@map("chat_messages")
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance tickets (Phase 2 — schema only)
+// ---------------------------------------------------------------------------
+
+model MaintenanceTicket {
+  id              String             @id @default(uuid()) @db.Uuid
+  villageId       String             @map("village_id") @db.Uuid
+  houseId         String             @map("house_id") @db.Uuid
+  createdByUserId String             @map("created_by_user_id") @db.Uuid
+  category        String
+  description     String
+  imageUrl        String?            @map("image_url")
+  status          MaintenanceStatus  @default(OPEN)
+  assignedTo      String?            @map("assigned_to")
+  scheduledDate   DateTime?          @map("scheduled_date")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  village   Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  house     House   @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("MaintenanceTicketCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([villageId, status])
+  @@map("maintenance_tickets")
+}
+
+// ---------------------------------------------------------------------------
+// Facility booking (Phase 3 — schema only)
+// ---------------------------------------------------------------------------
+
+model Facility {
+  id          String   @id @default(uuid()) @db.Uuid
+  villageId   String   @map("village_id") @db.Uuid
+  name        String
+  description String?
+  openTime    String?  @map("open_time")
+  closeTime   String?  @map("close_time")
+  rules       String?
+
+  village  Village   @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([villageId])
+  @@map("facilities")
+}
+
+model Booking {
+  id         String   @id @default(uuid()) @db.Uuid
+  // Denormalized for RLS even though `facility_id` already scopes this row
+  // indirectly — see docs/ARCHITECTURE.md "ADR-002".
+  villageId  String   @map("village_id") @db.Uuid
+  facilityId String   @map("facility_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  houseId    String   @map("house_id") @db.Uuid
+  startTime  DateTime @map("start_time")
+  endTime    DateTime @map("end_time")
+  status     String
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  house    House    @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  @@index([villageId, facilityId, startTime])
+  @@map("bookings")
+}
+
+// ---------------------------------------------------------------------------
+// Billing / Payments (Phase 3 — schema only)
+// ---------------------------------------------------------------------------
+
+model Bill {
+  id        String     @id @default(uuid()) @db.Uuid
+  villageId String     @map("village_id") @db.Uuid
+  houseId   String     @map("house_id") @db.Uuid
+  period    String
+  amount    Decimal    @db.Decimal(12, 2)
+  dueDate   DateTime   @map("due_date")
+  status    BillStatus @default(UNPAID)
+  paidAt    DateTime?  @map("paid_at")
+
+  village  Village   @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  house    House     @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([villageId, houseId, status])
+  @@map("bills")
+}
+
+model Payment {
+  id             String   @id @default(uuid()) @db.Uuid
+  // Denormalized for RLS even though `bill_id` already scopes this row
+  // indirectly — see docs/ARCHITECTURE.md "ADR-002".
+  villageId      String   @map("village_id") @db.Uuid
+  billId         String   @map("bill_id") @db.Uuid
+  amount         Decimal  @db.Decimal(12, 2)
+  method         String
+  transactionRef String?  @map("transaction_ref")
+  paidAt         DateTime @default(now()) @map("paid_at")
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([villageId, billId])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log (spec 3.4: "Log การเข้าถึงข้อมูลอ่อนไหว (audit trail) สำหรับแอดมิน")
+// Was referenced in the spec's security section but missing from the ER
+// diagram — added here to close that gap. Append-only: no update/delete
+// endpoint should ever be exposed for this table.
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  villageId    String   @map("village_id") @db.Uuid
+  actorUserId  String   @map("actor_user_id") @db.Uuid
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id") @db.Uuid
+  metadata     Json?
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  actor   User    @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  // Supports "who viewed this resident's ID card photo" style lookups and
+  // per-village audit review ordered by time.
+  @@index([villageId, createdAt])
+  @@index([villageId, resourceType, resourceId])
+  @@map("audit_logs")
+}

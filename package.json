@@ -1,0 +1,21 @@
+{
+  "name": "village-security-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Village Security & Community App — monorepo root (npm workspaces)",
+  "workspaces": [
+    "apps/backend",
+    "apps/admin-web"
+  ],
+  "scripts": {
+    "dev:backend": "npm run start:dev --workspace apps/backend",
+    "dev:admin": "npm run dev --workspace apps/admin-web",
+    "build:backend": "npm run build --workspace apps/backend",
+    "build:admin": "npm run build --workspace apps/admin-web",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "prisma:generate": "npm run prisma:generate --workspace apps/backend",
+    "prisma:migrate:dev": "npm run prisma:migrate:dev --workspace apps/backend",
+    "prisma:seed": "npm run prisma:seed --workspace apps/backend"
+  }
+}

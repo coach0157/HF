@@ -202,7 +202,12 @@ bookings (id, facility_id, user_id, house_id, start_time, end_time, status)
 
 bills (id, village_id, house_id, period, amount, due_date, status[unpaid/paid], paid_at)
 payments (id, bill_id, amount, method, transaction_ref, paid_at)
+
+audit_logs (id, village_id, actor_user_id, action, resource_type, resource_id NULLABLE,
+            metadata JSON NULLABLE, ip_address, created_at)
 ```
+
+> `audit_logs` รองรับข้อกำหนดข้อ 3.4 "Log การเข้าถึงข้อมูลอ่อนไหว (audit trail) สำหรับแอดมิน" — เป็น append-only ห้ามมี endpoint แก้ไข/ลบ บันทึกทุกครั้งที่แอดมินเข้าถึงข้อมูลอ่อนไหว (เช่น ดูรูปบัตร ปชช., export ประวัติเข้า-ออก, revoke QR ของคนอื่น)
 
 ### 3.3 โครงสร้าง API หลัก (REST ตัวอย่าง)
 
