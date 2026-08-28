@@ -23,6 +23,7 @@ export type ResidentTabParamList = {
   InviteGuest: undefined;
   QrDisplay: { pass: VisitorPass };
   EntryHistory: undefined;
+  Transport: undefined;
   Announcements: undefined;
   Profile: undefined;
 };

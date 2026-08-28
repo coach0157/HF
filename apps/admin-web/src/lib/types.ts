@@ -100,3 +100,17 @@ export interface Paginated<T> {
   page: number;
   pageSize: number;
 }
+
+// Epic 10 — Transport Directory (spec 2.7 / docs/PHASE2_BACKLOG.md Epic 10).
+export type TransportProviderType = 'MOTORCYCLE' | 'TAXI' | 'VAN' | 'OTHER';
+
+export interface TransportProvider {
+  id: string;
+  villageId: string;
+  name: string;
+  type: TransportProviderType;
+  phone: string;
+  serviceArea: string | null;
+  isActive: boolean;
+  createdAt: string;
+}

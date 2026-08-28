@@ -17,6 +17,7 @@ import { ResidentHomeScreen } from "../screens/resident/HomeScreen";
 import { InviteGuestScreen } from "../screens/resident/InviteGuestScreen";
 import { QrDisplayScreen } from "../screens/resident/QrDisplayScreen";
 import { EntryHistoryScreen } from "../screens/resident/EntryHistoryScreen";
+import { TransportScreen } from "../screens/resident/TransportScreen";
 import { AnnouncementsScreen } from "../screens/resident/AnnouncementsScreen";
 import { ProfileScreen } from "../screens/resident/ProfileScreen";
 import type { ResidentTabParamList } from "./types";
@@ -44,6 +45,11 @@ function HomeStackNavigator() {
         name="EntryHistory"
         component={EntryHistoryScreen}
         options={{ title: "ประวัติเข้า-ออก" }}
+      />
+      <HomeStack.Screen
+        name="Transport"
+        component={TransportScreen}
+        options={{ title: "เรียกรถโดยสาร" }}
       />
     </HomeStack.Navigator>
   );

@@ -129,6 +129,10 @@ export function ResidentHomeScreen() {
           <Text style={styles.cardIcon}>🕒</Text>
           <Text style={styles.cardLabel}>ประวัติเข้า-ออก</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate("Transport")}>
+          <Text style={styles.cardIcon}>🚕</Text>
+          <Text style={styles.cardLabel}>เรียกรถโดยสาร</Text>
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.sectionTitle}>ประกาศล่าสุด</Text>

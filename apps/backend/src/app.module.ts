@@ -8,6 +8,7 @@ import { AnnouncementModule } from "./modules/announcement/announcement.module";
 import { SosModule } from "./modules/sos/sos.module";
 import { GuardShiftModule } from "./modules/guard-shift/guard-shift.module";
 import { HouseModule } from "./modules/house/house.module";
+import { TransportProviderModule } from "./modules/transport-provider/transport-provider.module";
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { HouseModule } from "./modules/house/house.module";
     SosModule,
     GuardShiftModule,
     HouseModule,
+    TransportProviderModule,
   ],
 })
 export class AppModule implements NestModule {
