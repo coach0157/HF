@@ -116,5 +116,12 @@ export const api = {
       method: "PATCH",
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
-  delete: <T>(path: string) => apiFetch<T>(path, { method: "DELETE" }),
+  // `body` is optional (most DELETE calls in this app don't need one) —
+  // added for Epic 11's `DELETE /push-tokens`, which does (identifies WHICH
+  // of a user's possibly-several device tokens to remove).
+  delete: <T>(path: string, body?: unknown) =>
+    apiFetch<T>(path, {
+      method: "DELETE",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
 };

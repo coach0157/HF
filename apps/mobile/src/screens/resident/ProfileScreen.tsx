@@ -15,6 +15,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacit
 import { api, ApiError } from "../../lib/api";
 import { clearSession } from "../../lib/auth";
 import { disconnectChatSocket } from "../../lib/chat";
+import { unregisterPushTokenAsync } from "../../lib/push";
 import { useAuth } from "../../context/AuthContext";
 import type { House } from "../../lib/types";
 
@@ -51,6 +52,9 @@ export function ProfileScreen() {
       }
     } finally {
       disconnectChatSocket();
+      // Epic 11 (ADR-006): must run BEFORE clearSession() — it needs the
+      // still-valid JWT to call DELETE /push-tokens.
+      await unregisterPushTokenAsync();
       await clearSession();
       setSession(null);
       setLoggingOut(false);

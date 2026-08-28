@@ -20,6 +20,7 @@ function mockClaims(overrides: Partial<TenantClaims> = {}): TenantClaims {
 
 describe("SosService", () => {
   let service: SosService;
+  let pushNotificationService: { send: jest.Mock };
   let tx: {
     sosAlert: {
       create: jest.Mock;
@@ -31,7 +32,8 @@ describe("SosService", () => {
   };
 
   beforeEach(() => {
-    service = new SosService();
+    pushNotificationService = { send: jest.fn() };
+    service = new SosService(pushNotificationService as any);
     tx = {
       sosAlert: {
         create: jest.fn(),
@@ -64,6 +66,28 @@ describe("SosService", () => {
         "guard-on-duty-1",
         "guard-on-duty-2",
       ]);
+
+      // Epic 11 (ADR-006): push is fire-and-forget — sent with exactly the
+      // routing result, never awaited by trigger().
+      expect(pushNotificationService.send).toHaveBeenCalledWith(
+        ["guard-on-duty-1", "guard-on-duty-2"],
+        expect.objectContaining({
+          data: { type: "sos", id: "alert-1" },
+        }),
+      );
+    });
+
+    it("Epic 11 (ADR-006): does not call push when no guard is on duty", async () => {
+      const claims = mockClaims();
+      tx.sosAlert.create.mockResolvedValue({ id: "alert-1" });
+      tx.guardShift.findMany.mockResolvedValue([]);
+
+      await service.trigger({}, claims);
+
+      expect(pushNotificationService.send).toHaveBeenCalledWith(
+        [],
+        expect.anything(),
+      );
     });
 
     it("edge case (spec 2.2): only queries guards with status ON_DUTY and no shiftEnd — an off-duty guard is structurally excluded", async () => {

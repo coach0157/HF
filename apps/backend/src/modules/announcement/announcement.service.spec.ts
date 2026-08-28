@@ -24,6 +24,7 @@ function mockClaims(overrides: Partial<TenantClaims> = {}): TenantClaims {
 
 describe("AnnouncementService", () => {
   let service: AnnouncementService;
+  let pushNotificationService: { send: jest.Mock };
   let tx: {
     announcement: {
       create: jest.Mock;
@@ -37,7 +38,8 @@ describe("AnnouncementService", () => {
   };
 
   beforeEach(() => {
-    service = new AnnouncementService();
+    pushNotificationService = { send: jest.fn() };
+    service = new AnnouncementService(pushNotificationService as any);
     tx = {
       announcement: {
         create: jest.fn(),
@@ -55,7 +57,13 @@ describe("AnnouncementService", () => {
   describe("create", () => {
     it("happy path: ALL scope resolves every resident as a recipient", async () => {
       const claims = mockClaims();
-      const created = { id: "ann-1", targetScope: AnnouncementTargetScope.ALL };
+      const created = {
+        id: "ann-1",
+        title: "Water outage",
+        content: "Water will be off 10:00-12:00",
+        level: AnnouncementLevel.NORMAL,
+        targetScope: AnnouncementTargetScope.ALL,
+      };
       tx.announcement.create.mockResolvedValue(created);
       tx.user.findMany.mockResolvedValue([{ id: "res-1" }, { id: "res-2" }]);
 
@@ -75,6 +83,48 @@ describe("AnnouncementService", () => {
         where: { role: UserRole.RESIDENT },
         select: { id: true },
       });
+
+      // Epic 11 (ADR-006): push fires for every level (not emergency-only),
+      // fire-and-forget, deep-link data is exactly {type, id}.
+      expect(pushNotificationService.send).toHaveBeenCalledWith(
+        ["res-1", "res-2"],
+        expect.objectContaining({
+          data: { type: "announcement", id: "ann-1" },
+        }),
+      );
+    });
+
+    it("Epic 11 (ADR-006): EMERGENCY level prefixes the push title but keeps data schema as {type, id}", async () => {
+      const claims = mockClaims();
+      const created = {
+        id: "ann-2",
+        title: "Fire evacuation",
+        content: "Evacuate now",
+        level: AnnouncementLevel.EMERGENCY,
+        targetScope: AnnouncementTargetScope.ALL,
+      };
+      tx.announcement.create.mockResolvedValue(created);
+      tx.user.findMany.mockResolvedValue([{ id: "res-1" }]);
+
+      await service.create(
+        {
+          title: "Fire evacuation",
+          content: "Evacuate now",
+          level: AnnouncementLevel.EMERGENCY,
+          targetScope: AnnouncementTargetScope.ALL,
+        },
+        claims,
+      );
+
+      expect(pushNotificationService.send).toHaveBeenCalledWith(
+        ["res-1"],
+        expect.objectContaining({
+          title: expect.stringContaining("Fire evacuation"),
+          data: { type: "announcement", id: "ann-2" },
+        }),
+      );
+      const [, payload] = pushNotificationService.send.mock.calls[0];
+      expect(payload.title).toMatch(/ฉุกเฉิน/);
     });
 
     it("edge case: HOUSE scope requires targetHouseIds", async () => {

@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import {
   Announcement,
+  AnnouncementLevel,
   AnnouncementTargetScope,
   Prisma,
   PrismaClient,
@@ -12,6 +13,7 @@ import {
 } from "@prisma/client";
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
+import { PushNotificationService } from "../../common/push/push-notification.service";
 import { CreateAnnouncementDto } from "./dto/create-announcement.dto";
 import { UpdateAnnouncementDto } from "./dto/update-announcement.dto";
 
@@ -26,6 +28,10 @@ import { UpdateAnnouncementDto } from "./dto/update-announcement.dto";
  */
 @Injectable()
 export class AnnouncementService {
+  constructor(
+    private readonly pushNotificationService: PushNotificationService,
+  ) {}
+
   async create(dto: CreateAnnouncementDto, claims: TenantClaims) {
     if (dto.targetScope === AnnouncementTargetScope.ZONE && !dto.targetZone) {
       throw new BadRequestException(
@@ -74,18 +80,32 @@ export class AnnouncementService {
 
     const recipientUserIds = await this.resolveRecipients(announcement);
 
-    // Spec 2.2: EMERGENCY level -> push + SMS fallback; every level carries
-    // `level` in push metadata so the client can pick color/sound.
-    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
-    // push to recipientUserIds via the shared `PushNotificationService`
-    // (src/common/push/, not yet implemented — Epic 11 is at the
-    // planning/schema stage; see PHASE2_BACKLOG.md Epic 11), fire-and-forget
-    // per ADR-006. SMS fallback for EMERGENCY level is a SEPARATE, still-
-    // unaddressed gap — no SMS gateway configured in this MVP/dev
-    // environment (.env.example only stubs OTP's SMS path) and Epic 11's
-    // scope is push-only (explicitly excluded SMS per the user's request).
-    // Recipient targeting (WHO gets it) is fully implemented and returned
-    // here so it's independently verifiable/testable.
+    // Epic 11 (ADR-006): push to every resolved recipient, for EVERY level
+    // (PHASE2_BACKLOG.md Epic 11 AC #3: "ประกาศระดับฉุกเฉิน (และระดับอื่น
+    // ด้วย)" — not emergency-only). ADR-006's `data` payload schema is
+    // exactly `{type, id}` (no room for a `level` field), so the level is
+    // instead surfaced as a title prefix (a best-effort hint for the
+    // notification banner itself) — the tapped-through
+    // AnnouncementDetailScreen re-fetches the announcement, which carries
+    // the real `level`, to pick the actual color/sound treatment. Fire-and-
+    // forget, not awaited, per ADR-006. SMS fallback for EMERGENCY level
+    // remains a SEPARATE, still-unaddressed gap (no SMS gateway configured
+    // in this MVP/dev environment; explicitly out of scope for Epic 11 per
+    // the user's request — push only).
+    const levelPrefix =
+      announcement.level === AnnouncementLevel.EMERGENCY
+        ? "🚨 [ฉุกเฉิน] "
+        : announcement.level === AnnouncementLevel.IMPORTANT
+          ? "⚠️ [สำคัญ] "
+          : "";
+    this.pushNotificationService.send(recipientUserIds, {
+      title: `${levelPrefix}${announcement.title}`,
+      body:
+        announcement.content.length > 160
+          ? `${announcement.content.slice(0, 160)}…`
+          : announcement.content,
+      data: { type: "announcement", id: announcement.id },
+    });
 
     return { announcement, recipientUserIds };
   }

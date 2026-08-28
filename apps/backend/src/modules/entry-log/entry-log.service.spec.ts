@@ -26,6 +26,7 @@ describe("EntryLogService", () => {
   };
   let fileStorage: { savePhoto: jest.Mock };
   let auditService: { log: jest.Mock };
+  let pushNotificationService: { send: jest.Mock };
   let tx: {
     entryLog: {
       findFirst: jest.Mock;
@@ -47,10 +48,12 @@ describe("EntryLogService", () => {
     };
     fileStorage = { savePhoto: jest.fn() };
     auditService = { log: jest.fn().mockResolvedValue(undefined) };
+    pushNotificationService = { send: jest.fn() };
     service = new EntryLogService(
       visitorPassService as any,
       fileStorage as any,
       auditService as any,
+      pushNotificationService as any,
     );
     tx = {
       entryLog: {
@@ -88,6 +91,15 @@ describe("EntryLogService", () => {
 
       expect(result).toEqual({ entryLog: created, alreadyEntered: false });
       expect(visitorPassService.markEntered).toHaveBeenCalledWith("pass-1");
+
+      // Epic 11 (ADR-006): push fires to the host (pass.createdByUserId)
+      // on a genuine new scan-in, fire-and-forget, {type, id} data schema.
+      expect(pushNotificationService.send).toHaveBeenCalledWith(
+        ["resident-1"],
+        expect.objectContaining({
+          data: { type: "entry", id: "log-1" },
+        }),
+      );
     });
 
     it("edge case: re-scanning an already-ENTERED pass at the exit gate must NOT auto-close — no new log, exitTime stays null", async () => {
@@ -107,6 +119,8 @@ describe("EntryLogService", () => {
       // status transition (which would fire an FCM/UI side effect) never runs.
       expect(tx.entryLog.create).not.toHaveBeenCalled();
       expect(visitorPassService.markEntered).not.toHaveBeenCalled();
+      // Epic 11 (ADR-006) AC #1: no push on the exit-gate re-scan.
+      expect(pushNotificationService.send).not.toHaveBeenCalled();
     });
   });
 

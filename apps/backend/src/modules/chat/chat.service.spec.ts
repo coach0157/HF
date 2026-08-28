@@ -558,4 +558,24 @@ describe("ChatService", () => {
       });
     });
   });
+
+  describe("listOtherParticipantUserIds — Epic 11 (ADR-006) chat push recipient list", () => {
+    it("excludes the sender and returns every other participant", async () => {
+      tx.chatParticipant.findMany.mockResolvedValue([
+        { userId: "resident-2" },
+        { userId: "guard-1" },
+      ]);
+
+      const result = await service.listOtherParticipantUserIds(
+        "room-A",
+        "resident-1",
+      );
+
+      expect(result).toEqual(["resident-2", "guard-1"]);
+      expect(tx.chatParticipant.findMany).toHaveBeenCalledWith({
+        where: { chatRoomId: "room-A", userId: { not: "resident-1" } },
+        select: { userId: true },
+      });
+    });
+  });
 });

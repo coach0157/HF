@@ -6,6 +6,7 @@ import {
 import { GuardShiftStatus, PrismaClient, SosStatus } from "@prisma/client";
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
+import { PushNotificationService } from "../../common/push/push-notification.service";
 import { CreateSosAlertDto } from "./dto/create-sos-alert.dto";
 
 /**
@@ -16,6 +17,10 @@ import { CreateSosAlertDto } from "./dto/create-sos-alert.dto";
  */
 @Injectable()
 export class SosService {
+  constructor(
+    private readonly pushNotificationService: PushNotificationService,
+  ) {}
+
   async trigger(dto: CreateSosAlertDto, claims: TenantClaims) {
     if (!claims.houseId) {
       throw new BadRequestException(
@@ -47,15 +52,21 @@ export class SosService {
       select: { guardUserId: true },
     });
 
-    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
-    // push to routedToGuardUserIds via the shared `PushNotificationService`
-    // (src/common/push/, not yet implemented — Epic 11 is at the
-    // planning/schema stage; see PHASE2_BACKLOG.md Epic 11), fire-and-forget
-    // per ADR-006 (never make an on-duty guard's alert wait on a push
-    // vendor's API — see ADR-006's SOS-specific reasoning). Routing itself
-    // (deciding WHO gets notified) is fully implemented and independently
-    // testable/verifiable via this method's return value.
-    //
+    const routedToGuardUserIds = onDutyGuards.map((g) => g.guardUserId);
+
+    // Epic 11 (ADR-006): fire-and-forget push to every routed on-duty
+    // guard — never awaited, so a slow/degraded Expo API can never delay
+    // this response (the resident's confirmation that the SOS is durably
+    // recorded + routed). See ADR-006's dedicated SOS reasoning for why
+    // this is true even for the single most safety-critical trigger.
+    // Routing itself (deciding WHO gets notified) is unaffected — it
+    // already fully resolved above, independent of push delivery.
+    this.pushNotificationService.send(routedToGuardUserIds, {
+      title: "🚨 แจ้งเหตุฉุกเฉิน SOS",
+      body: "มีการแจ้งเหตุฉุกเฉินจากลูกบ้าน กรุณาตรวจสอบทันที",
+      data: { type: "sos", id: alert.id },
+    });
+
     // TODO(Dev agent, future): optional neighbor notification within a
     // configurable radius (spec 2.2, haversine over houses.latitude/
     // longitude) — intentionally left OFF; needs a village-level setting
@@ -64,7 +75,7 @@ export class SosService {
 
     return {
       alert,
-      routedToGuardUserIds: onDutyGuards.map((g) => g.guardUserId),
+      routedToGuardUserIds,
     };
   }
 

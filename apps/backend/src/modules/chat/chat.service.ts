@@ -435,4 +435,26 @@ export class ChatService {
     const tx = getTenantPrismaClient<PrismaClient>();
     return this.assertMembership(tx, chatRoomId, claims.userId);
   }
+
+  /**
+   * Epic 11 (ADR-006) — every OTHER `ChatParticipant` of a room, for the
+   * chat push trigger. `ChatGateway.onSendMessage()` calls this AFTER
+   * membership has already been established by `sendMessage()` above (no
+   * redundant `assertMembership` check needed here — the caller is always
+   * the message's own sender, who just proved membership). Excludes
+   * `excludeUserId` (the sender) — an open socket already got `new_message`
+   * in real time; push only needs to reach participants who might have the
+   * app backgrounded.
+   */
+  async listOtherParticipantUserIds(
+    chatRoomId: string,
+    excludeUserId: string,
+  ): Promise<string[]> {
+    const tx = getTenantPrismaClient<PrismaClient>();
+    const participants = await tx.chatParticipant.findMany({
+      where: { chatRoomId, userId: { not: excludeUserId } },
+      select: { userId: true },
+    });
+    return participants.map((p) => p.userId);
+  }
 }

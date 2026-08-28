@@ -20,6 +20,7 @@ import { JwtService } from "@nestjs/jwt";
 import type { Server, Socket } from "socket.io";
 import type { TenantClaims } from "../../common/rls/tenant-context";
 import { WsRlsInterceptor } from "../../common/rls/ws-rls.interceptor";
+import { PushNotificationService } from "../../common/push/push-notification.service";
 import { ChatService } from "./chat.service";
 import { WsRateLimiterService } from "./ws-rate-limiter.service";
 import { WsJoinRoomDto } from "./dto/ws-join-room.dto";
@@ -56,6 +57,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly configService: ConfigService,
     private readonly chatService: ChatService,
     private readonly rateLimiter: WsRateLimiterService,
+    private readonly pushNotificationService: PushNotificationService,
   ) {}
 
   /**
@@ -165,18 +167,24 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // first place.
     this.server.to(dto.chatRoomId).emit("new_message", message);
 
-    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
-    // push to every ChatParticipant of dto.chatRoomId EXCEPT claims.userId
-    // (the sender) — covers the backgrounded-app case; an open socket
-    // already got `new_message` above in real time. Via the shared
-    // `PushNotificationService` (src/common/push/, not yet implemented —
-    // Epic 11 is at the planning/schema stage; see PHASE2_BACKLOG.md
-    // Epic 11), fire-and-forget per ADR-006, and — unlike the HTTP call
-    // sites (entry-log/sos/announcement) — this runs OUTSIDE the request/
-    // response path entirely (WS event handlers don't have one to protect),
-    // but should still not be awaited before this handler's ack/return, for
+    // Epic 11 (ADR-006): push to every OTHER participant of this room,
+    // covering the backgrounded-app case (an open socket already got
+    // `new_message` above in real time). Unlike the HTTP call sites
+    // (entry-log/sos/announcement), this runs OUTSIDE the request/response
+    // path entirely (WS event handlers don't have one to protect), but is
+    // still deliberately NOT awaited before this handler's ack/return, for
     // the same "don't let an external push vendor call gate this event
-    // handler" reasoning.
+    // handler" reasoning ADR-006 applies everywhere else.
+    const recipientUserIds = await this.chatService.listOtherParticipantUserIds(
+      dto.chatRoomId,
+      claims.userId,
+    );
+    this.pushNotificationService.send(recipientUserIds, {
+      title: "ข้อความใหม่",
+      body: dto.message?.trim() || "ส่งรูปภาพ",
+      data: { type: "chat", id: dto.chatRoomId },
+    });
+
     return message;
   }
 

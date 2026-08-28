@@ -14,6 +14,7 @@ import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
 import { AuditService } from "../../common/audit/audit.service";
 import { FileStorageService } from "../../common/storage/file-storage.service";
+import { PushNotificationService } from "../../common/push/push-notification.service";
 import { VisitorPassService } from "../visitor-pass/visitor-pass.service";
 import { CreateEntryLogDto } from "./dto/create-entry-log.dto";
 
@@ -39,6 +40,7 @@ export class EntryLogService {
     private readonly visitorPassService: VisitorPassService,
     private readonly fileStorage: FileStorageService,
     private readonly auditService: AuditService,
+    private readonly pushNotificationService: PushNotificationService,
   ) {}
 
   async create(dto: CreateEntryLogDto, claims: TenantClaims) {
@@ -104,15 +106,18 @@ export class EntryLogService {
 
     await this.visitorPassService.markEntered(pass.id);
 
-    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
-    // push to `host` within ~3s of a successful scan-in (soft target, spec
-    // 2.1), via the shared `PushNotificationService` (src/common/push/, not
-    // yet implemented — Epic 11 is at the planning/schema stage; see
-    // PHASE2_BACKLOG.md Epic 11). Not implemented here — documented gap
-    // rather than a stub pretending to send. When wired, call it AFTER this
-    // transaction resolves (RlsInterceptor's documented trade-off: don't
-    // hold the request transaction open across a slow external call), and
-    // fire-and-forget per ADR-006 (don't await it on this response path).
+    // Epic 11 (ADR-006): push to the host who created the pass, within
+    // ~3s soft target (spec 2.1). Fire-and-forget — NOT awaited, so this
+    // handler (and the transaction RlsInterceptor opened around it) still
+    // returns/commits as soon as the DB writes above are durable, not when
+    // Expo's API call resolves. Only reached on a genuine new scan-in (the
+    // `alreadyEntered: true` early-return above never falls through here),
+    // matching AC #1's "don't send again for the exit-gate re-scan" rule.
+    this.pushNotificationService.send([pass.createdByUserId], {
+      title: "แขกของท่านมาถึงแล้ว",
+      body: `${pass.visitorName ?? "แขก"} มาถึงป้อมยามแล้ว`,
+      data: { type: "entry", id: entryLog.id },
+    });
 
     return { entryLog, alreadyEntered: false };
   }

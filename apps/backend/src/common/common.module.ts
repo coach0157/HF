@@ -11,10 +11,13 @@ import { RlsInterceptor } from "./rls/rls.interceptor";
 import { HealthController } from "./health/health.controller";
 import { AuditModule } from "./audit/audit.module";
 import { FileStorageModule } from "./storage/file-storage.module";
+import { PushModule } from "./push/push.module";
 
 /**
  * Cross-cutting infrastructure shared by every feature module:
  *  - PrismaModule (DB access)
+ *  - AuditModule / FileStorageModule / PushModule (all @Global(), see each
+ *    module's own doc comment)
  *  - JwtModule (used by TenantContextMiddleware to verify access tokens —
  *    NOT used to sign tokens; token issuing belongs to auth.module.ts)
  *  - Global guard order: JwtAuthGuard THEN RolesGuard (array order matters)
@@ -32,6 +35,7 @@ import { FileStorageModule } from "./storage/file-storage.module";
     PrismaModule,
     AuditModule,
     FileStorageModule,
+    PushModule,
     JwtModule.registerAsync({
       global: true,
       inject: [ConfigService],
