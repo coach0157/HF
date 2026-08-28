@@ -8,9 +8,11 @@
  *    via `expo-location` (falls back to no coordinates if permission is
  *    denied/unavailable — dto fields are optional) then
  *    `POST /sos-alerts`.
- *  - Shortcut cards, MVP-scoped: "เชิญแขก (QR)" -> InviteGuest,
- *    "ประวัติเข้า-ออก" -> EntryHistory (spec's full 2x3 grid also lists
- *    out-of-scope items per MVP_BACKLOG.md).
+ *  - Shortcut cards: "เชิญแขก (QR)" -> InviteGuest, "ประวัติเข้า-ออก" ->
+ *    EntryHistory (MVP, MVP_BACKLOG.md Epic 6), "เรียกรถโดยสาร" -> Transport
+ *    and "แจ้งซ่อม" -> Maintenance (Phase 2, docs/PHASE2_BACKLOG.md Epic
+ *    10/9) — matches spec 1.1's 2x3 shortcut grid except "จองพื้นที่" /
+ *    "ชำระค่าส่วนกลาง" (Phase 3, out of scope).
  *  - Latest-3 announcement preview, tap-through to the Announcements tab.
  */
 import { useCallback, useEffect, useState } from "react";
@@ -132,6 +134,10 @@ export function ResidentHomeScreen() {
         <TouchableOpacity style={styles.card} onPress={() => navigation.navigate("Transport")}>
           <Text style={styles.cardIcon}>🚕</Text>
           <Text style={styles.cardLabel}>เรียกรถโดยสาร</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate("Maintenance")}>
+          <Text style={styles.cardIcon}>🔧</Text>
+          <Text style={styles.cardLabel}>แจ้งซ่อม</Text>
         </TouchableOpacity>
       </View>
 

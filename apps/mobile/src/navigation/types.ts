@@ -24,6 +24,8 @@ export type ResidentTabParamList = {
   QrDisplay: { pass: VisitorPass };
   EntryHistory: undefined;
   Transport: undefined;
+  Maintenance: undefined;
+  CreateMaintenance: undefined;
   Announcements: undefined;
   Profile: undefined;
 };

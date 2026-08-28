@@ -114,3 +114,22 @@ export interface TransportProvider {
   isActive: boolean;
   createdAt: string;
 }
+
+// Epic 9 — Maintenance (spec 2.4 / docs/PHASE2_BACKLOG.md Epic 9).
+export type MaintenanceCategory = 'ELECTRICAL' | 'PLUMBING' | 'ROAD' | 'OTHER';
+export type MaintenanceStatus = 'OPEN' | 'IN_PROGRESS' | 'DONE';
+
+export interface MaintenanceTicket {
+  id: string;
+  villageId: string;
+  houseId: string;
+  createdByUserId: string;
+  category: MaintenanceCategory;
+  description: string;
+  imageUrl: string | null;
+  status: MaintenanceStatus;
+  assignedTo: string | null;
+  scheduledDate: string | null;
+  ticketNumber: string;
+  createdAt: string;
+}

@@ -9,6 +9,7 @@ import { SosModule } from "./modules/sos/sos.module";
 import { GuardShiftModule } from "./modules/guard-shift/guard-shift.module";
 import { HouseModule } from "./modules/house/house.module";
 import { TransportProviderModule } from "./modules/transport-provider/transport-provider.module";
+import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { TransportProviderModule } from "./modules/transport-provider/transport-
     GuardShiftModule,
     HouseModule,
     TransportProviderModule,
+    MaintenanceModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -18,6 +18,8 @@ import { InviteGuestScreen } from "../screens/resident/InviteGuestScreen";
 import { QrDisplayScreen } from "../screens/resident/QrDisplayScreen";
 import { EntryHistoryScreen } from "../screens/resident/EntryHistoryScreen";
 import { TransportScreen } from "../screens/resident/TransportScreen";
+import { MaintenanceScreen } from "../screens/resident/MaintenanceScreen";
+import { CreateMaintenanceScreen } from "../screens/resident/CreateMaintenanceScreen";
 import { AnnouncementsScreen } from "../screens/resident/AnnouncementsScreen";
 import { ProfileScreen } from "../screens/resident/ProfileScreen";
 import type { ResidentTabParamList } from "./types";
@@ -50,6 +52,16 @@ function HomeStackNavigator() {
         name="Transport"
         component={TransportScreen}
         options={{ title: "เรียกรถโดยสาร" }}
+      />
+      <HomeStack.Screen
+        name="Maintenance"
+        component={MaintenanceScreen}
+        options={{ title: "แจ้งซ่อม" }}
+      />
+      <HomeStack.Screen
+        name="CreateMaintenance"
+        component={CreateMaintenanceScreen}
+        options={{ title: "แจ้งซ่อมใหม่" }}
       />
     </HomeStack.Navigator>
   );
