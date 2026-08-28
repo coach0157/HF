@@ -10,6 +10,7 @@
   "scripts": {
     "dev:backend": "npm run start:dev --workspace apps/backend",
     "dev:admin": "npm run dev --workspace apps/admin-web",
+    "build": "npm run build:backend && npm run build:admin",
     "build:backend": "npm run build --workspace apps/backend",
     "build:admin": "npm run build --workspace apps/admin-web",
     "db:up": "docker compose up -d db",
