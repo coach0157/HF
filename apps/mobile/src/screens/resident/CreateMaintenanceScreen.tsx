@@ -8,7 +8,6 @@
  */
 import { useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
   ScrollView,
@@ -24,6 +23,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api, ApiError } from "../../lib/api";
 import type { MaintenanceCategory, MaintenanceTicket } from "../../lib/types";
 import type { ResidentTabParamList } from "../../navigation/types";
+import { Button } from "../../components/Button";
+import { colors, radius, spacing } from "../../theme";
 
 const CATEGORIES: { value: MaintenanceCategory; label: string; icon: string }[] = [
   { value: "ELECTRICAL", label: "ไฟฟ้า", icon: "💡" },
@@ -125,6 +126,7 @@ export function CreateMaintenanceScreen() {
         value={description}
         onChangeText={setDescription}
         placeholder="อธิบายปัญหาที่พบ เช่น ไฟหน้าบ้านดับ 2 วันแล้ว"
+        placeholderTextColor={colors.textMuted}
         multiline
         numberOfLines={4}
       />
@@ -144,78 +146,80 @@ export function CreateMaintenanceScreen() {
 
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
 
-      <TouchableOpacity
-        style={[styles.submitButton, (!formValid || submitting) && styles.buttonDisabled]}
+      <Button
+        title="แจ้งซ่อม"
         onPress={handleSubmit}
-        disabled={!formValid || submitting}
-      >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>แจ้งซ่อม</Text>}
-      </TouchableOpacity>
+        disabled={!formValid}
+        loading={submitting}
+        style={styles.submitButton}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  content: { padding: 16 },
-  label: { fontSize: 13, color: "#555", marginTop: 16, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 12, fontSize: 15 },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg },
+  label: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.lg, marginBottom: spacing.sm - 2 },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.input,
+    padding: spacing.md,
+    fontSize: 15,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
   textArea: { height: 100, textAlignVertical: "top" },
-  fieldError: { color: "#c0392b", fontSize: 12, marginTop: 8 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  fieldError: { color: colors.danger, fontSize: 12, marginTop: spacing.sm },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md + 2,
+    backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: "#1d6f42", borderColor: "#1d6f42" },
-  chipText: { fontSize: 13, color: "#444" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: 13, color: colors.textSecondary },
+  chipTextActive: { color: colors.white, fontWeight: "600" },
   captureBox: {
     height: 140,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     borderStyle: "dashed",
-    borderRadius: 10,
+    borderRadius: radius.card,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: spacing.sm - 2,
+    backgroundColor: colors.surface,
   },
   captureBoxIcon: { fontSize: 28 },
-  captureBoxText: { color: "#666" },
-  preview: { width: "100%", height: 180, borderRadius: 10 },
-  retake: { textAlign: "center", color: "#2980b9", marginTop: 6 },
-  submitButton: {
-    marginTop: 24,
-    backgroundColor: "#1d6f42",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-  },
-  buttonDisabled: { opacity: 0.5 },
-  submitText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  cameraContainer: { flex: 1, backgroundColor: "#000" },
+  captureBoxText: { color: colors.textSecondary },
+  preview: { width: "100%", height: 180, borderRadius: radius.card },
+  retake: { textAlign: "center", color: colors.secondaryDark, marginTop: spacing.sm - 2 },
+  submitButton: { marginTop: spacing.xl },
+  cameraContainer: { flex: 1, backgroundColor: colors.black },
   camera: { flex: 1 },
   cameraControls: {
     position: "absolute",
-    bottom: 32,
+    bottom: spacing.xxl,
     left: 0,
     right: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 40,
+    gap: spacing.xxxl - spacing.sm,
   },
-  cancelCameraButton: { position: "absolute", left: 24 },
-  cancelCameraText: { color: "#fff", fontSize: 15 },
+  cancelCameraButton: { position: "absolute", left: spacing.xl },
+  cancelCameraText: { color: colors.white, fontSize: 15 },
   captureButton: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
     borderWidth: 4,
-    borderColor: "#ccc",
+    borderColor: colors.border,
   },
 });

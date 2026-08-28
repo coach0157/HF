@@ -15,6 +15,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api, ApiError } from "../../lib/api";
 import type { ChatRoomSummary } from "../../lib/types";
 import type { ChatStackParamList } from "../../navigation/types";
+import { colors, radius, spacing } from "../../theme";
 
 function roomLabel(room: ChatRoomSummary): string {
   if (room.type === "GROUP") return room.name ?? "กลุ่มหมู่บ้าน";
@@ -85,28 +86,29 @@ export function ChatListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  errorText: { color: "#c0392b", padding: 16 },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  container: { flex: 1, backgroundColor: colors.background },
+  errorText: { color: colors.danger, padding: spacing.lg },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
   icon: { fontSize: 26 },
-  label: { fontSize: 15, fontWeight: "700" },
-  preview: { fontSize: 12, color: "#888", marginTop: 3 },
+  label: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
+  preview: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
   badge: {
-    backgroundColor: "#dc2626",
-    borderRadius: 10,
+    backgroundColor: colors.danger,
+    borderRadius: radius.pill,
     minWidth: 20,
     height: 20,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 5,
   },
-  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  badgeText: { color: colors.white, fontSize: 11, fontWeight: "700" },
 });

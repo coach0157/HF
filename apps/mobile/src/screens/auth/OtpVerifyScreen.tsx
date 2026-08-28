@@ -8,21 +8,14 @@
  * `RootNavigator` swaps to ResidentApp/GuardApp.
  */
 import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity } from "react-native";
 import type { RouteProp } from "@react-navigation/native";
 import type { AuthStackParamList } from "../../navigation/types";
 import { api, ApiError } from "../../lib/api";
 import { setSession } from "../../lib/auth";
 import { useAuth } from "../../context/AuthContext";
+import { Button } from "../../components/Button";
+import { colors, radius, spacing } from "../../theme";
 
 const OTP_RE = /^\d{6}$/;
 const RESEND_COOLDOWN_S = 60;
@@ -123,6 +116,7 @@ export function OtpVerifyScreen({
       <TextInput
         style={styles.input}
         placeholder="000000"
+        placeholderTextColor={colors.textMuted}
         keyboardType="number-pad"
         maxLength={6}
         value={otp}
@@ -133,13 +127,13 @@ export function OtpVerifyScreen({
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <TouchableOpacity
-        style={[styles.button, (!OTP_RE.test(otp) || loading) && styles.buttonDisabled]}
+      <Button
+        title="ยืนยัน"
         onPress={handleSubmit}
-        disabled={!OTP_RE.test(otp) || loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>ยืนยัน</Text>}
-      </TouchableOpacity>
+        disabled={!OTP_RE.test(otp)}
+        loading={loading}
+        style={styles.button}
+      />
 
       <TouchableOpacity style={styles.resend} onPress={handleResend} disabled={cooldown > 0}>
         <Text style={[styles.resendText, cooldown > 0 && styles.resendDisabled]}>
@@ -151,29 +145,23 @@ export function OtpVerifyScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 24 },
-  title: { fontSize: 24, fontWeight: "800", textAlign: "center" },
-  subtitle: { textAlign: "center", color: "#666", marginTop: 4, marginBottom: 32 },
+  container: { flex: 1, justifyContent: "center", padding: spacing.xl, backgroundColor: colors.background },
+  title: { fontSize: 24, fontWeight: "800", textAlign: "center", color: colors.textPrimary },
+  subtitle: { textAlign: "center", color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.xxl },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 10,
-    padding: 14,
+    borderColor: colors.border,
+    borderRadius: radius.input,
+    padding: spacing.md + 2,
     fontSize: 24,
     letterSpacing: 8,
     textAlign: "center",
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
   },
-  error: { color: "#c0392b", marginTop: 12, textAlign: "center" },
-  button: {
-    backgroundColor: "#1d6f42",
-    borderRadius: 10,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 24,
-  },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  resend: { marginTop: 20, alignItems: "center" },
-  resendText: { color: "#1d6f42", fontSize: 14 },
-  resendDisabled: { color: "#999" },
+  error: { color: colors.danger, marginTop: spacing.md, textAlign: "center" },
+  button: { marginTop: spacing.xl },
+  resend: { marginTop: spacing.lg, alignItems: "center" },
+  resendText: { color: colors.primaryDark, fontSize: 14 },
+  resendDisabled: { color: colors.textMuted },
 });

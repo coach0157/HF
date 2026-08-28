@@ -25,19 +25,19 @@
  */
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { EntryLog, Paginated } from "../../lib/types";
+import { Button } from "../../components/Button";
+import { colors, radius, spacing } from "../../theme";
 
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20; // sanity bound (2000 open entries) — see file doc comment.
@@ -103,6 +103,7 @@ export function ExitConfirmScreen() {
       <TextInput
         style={styles.search}
         placeholder="ค้นหาชื่อแขก/ทะเบียนรถ"
+        placeholderTextColor={colors.textMuted}
         value={query}
         onChangeText={setQuery}
       />
@@ -118,17 +119,12 @@ export function ExitConfirmScreen() {
               {item.vehiclePlate ? <Text style={styles.meta}>ทะเบียน: {item.vehiclePlate}</Text> : null}
               <Text style={styles.meta}>เข้าเมื่อ: {new Date(item.entryTime).toLocaleString("th-TH")}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.confirmButton}
+            <Button
+              title="ยืนยันแขกออก"
               onPress={() => handleConfirm(item)}
-              disabled={confirmingId === item.id}
-            >
-              {confirmingId === item.id ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.confirmText}>ยืนยันแขกออก</Text>
-              )}
-            </TouchableOpacity>
+              loading={confirmingId === item.id}
+              style={styles.confirmButton}
+            />
           </View>
         )}
       />
@@ -137,27 +133,29 @@ export function ExitConfirmScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: colors.background },
   search: {
-    margin: 12,
+    margin: spacing.md,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: colors.border,
+    borderRadius: radius.input,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
     fontSize: 14,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
   },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
+    padding: spacing.md + 2,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
-    gap: 10,
+    borderTopColor: colors.border,
+    gap: spacing.sm + 2,
+    backgroundColor: colors.surface,
   },
-  name: { fontSize: 15, fontWeight: "700" },
-  meta: { fontSize: 12, color: "#666", marginTop: 2 },
-  confirmButton: { backgroundColor: "#1d6f42", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  confirmText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  name: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
+  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  confirmButton: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
 });

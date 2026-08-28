@@ -21,6 +21,8 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { api, ApiError } from "../../lib/api";
 import type { House } from "../../lib/types";
+import { Button } from "../../components/Button";
+import { colors, radius, spacing } from "../../theme";
 
 export function ManualEntryScreen() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -121,14 +123,26 @@ export function ManualEntryScreen() {
       )}
 
       <Text style={styles.label}>ชื่อแขก *</Text>
-      <TextInput style={styles.input} value={visitorName} onChangeText={setVisitorName} placeholder="ชื่อ-นามสกุล" />
+      <TextInput
+        style={styles.input}
+        value={visitorName}
+        onChangeText={setVisitorName}
+        placeholder="ชื่อ-นามสกุล"
+        placeholderTextColor={colors.textMuted}
+      />
 
       <Text style={styles.label}>ทะเบียนรถ (ถ้ามี)</Text>
-      <TextInput style={styles.input} value={vehiclePlate} onChangeText={setVehiclePlate} placeholder="กข 1234" />
+      <TextInput
+        style={styles.input}
+        value={vehiclePlate}
+        onChangeText={setVehiclePlate}
+        placeholder="กข 1234"
+        placeholderTextColor={colors.textMuted}
+      />
 
       <Text style={styles.label}>บ้านที่ไปหา *</Text>
       {loadingHouses ? (
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.primary} />
       ) : (
         <TouchableOpacity style={styles.input} onPress={() => setHousePickerOpen(true)}>
           <Text style={selectedHouse ? styles.houseSelected : styles.housePlaceholder}>
@@ -137,16 +151,16 @@ export function ManualEntryScreen() {
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
-        style={[styles.submitButton, (!formValid || submitting) && styles.buttonDisabled]}
+      <Button
+        title="บันทึกเข้า"
         onPress={handleSubmit}
-        disabled={!formValid || submitting}
-      >
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>บันทึกเข้า</Text>}
-      </TouchableOpacity>
+        disabled={!formValid}
+        loading={submitting}
+        style={styles.submitButton}
+      />
 
       <Modal visible={housePickerOpen} animationType="slide" onRequestClose={() => setHousePickerOpen(false)}>
-        <ScrollView style={{ flex: 1, padding: 16 }}>
+        <ScrollView style={{ flex: 1, padding: spacing.lg, backgroundColor: colors.background }}>
           <Text style={styles.modalTitle}>เลือกบ้าน</Text>
           {houses.map((h) => (
             <TouchableOpacity
@@ -173,67 +187,62 @@ export function ManualEntryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  content: { padding: 16 },
-  label: { fontSize: 13, color: "#555", marginTop: 16, marginBottom: 6 },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg },
+  label: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.lg, marginBottom: spacing.sm - 2 },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
+    borderColor: colors.border,
+    borderRadius: radius.input,
+    padding: spacing.md,
     fontSize: 15,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
     justifyContent: "center",
   },
   captureBox: {
     height: 140,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     borderStyle: "dashed",
-    borderRadius: 10,
+    borderRadius: radius.card,
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: spacing.sm - 2,
+    backgroundColor: colors.surface,
   },
   captureBoxIcon: { fontSize: 28 },
-  captureBoxText: { color: "#666" },
-  preview: { width: "100%", height: 180, borderRadius: 10 },
-  retake: { textAlign: "center", color: "#2980b9", marginTop: 6 },
-  housePlaceholder: { color: "#999" },
-  houseSelected: { color: "#111" },
-  submitButton: {
-    marginTop: 24,
-    backgroundColor: "#1d6f42",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-  },
-  buttonDisabled: { opacity: 0.5 },
-  submitText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  cameraContainer: { flex: 1, backgroundColor: "#000" },
+  captureBoxText: { color: colors.textSecondary },
+  preview: { width: "100%", height: 180, borderRadius: radius.card },
+  retake: { textAlign: "center", color: colors.secondaryDark, marginTop: spacing.sm - 2 },
+  housePlaceholder: { color: colors.textMuted },
+  houseSelected: { color: colors.textPrimary },
+  submitButton: { marginTop: spacing.xl },
+  cameraContainer: { flex: 1, backgroundColor: colors.black },
   camera: { flex: 1 },
   cameraControls: {
     position: "absolute",
-    bottom: 32,
+    bottom: spacing.xxl,
     left: 0,
     right: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 40,
+    gap: spacing.xxxl - spacing.sm,
   },
-  cancelCameraButton: { position: "absolute", left: 24 },
-  cancelCameraText: { color: "#fff", fontSize: 15 },
+  cancelCameraButton: { position: "absolute", left: spacing.xl },
+  cancelCameraText: { color: colors.white, fontSize: 15 },
   captureButton: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#fff",
+    backgroundColor: colors.white,
     borderWidth: 4,
-    borderColor: "#ccc",
+    borderColor: colors.border,
   },
-  modalTitle: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
-  houseRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#eee" },
-  houseRowText: { fontSize: 15 },
-  closeModal: { marginTop: 20, alignItems: "center", padding: 12 },
-  closeModalText: { color: "#999" },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing.md },
+  houseRow: { paddingVertical: spacing.md + 2, borderBottomWidth: 1, borderBottomColor: colors.border },
+  houseRowText: { fontSize: 15, color: colors.textPrimary },
+  closeModal: { marginTop: spacing.xl, alignItems: "center", padding: spacing.md },
+  closeModalText: { color: colors.textMuted },
 });

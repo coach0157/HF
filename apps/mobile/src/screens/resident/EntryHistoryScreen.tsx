@@ -6,7 +6,6 @@
  */
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -14,12 +13,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { EntryLog, Paginated } from "../../lib/types";
+import { Button } from "../../components/Button";
+import { colors, radius, spacing } from "../../theme";
 
 function fmt(iso: string | null): string {
   if (!iso) return "ยังไม่ออก";
@@ -70,23 +70,22 @@ export function EntryHistoryScreen() {
         <TextInput
           style={styles.dateInput}
           placeholder="กรองวันที่ YYYY-MM-DD"
+          placeholderTextColor={colors.textMuted}
           value={date}
           onChangeText={setDate}
           onSubmitEditing={() => load(date)}
         />
-        <TouchableOpacity style={styles.filterButton} onPress={() => load(date)}>
-          <Text style={styles.filterButtonText}>ค้นหา</Text>
-        </TouchableOpacity>
+        <Button title="ค้นหา" variant="secondary" onPress={() => load(date)} style={styles.filterButton} />
         {date.length > 0 && (
-          <TouchableOpacity
-            style={styles.filterButton}
+          <Button
+            title="ล้าง"
+            variant="secondary"
             onPress={() => {
               setDate("");
               load("");
             }}
-          >
-            <Text style={styles.filterButtonText}>ล้าง</Text>
-          </TouchableOpacity>
+            style={styles.filterButton}
+          />
         )}
       </View>
 
@@ -112,17 +111,12 @@ export function EntryHistoryScreen() {
               <Text style={styles.metaSmall}>บันทึกโดย: {item.method === "QR" ? "สแกน QR" : "รปภ. บันทึกด้วยมือ"}</Text>
 
               {!item.exitTime && (
-                <TouchableOpacity
-                  style={styles.confirmButton}
+                <Button
+                  title="ยืนยันแขกออก"
                   onPress={() => handleConfirmExit(item)}
-                  disabled={confirmingId === item.id}
-                >
-                  {confirmingId === item.id ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.confirmText}>ยืนยันแขกออก</Text>
-                  )}
-                </TouchableOpacity>
+                  loading={confirmingId === item.id}
+                  style={styles.confirmButton}
+                />
               )}
             </View>
           </View>
@@ -133,40 +127,37 @@ export function EntryHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  filterRow: { flexDirection: "row", padding: 12, gap: 8, alignItems: "center" },
+  container: { flex: 1, backgroundColor: colors.background },
+  filterRow: { flexDirection: "row", padding: spacing.md, gap: spacing.sm, alignItems: "center" },
   dateInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.input,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm,
     fontSize: 13,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
   },
-  filterButton: { backgroundColor: "#1d6f42", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 },
-  filterButtonText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  filterButton: { paddingVertical: spacing.sm + 1, paddingHorizontal: spacing.md },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   row: {
     flexDirection: "row",
-    padding: 12,
-    gap: 12,
+    padding: spacing.md,
+    gap: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: colors.border,
   },
-  photo: { width: 56, height: 56, borderRadius: 8 },
-  photoPlaceholder: { backgroundColor: "#eee", alignItems: "center", justifyContent: "center" },
-  name: { fontSize: 14, fontWeight: "700" },
-  meta: { fontSize: 12, color: "#555", marginTop: 2 },
-  metaSmall: { fontSize: 11, color: "#999", marginTop: 2 },
+  photo: { width: 56, height: 56, borderRadius: spacing.sm },
+  photoPlaceholder: { backgroundColor: colors.border, alignItems: "center", justifyContent: "center" },
+  name: { fontSize: 14, fontWeight: "700", color: colors.textPrimary },
+  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  metaSmall: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   confirmButton: {
-    marginTop: 8,
-    backgroundColor: "#2980b9",
-    borderRadius: 8,
-    paddingVertical: 6,
-    alignItems: "center",
+    marginTop: spacing.sm,
     alignSelf: "flex-start",
-    paddingHorizontal: 14,
+    paddingVertical: spacing.sm - 2,
+    paddingHorizontal: spacing.md,
   },
-  confirmText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 });

@@ -29,6 +29,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api, ApiError } from "../../lib/api";
 import type { EntryLog, GuardShift, Paginated } from "../../lib/types";
 import type { GuardTabParamList } from "../../navigation/types";
+import { colors, radius, spacing } from "../../theme";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -103,7 +104,7 @@ export function GuardHomeScreen() {
       contentContainerStyle={styles.content}
     >
       <View style={styles.shiftRow}>
-        <View style={[styles.dot, { backgroundColor: onDuty ? "#27ae60" : "#999" }]} />
+        <View style={[styles.dot, { backgroundColor: onDuty ? colors.primary : colors.textMuted }]} />
         <Text style={styles.shiftLabel}>
           {!shiftSynced && loading ? "กำลังซิงค์สถานะเวร..." : onDuty ? "กำลังปฏิบัติหน้าที่" : "ยังไม่เริ่มเวร"}
         </Text>
@@ -113,7 +114,7 @@ export function GuardHomeScreen() {
           disabled={shiftBusy || !shiftSynced}
         >
           {shiftBusy ? (
-            <ActivityIndicator size="small" color="#1d6f42" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <Text style={styles.shiftButtonText}>{onDuty ? "เลิกเวร" : "เริ่มเวร"}</Text>
           )}
@@ -152,29 +153,50 @@ export function GuardHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  content: { alignItems: "center", padding: 20 },
-  shiftRow: { flexDirection: "row", alignItems: "center", alignSelf: "stretch", gap: 8, marginBottom: 24 },
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { alignItems: "center", padding: spacing.xl },
+  shiftRow: { flexDirection: "row", alignItems: "center", alignSelf: "stretch", gap: spacing.sm, marginBottom: spacing.xl },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  shiftLabel: { flex: 1, fontSize: 13, color: "#555" },
-  shiftButton: { borderWidth: 1, borderColor: "#1d6f42", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  shiftButtonText: { color: "#1d6f42", fontWeight: "600", fontSize: 12 },
+  shiftLabel: { flex: 1, fontSize: 13, color: colors.textSecondary },
+  shiftButton: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.button - 2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 2,
+  },
+  shiftButtonText: { color: colors.primary, fontWeight: "600", fontSize: 12 },
   scanButton: {
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: "#1d6f42",
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginVertical: 12,
+    marginVertical: spacing.md,
   },
   scanIcon: { fontSize: 48 },
-  scanLabel: { color: "#fff", fontSize: 20, fontWeight: "800", marginTop: 4 },
-  summaryRow: { flexDirection: "row", gap: 16, marginTop: 28 },
-  summaryCard: { alignItems: "center", backgroundColor: "#f2f6f4", borderRadius: 12, padding: 16, minWidth: 100 },
-  summaryValue: { fontSize: 28, fontWeight: "800", color: "#1d6f42" },
-  summaryLabel: { fontSize: 12, color: "#666", marginTop: 4 },
-  quickLinks: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 32, justifyContent: "center" },
-  linkButton: { borderWidth: 1, borderColor: "#ccc", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
-  linkText: { fontSize: 13, color: "#333" },
+  scanLabel: { color: colors.white, fontSize: 20, fontWeight: "800", marginTop: spacing.xs },
+  summaryRow: { flexDirection: "row", gap: spacing.lg, marginTop: spacing.xxl - spacing.xs },
+  summaryCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    padding: spacing.lg,
+    minWidth: 100,
+  },
+  summaryValue: { fontSize: 28, fontWeight: "800", color: colors.primaryDark },
+  summaryLabel: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
+  quickLinks: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm + 2, marginTop: spacing.xxl, justifyContent: "center" },
+  linkButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  linkText: { fontSize: 13, color: colors.textPrimary },
 });

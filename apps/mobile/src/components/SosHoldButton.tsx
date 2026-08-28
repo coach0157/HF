@@ -17,6 +17,7 @@
  */
 import { useCallback, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { colors, spacing } from "../theme";
 
 const HOLD_MS = 2000;
 
@@ -77,10 +78,10 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: "#c0392b",
+    backgroundColor: colors.danger,
     alignItems: "center",
     justifyContent: "center",
-    padding: 12,
+    padding: spacing.md,
     overflow: "hidden",
   },
   fillClip: {
@@ -91,6 +92,6 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: "rgba(255,255,255,0.28)",
   },
-  label: { color: "#fff", fontSize: 32, fontWeight: "800" },
-  hint: { color: "#fff", fontSize: 12, textAlign: "center", marginTop: 4 },
+  label: { color: colors.white, fontSize: 32, fontWeight: "800" },
+  hint: { color: colors.white, fontSize: 12, textAlign: "center", marginTop: spacing.xs },
 });

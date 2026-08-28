@@ -26,6 +26,7 @@ import { ChatListScreen } from "../screens/resident/ChatListScreen";
 import { ChatRoomScreen } from "../screens/shared/ChatRoomScreen";
 import { ProfileScreen } from "../screens/resident/ProfileScreen";
 import type { ChatStackParamList, ResidentTabParamList } from "./types";
+import { colors } from "../theme";
 
 const HomeStack = createNativeStackNavigator<ResidentTabParamList>();
 function HomeStackNavigator() {
@@ -90,7 +91,13 @@ const Tab = createBottomTabNavigator<ResidentTabParamList>();
 
 export function ResidentTabNavigator() {
   return (
-    <Tab.Navigator>
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+      }}
+    >
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}

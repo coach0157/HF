@@ -13,7 +13,6 @@
  */
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   RefreshControl,
@@ -28,6 +27,9 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api, ApiError } from "../../lib/api";
 import type { Paginated, VisitorPass, VisitorPassUsageType } from "../../lib/types";
 import type { ResidentTabParamList } from "../../navigation/types";
+import { Button } from "../../components/Button";
+import { Badge, type BadgeVariant } from "../../components/Badge";
+import { colors, radius, spacing } from "../../theme";
 
 const PHONE_RE = /^0\d{9}$/;
 
@@ -38,12 +40,12 @@ const STATUS_LABEL: Record<VisitorPass["status"], string> = {
   EXPIRED: "หมดอายุ",
   REVOKED: "ยกเลิกแล้ว",
 };
-const STATUS_COLOR: Record<VisitorPass["status"], string> = {
-  UNUSED: "#2980b9",
-  ENTERED: "#27ae60",
-  EXITED: "#7f8c8d",
-  EXPIRED: "#bdc3c7",
-  REVOKED: "#c0392b",
+const STATUS_BADGE_VARIANT: Record<VisitorPass["status"], BadgeVariant> = {
+  UNUSED: "info",
+  ENTERED: "success",
+  EXITED: "neutral",
+  EXPIRED: "neutral",
+  REVOKED: "danger",
 };
 
 const CATEGORIES = ["แขก", "ไรเดอร์", "ช่าง", "แม่บ้าน"] as const;
@@ -209,13 +211,13 @@ export function InviteGuestScreen() {
 
           {error ? <Text style={styles.fieldError}>{error}</Text> : null}
 
-          <TouchableOpacity
-            style={[styles.submitButton, (!formValid || submitting) && styles.buttonDisabled]}
+          <Button
+            title="สร้าง QR"
             onPress={handleCreate}
-            disabled={!formValid || submitting}
-          >
-            {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>สร้าง QR</Text>}
-          </TouchableOpacity>
+            disabled={!formValid}
+            loading={submitting}
+            style={styles.submitButton}
+          />
 
           <Text style={styles.sectionTitle}>QR ที่สร้างไว้</Text>
         </View>
@@ -228,9 +230,7 @@ export function InviteGuestScreen() {
               {new Date(item.validFrom).toLocaleDateString("th-TH")} - {new Date(item.validTo).toLocaleDateString("th-TH")}
             </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[item.status] }]}>
-            <Text style={styles.statusText}>{STATUS_LABEL[item.status]}</Text>
-          </View>
+          <Badge label={STATUS_LABEL[item.status]} variant={STATUS_BADGE_VARIANT[item.status]} />
           {(item.status === "UNUSED" || item.status === "ENTERED") && (
             <TouchableOpacity style={styles.revokeButton} onPress={() => handleRevoke(item)}>
               <Text style={styles.revokeText}>ยกเลิก</Text>
@@ -244,46 +244,51 @@ export function InviteGuestScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  form: { padding: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", marginTop: 16, marginBottom: 8 },
-  label: { fontSize: 13, color: "#555", marginTop: 12, marginBottom: 4 },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, fontSize: 15 },
-  fieldError: { color: "#c0392b", fontSize: 12, marginTop: 4 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  container: { flex: 1, backgroundColor: colors.background },
+  form: { padding: spacing.lg },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  label: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.md, marginBottom: spacing.xs },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.input,
+    padding: spacing.sm + 2,
+    fontSize: 15,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
+  fieldError: { color: colors.danger, fontSize: 12, marginTop: spacing.xs },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm - 2,
+    paddingHorizontal: spacing.md + 2,
+    backgroundColor: colors.surface,
   },
-  chipActive: { backgroundColor: "#1d6f42", borderColor: "#1d6f42" },
-  chipText: { fontSize: 13, color: "#444" },
-  chipTextActive: { color: "#fff", fontWeight: "600" },
-  submitButton: {
-    backgroundColor: "#1d6f42",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  buttonDisabled: { opacity: 0.5 },
-  submitText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: 13, color: colors.textSecondary },
+  chipTextActive: { color: colors.white, fontWeight: "600" },
+  submitButton: { marginTop: spacing.lg },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
-    gap: 8,
+    borderTopColor: colors.border,
+    gap: spacing.sm,
   },
-  rowName: { fontSize: 14, fontWeight: "600" },
-  rowMeta: { fontSize: 11, color: "#999", marginTop: 2 },
-  statusBadge: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 },
-  statusText: { color: "#fff", fontSize: 11, fontWeight: "600" },
-  revokeButton: { paddingHorizontal: 8, paddingVertical: 4 },
-  revokeText: { color: "#c0392b", fontSize: 12, fontWeight: "600" },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  rowName: { fontSize: 14, fontWeight: "600", color: colors.textPrimary },
+  rowMeta: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  revokeButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  revokeText: { color: colors.danger, fontSize: 12, fontWeight: "600" },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
 });

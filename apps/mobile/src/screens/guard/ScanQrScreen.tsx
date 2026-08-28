@@ -13,6 +13,8 @@ import { ActivityIndicator, Alert, Linking, StyleSheet, Text, TouchableOpacity, 
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
 import { api, ApiError } from "../../lib/api";
 import type { VisitorPassScanResult } from "../../lib/types";
+import { Button } from "../../components/Button";
+import { colors, spacing } from "../../theme";
 
 const STATUS_LABEL: Record<string, string> = {
   UNUSED: "ยังไม่ใช้",
@@ -68,7 +70,7 @@ export function ScanQrScreen() {
   if (!permission) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -77,9 +79,7 @@ export function ScanQrScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.permissionText}>ต้องอนุญาตใช้กล้องเพื่อสแกน QR</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-          <Text style={styles.permissionButtonText}>อนุญาตใช้กล้อง</Text>
-        </TouchableOpacity>
+        <Button title="อนุญาตใช้กล้อง" onPress={requestPermission} style={styles.permissionButton} />
         <TouchableOpacity onPress={() => Linking.openSettings()}>
           <Text style={styles.settingsLink}>เปิดการตั้งค่า</Text>
         </TouchableOpacity>
@@ -100,16 +100,14 @@ export function ScanQrScreen() {
 
       {loading && (
         <View style={styles.overlay}>
-          <ActivityIndicator size="large" color="#fff" />
+          <ActivityIndicator size="large" color={colors.white} />
         </View>
       )}
 
       {scanError && (
         <View style={styles.resultPanel}>
           <Text style={styles.errorText}>{scanError}</Text>
-          <TouchableOpacity style={styles.rescanButton} onPress={reset}>
-            <Text style={styles.rescanText}>สแกนใหม่</Text>
-          </TouchableOpacity>
+          <Button title="สแกนใหม่" onPress={reset} style={styles.rescanButton} />
         </View>
       )}
 
@@ -129,12 +127,13 @@ export function ScanQrScreen() {
           )}
 
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.rejectButton} onPress={reset}>
-              <Text style={styles.rejectText}>ปฏิเสธ</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmEntry} disabled={confirming}>
-              {confirming ? <ActivityIndicator color="#fff" /> : <Text style={styles.confirmText}>ยืนยันเข้า</Text>}
-            </TouchableOpacity>
+            <Button title="ปฏิเสธ" variant="danger" onPress={reset} style={styles.actionButton} />
+            <Button
+              title="ยืนยันเข้า"
+              onPress={handleConfirmEntry}
+              loading={confirming}
+              style={styles.actionButton}
+            />
           </View>
         </View>
       )}
@@ -143,41 +142,23 @@ export function ScanQrScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#000" },
+  container: { flex: 1, backgroundColor: colors.black },
   camera: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  permissionText: { textAlign: "center", marginBottom: 16, fontSize: 15 },
-  permissionButton: { backgroundColor: "#1d6f42", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 24 },
-  permissionButtonText: { color: "#fff", fontWeight: "700" },
-  settingsLink: { marginTop: 12, color: "#2980b9" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
+  permissionText: { textAlign: "center", marginBottom: spacing.lg, fontSize: 15, color: colors.textPrimary },
+  permissionButton: { paddingHorizontal: spacing.xl },
+  settingsLink: { marginTop: spacing.md, color: colors.secondary },
   overlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.5)",
     alignItems: "center",
     justifyContent: "center",
   },
-  resultPanel: { flex: 1, backgroundColor: "#fff", padding: 24, justifyContent: "center" },
-  visitorName: { fontSize: 22, fontWeight: "800", textAlign: "center" },
-  meta: { fontSize: 14, color: "#555", textAlign: "center", marginTop: 6 },
-  errorText: { fontSize: 16, color: "#c0392b", textAlign: "center" },
-  rescanButton: {
-    marginTop: 20,
-    backgroundColor: "#1d6f42",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-  },
-  rescanText: { color: "#fff", fontWeight: "700" },
-  actionRow: { flexDirection: "row", gap: 12, marginTop: 24 },
-  rejectButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#c0392b",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-  },
-  rejectText: { color: "#c0392b", fontWeight: "700" },
-  confirmButton: { flex: 1, backgroundColor: "#1d6f42", borderRadius: 10, padding: 14, alignItems: "center" },
-  confirmText: { color: "#fff", fontWeight: "700" },
+  resultPanel: { flex: 1, backgroundColor: colors.surface, padding: spacing.xl, justifyContent: "center" },
+  visitorName: { fontSize: 22, fontWeight: "800", textAlign: "center", color: colors.textPrimary },
+  meta: { fontSize: 14, color: colors.textSecondary, textAlign: "center", marginTop: spacing.sm - 2 },
+  errorText: { fontSize: 16, color: colors.danger, textAlign: "center" },
+  rescanButton: { marginTop: spacing.xl },
+  actionRow: { flexDirection: "row", gap: spacing.md, marginTop: spacing.xl },
+  actionButton: { flex: 1 },
 });

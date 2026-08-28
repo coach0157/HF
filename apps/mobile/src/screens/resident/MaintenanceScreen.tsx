@@ -6,14 +6,7 @@
  * CreateMaintenanceScreen; tapping a ticket row shows its full status.
  */
 import { useCallback, useState } from "react";
-import {
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api, ApiError } from "../../lib/api";
@@ -24,6 +17,9 @@ import type {
   Paginated,
 } from "../../lib/types";
 import type { ResidentTabParamList } from "../../navigation/types";
+import { Button } from "../../components/Button";
+import { Badge, type BadgeVariant } from "../../components/Badge";
+import { colors, spacing } from "../../theme";
 
 const CATEGORY_LABEL: Record<MaintenanceCategory, string> = {
   ELECTRICAL: "ไฟฟ้า",
@@ -38,10 +34,10 @@ const STATUS_LABEL: Record<MaintenanceStatus, string> = {
   DONE: "เสร็จสิ้น",
 };
 
-const STATUS_COLOR: Record<MaintenanceStatus, string> = {
-  OPEN: "#f39c12",
-  IN_PROGRESS: "#2980b9",
-  DONE: "#27ae60",
+const STATUS_BADGE_VARIANT: Record<MaintenanceStatus, BadgeVariant> = {
+  OPEN: "warning",
+  IN_PROGRESS: "info",
+  DONE: "success",
 };
 
 export function MaintenanceScreen() {
@@ -74,12 +70,11 @@ export function MaintenanceScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.createButton}
+      <Button
+        title="+ แจ้งซ่อมใหม่"
         onPress={() => navigation.navigate("CreateMaintenance")}
-      >
-        <Text style={styles.createButtonText}>+ แจ้งซ่อมใหม่</Text>
-      </TouchableOpacity>
+        style={styles.createButton}
+      />
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -105,9 +100,7 @@ export function MaintenanceScreen() {
               )}
               {item.assignedTo && <Text style={styles.meta}>ผู้รับผิดชอบ: {item.assignedTo}</Text>}
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[item.status] }]}>
-              <Text style={styles.statusText}>{STATUS_LABEL[item.status]}</Text>
-            </View>
+            <Badge label={STATUS_LABEL[item.status]} variant={STATUS_BADGE_VARIANT[item.status]} />
           </View>
         )}
       />
@@ -116,29 +109,21 @@ export function MaintenanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  createButton: {
-    margin: 16,
-    backgroundColor: "#1d6f42",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-  },
-  createButtonText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  errorText: { color: "#c0392b", paddingHorizontal: 16, paddingBottom: 8 },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  container: { flex: 1, backgroundColor: colors.background },
+  createButton: { margin: spacing.lg },
+  errorText: { color: colors.danger, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
-    padding: 14,
-    gap: 10,
+    padding: spacing.md + 2,
+    gap: spacing.sm + 2,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  ticketNumber: { fontSize: 14, fontWeight: "700" },
-  category: { fontSize: 12, color: "#666", marginTop: 2 },
-  description: { fontSize: 13, color: "#333", marginTop: 4 },
-  meta: { fontSize: 11, color: "#999", marginTop: 4 },
-  statusBadge: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  statusText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  ticketNumber: { fontSize: 14, fontWeight: "700", color: colors.textPrimary },
+  category: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  description: { fontSize: 13, color: colors.textPrimary, marginTop: spacing.xs },
+  meta: { fontSize: 11, color: colors.textMuted, marginTop: spacing.xs },
 });

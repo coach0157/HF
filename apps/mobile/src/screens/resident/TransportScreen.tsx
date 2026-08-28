@@ -20,6 +20,8 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { TransportProvider, TransportProviderType } from "../../lib/types";
+import { Button } from "../../components/Button";
+import { colors, radius, spacing } from "../../theme";
 
 const TYPE_LABEL: Record<TransportProviderType, string> = {
   MOTORCYCLE: "วินมอเตอร์ไซค์",
@@ -102,9 +104,7 @@ export function TransportScreen() {
               {item.serviceArea ? <Text style={styles.meta}>{item.serviceArea}</Text> : null}
               <Text style={styles.phone}>{item.phone}</Text>
             </View>
-            <TouchableOpacity style={styles.callButton} onPress={() => call(item.phone)}>
-              <Text style={styles.callButtonText}>📞 โทร</Text>
-            </TouchableOpacity>
+            <Button title="📞 โทร" variant="secondary" onPress={() => call(item.phone)} style={styles.callButton} />
           </View>
         )}
       />
@@ -113,42 +113,38 @@ export function TransportScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: colors.background },
   filterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    padding: 12,
+    gap: spacing.sm,
+    padding: spacing.md,
   },
   filterChip: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm - 2,
+    backgroundColor: colors.surface,
   },
-  filterChipActive: { backgroundColor: "#1d6f42", borderColor: "#1d6f42" },
-  filterChipText: { fontSize: 12, color: "#444" },
-  filterChipTextActive: { color: "#fff", fontWeight: "700" },
-  errorText: { color: "#c0392b", paddingHorizontal: 16, paddingBottom: 8 },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  filterChipText: { fontSize: 12, color: colors.textSecondary },
+  filterChipTextActive: { color: colors.white, fontWeight: "700" },
+  errorText: { color: colors.danger, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
-    gap: 12,
+    padding: spacing.md + 2,
+    gap: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
   icon: { fontSize: 28 },
-  name: { fontSize: 15, fontWeight: "700" },
-  meta: { fontSize: 12, color: "#666", marginTop: 2 },
-  phone: { fontSize: 13, color: "#1d6f42", marginTop: 4, fontWeight: "600" },
-  callButton: {
-    backgroundColor: "#2980b9",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  callButtonText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  name: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
+  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  phone: { fontSize: 13, color: colors.primaryDark, marginTop: spacing.xs, fontWeight: "600" },
+  callButton: { paddingVertical: spacing.sm + 1, paddingHorizontal: spacing.md },
 });

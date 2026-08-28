@@ -22,16 +22,18 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { Announcement } from "../../lib/types";
+import { Badge, type BadgeVariant } from "../../components/Badge";
+import { colors, radius, spacing } from "../../theme";
 
 const LEVEL_LABEL: Record<Announcement["level"], string> = {
   NORMAL: "ปกติ",
   IMPORTANT: "สำคัญ",
   EMERGENCY: "ฉุกเฉิน",
 };
-const LEVEL_COLOR: Record<Announcement["level"], string> = {
-  NORMAL: "#7f8c8d",
-  IMPORTANT: "#f39c12",
-  EMERGENCY: "#c0392b",
+const LEVEL_BADGE_VARIANT: Record<Announcement["level"], BadgeVariant> = {
+  NORMAL: "neutral",
+  IMPORTANT: "warning",
+  EMERGENCY: "danger",
 };
 
 export function AnnouncementsScreen() {
@@ -77,7 +79,7 @@ export function AnnouncementsScreen() {
   if (loading && items.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -95,9 +97,7 @@ export function AnnouncementsScreen() {
         const expanded = expandedId === item.id;
         return (
           <TouchableOpacity style={styles.row} onPress={() => handleOpen(item)}>
-            <View style={[styles.levelBadge, { backgroundColor: LEVEL_COLOR[item.level] }]}>
-              <Text style={styles.levelBadgeText}>{LEVEL_LABEL[item.level]}</Text>
-            </View>
+            <Badge label={LEVEL_LABEL[item.level]} variant={LEVEL_BADGE_VARIANT[item.level]} style={styles.levelBadge} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, unread && styles.titleUnread]}>{item.title}</Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleString("th-TH")}</Text>
@@ -119,25 +119,25 @@ export function AnnouncementsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  error: { color: "#c0392b", textAlign: "center", padding: 16 },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  error: { color: colors.danger, textAlign: "center", padding: spacing.lg },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   row: {
     flexDirection: "row",
     alignItems: "flex-start",
-    padding: 14,
-    gap: 10,
+    padding: spacing.md + 2,
+    gap: spacing.sm + 2,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  levelBadge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginTop: 2 },
-  levelBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
-  title: { fontSize: 15, fontWeight: "500" },
+  levelBadge: { marginTop: 2 },
+  title: { fontSize: 15, fontWeight: "500", color: colors.textPrimary },
   titleUnread: { fontWeight: "800" },
-  date: { fontSize: 11, color: "#999", marginTop: 2 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#2980b9", marginTop: 6 },
-  detail: { marginTop: 8 },
-  content: { fontSize: 13, color: "#333", lineHeight: 20 },
-  image: { width: "100%", height: 180, borderRadius: 8, marginTop: 8 },
+  date: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  unreadDot: { width: 8, height: 8, borderRadius: radius.pill, backgroundColor: colors.secondary, marginTop: spacing.sm - 2 },
+  detail: { marginTop: spacing.sm },
+  content: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+  image: { width: "100%", height: 180, borderRadius: radius.card, marginTop: spacing.sm },
 });

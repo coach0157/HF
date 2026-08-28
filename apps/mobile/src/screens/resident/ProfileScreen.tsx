@@ -11,13 +11,16 @@
  * zone, which the session doesn't carry.
  */
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text } from "react-native";
 import { api, ApiError } from "../../lib/api";
 import { clearSession } from "../../lib/auth";
 import { disconnectChatSocket } from "../../lib/chat";
 import { unregisterPushTokenAsync } from "../../lib/push";
 import { useAuth } from "../../context/AuthContext";
 import type { House } from "../../lib/types";
+import { Card } from "../../components/Card";
+import { Button } from "../../components/Button";
+import { colors, spacing } from "../../theme";
 
 export function ProfileScreen() {
   const { session, setSession } = useAuth();
@@ -65,7 +68,7 @@ export function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.card}>
+      <Card>
         <Text style={styles.label}>ชื่อ</Text>
         <Text style={styles.value}>{session.name}</Text>
 
@@ -77,30 +80,26 @@ export function ProfileScreen() {
 
         <Text style={styles.label}>บ้านเลขที่</Text>
         {loadingHouse ? (
-          <ActivityIndicator size="small" style={{ alignSelf: "flex-start", marginTop: 4 }} />
+          <ActivityIndicator size="small" color={colors.primary} style={{ alignSelf: "flex-start", marginTop: spacing.xs }} />
         ) : (
           <Text style={styles.value}>{house ? `${house.houseNo}${house.zone ? ` (โซน ${house.zone})` : ""}` : "-"}</Text>
         )}
-      </View>
+      </Card>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} disabled={loggingOut}>
-        {loggingOut ? <ActivityIndicator color="#fff" /> : <Text style={styles.logoutText}>ออกจากระบบ</Text>}
-      </TouchableOpacity>
+      <Button
+        title="ออกจากระบบ"
+        variant="danger"
+        onPress={handleLogout}
+        loading={loggingOut}
+        style={styles.logoutButton}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  card: { backgroundColor: "#f7f7f7", borderRadius: 12, padding: 16 },
-  label: { fontSize: 12, color: "#888", marginTop: 12 },
-  value: { fontSize: 16, fontWeight: "600", marginTop: 2 },
-  logoutButton: {
-    marginTop: 24,
-    backgroundColor: "#c0392b",
-    borderRadius: 10,
-    padding: 14,
-    alignItems: "center",
-  },
-  logoutText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
+  label: { fontSize: 12, color: colors.textMuted, marginTop: spacing.md },
+  value: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, marginTop: 2 },
+  logoutButton: { marginTop: spacing.xl },
 });

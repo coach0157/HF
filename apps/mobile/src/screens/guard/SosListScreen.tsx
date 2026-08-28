@@ -10,7 +10,6 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Linking,
@@ -23,6 +22,8 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { AppUser, House, SosAlert } from "../../lib/types";
+import { Button } from "../../components/Button";
+import { colors, radius, spacing } from "../../theme";
 
 const POLL_MS = 5000;
 
@@ -150,20 +151,19 @@ export function SosListScreen() {
           </TouchableOpacity>
 
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.callButton} onPress={() => handleCall(item.callerPhone)}>
-              <Text style={styles.callText}>📞 โทรกลับ</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.ackButton}
+            <Button
+              title="📞 โทรกลับ"
+              variant="secondary"
+              onPress={() => handleCall(item.callerPhone)}
+              style={styles.actionButton}
+            />
+            <Button
+              title="รับเรื่อง"
+              variant="danger"
               onPress={() => handleAcknowledge(item)}
-              disabled={ackingId === item.id}
-            >
-              {ackingId === item.id ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Text style={styles.ackText}>รับเรื่อง</Text>
-              )}
-            </TouchableOpacity>
+              loading={ackingId === item.id}
+              style={styles.actionButton}
+            />
           </View>
         </View>
       )}
@@ -172,30 +172,21 @@ export function SosListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  container: { flex: 1, backgroundColor: colors.background },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   card: {
-    margin: 12,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: "#fdecea",
+    margin: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.card,
+    backgroundColor: colors.dangerLight,
     borderWidth: 1,
-    borderColor: "#e74c3c",
+    borderColor: colors.danger,
   },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  houseNo: { fontSize: 17, fontWeight: "800", color: "#c0392b" },
-  time: { fontSize: 12, color: "#888" },
-  caller: { fontSize: 13, color: "#444", marginTop: 4 },
-  coords: { fontSize: 12, color: "#2980b9", marginTop: 6 },
-  actionRow: { flexDirection: "row", gap: 10, marginTop: 14 },
-  callButton: {
-    flex: 1,
-    backgroundColor: "#2980b9",
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  callText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-  ackButton: { flex: 1, backgroundColor: "#c0392b", borderRadius: 8, paddingVertical: 10, alignItems: "center" },
-  ackText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  houseNo: { fontSize: 17, fontWeight: "800", color: colors.danger },
+  time: { fontSize: 12, color: colors.textMuted },
+  caller: { fontSize: 13, color: colors.textPrimary, marginTop: spacing.xs },
+  coords: { fontSize: 12, color: colors.secondaryDark, marginTop: spacing.sm },
+  actionRow: { flexDirection: "row", gap: spacing.sm + 2, marginTop: spacing.md + 2 },
+  actionButton: { flex: 1, paddingVertical: spacing.sm + 2 },
 });

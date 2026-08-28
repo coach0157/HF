@@ -34,11 +34,12 @@ import { useAuth } from "../../context/AuthContext";
 import type { Announcement } from "../../lib/types";
 import type { ResidentTabParamList } from "../../navigation/types";
 import { SosHoldButton } from "../../components/SosHoldButton";
+import { colors, radius, spacing } from "../../theme";
 
 const LEVEL_COLOR: Record<Announcement["level"], string> = {
-  NORMAL: "#7f8c8d",
-  IMPORTANT: "#f39c12",
-  EMERGENCY: "#c0392b",
+  NORMAL: colors.textMuted,
+  IMPORTANT: colors.warning,
+  EMERGENCY: colors.danger,
 };
 
 export function ResidentHomeScreen() {
@@ -119,7 +120,7 @@ export function ResidentHomeScreen() {
 
       <View style={styles.sosWrap}>
         <SosHoldButton onTrigger={handleSos} />
-        {sosSending && <ActivityIndicator style={{ marginTop: 8 }} />}
+        {sosSending && <ActivityIndicator style={{ marginTop: spacing.sm }} />}
       </View>
 
       <View style={styles.cardsRow}>
@@ -168,52 +169,65 @@ export function ResidentHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: colors.background },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    padding: spacing.lg,
   },
-  villageName: { fontSize: 18, fontWeight: "700" },
-  bell: { padding: 4 },
+  villageName: { fontSize: 18, fontWeight: "700", color: colors.textPrimary },
+  bell: { padding: spacing.xs },
   bellIcon: { fontSize: 22 },
   badge: {
     position: "absolute",
     top: -2,
     right: -2,
-    backgroundColor: "#c0392b",
-    borderRadius: 9,
+    backgroundColor: colors.danger,
+    borderRadius: radius.pill,
     minWidth: 18,
     height: 18,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 3,
   },
-  badgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
-  greeting: { fontSize: 16, color: "#444", paddingHorizontal: 16, marginBottom: 8 },
-  sosWrap: { alignItems: "center", marginVertical: 20 },
-  cardsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 12 },
+  badgeText: { color: colors.white, fontSize: 10, fontWeight: "700" },
+  greeting: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  sosWrap: { alignItems: "center", marginVertical: spacing.xl },
+  cardsRow: { flexDirection: "row", paddingHorizontal: spacing.lg, gap: spacing.md },
   card: {
     flex: 1,
-    backgroundColor: "#f2f6f4",
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
     alignItems: "center",
-    gap: 6,
+    gap: spacing.sm,
   },
   cardIcon: { fontSize: 26 },
-  cardLabel: { fontSize: 13, fontWeight: "600", textAlign: "center" },
-  sectionTitle: { fontSize: 15, fontWeight: "700", padding: 16, paddingBottom: 8 },
-  empty: { color: "#999", paddingHorizontal: 16, paddingBottom: 24 },
+  cardLabel: { fontSize: 13, fontWeight: "600", textAlign: "center", color: colors.textPrimary },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    padding: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  empty: { color: colors.textMuted, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   announcementRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    gap: spacing.md,
   },
   levelDot: { width: 10, height: 10, borderRadius: 5 },
-  announcementTitle: { fontSize: 14, fontWeight: "600" },
-  announcementDate: { fontSize: 11, color: "#999", marginTop: 2 },
+  announcementTitle: { fontSize: 14, fontWeight: "600", color: colors.textPrimary },
+  announcementDate: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
 });

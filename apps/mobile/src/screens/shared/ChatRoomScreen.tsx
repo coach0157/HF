@@ -33,6 +33,7 @@ import { getChatSocket } from "../../lib/chat";
 import { useAuth } from "../../context/AuthContext";
 import type { ChatMessage, Paginated } from "../../lib/types";
 import type { ChatStackParamList } from "../../navigation/types";
+import { colors, radius, spacing } from "../../theme";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString("th-TH", {
@@ -159,7 +160,7 @@ export function ChatRoomScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -201,13 +202,14 @@ export function ChatRoomScreen() {
 
       <View style={styles.composer}>
         <TouchableOpacity style={styles.attachButton} onPress={handleAttachImage} disabled={uploading}>
-          {uploading ? <ActivityIndicator size="small" /> : <Text style={styles.attachIcon}>📷</Text>}
+          {uploading ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={styles.attachIcon}>📷</Text>}
         </TouchableOpacity>
         <TextInput
           style={styles.input}
           value={input}
           onChangeText={setInput}
           placeholder="พิมพ์ข้อความ..."
+          placeholderTextColor={colors.textMuted}
           multiline
         />
         <TouchableOpacity
@@ -223,42 +225,43 @@ export function ChatRoomScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  errorText: { color: "#c0392b", padding: 12 },
-  list: { padding: 12, gap: 10 },
-  empty: { color: "#999", textAlign: "center", padding: 24 },
+  errorText: { color: colors.danger, padding: spacing.md },
+  list: { padding: spacing.md, gap: spacing.sm + 2 },
+  empty: { color: colors.textMuted, textAlign: "center", padding: spacing.xl },
   bubbleRow: { maxWidth: "78%" },
   bubbleRowMine: { alignSelf: "flex-end", alignItems: "flex-end" },
   bubbleRowTheirs: { alignSelf: "flex-start", alignItems: "flex-start" },
-  bubble: { borderRadius: 14, paddingVertical: 8, paddingHorizontal: 12 },
-  bubbleMine: { backgroundColor: "#1d6f42" },
-  bubbleTheirs: { backgroundColor: "#f1f1f1" },
-  bubbleTextMine: { color: "#fff", fontSize: 14 },
-  bubbleTextTheirs: { color: "#222", fontSize: 14 },
+  bubble: { borderRadius: 14, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  bubbleMine: { backgroundColor: colors.primary },
+  bubbleTheirs: { backgroundColor: colors.border },
+  bubbleTextMine: { color: colors.white, fontSize: 14 },
+  bubbleTextTheirs: { color: colors.textPrimary, fontSize: 14 },
   imagePlaceholder: {
     backgroundColor: "rgba(0,0,0,0.08)",
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 4,
+    borderRadius: radius.card - 4,
+    padding: spacing.sm + 2,
+    marginBottom: spacing.xs,
   },
   imagePlaceholderText: { fontSize: 12 },
-  timestamp: { fontSize: 10, color: "#999", marginTop: 2 },
+  timestamp: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
   timestampMine: { textAlign: "right" },
   timestampTheirs: { textAlign: "left" },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 8,
-    padding: 10,
+    gap: spacing.sm,
+    padding: spacing.sm + 2,
     borderTopWidth: 1,
-    borderTopColor: "#eee",
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
   attachButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#f2f6f4",
+    backgroundColor: colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -266,18 +269,19 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: colors.border,
     borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.sm,
     maxHeight: 100,
+    color: colors.textPrimary,
   },
   sendButton: {
-    backgroundColor: "#1d6f42",
+    backgroundColor: colors.primary,
     borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
   },
   sendButtonDisabled: { opacity: 0.4 },
-  sendButtonText: { color: "#fff", fontWeight: "700" },
+  sendButtonText: { color: colors.white, fontWeight: "700" },
 });

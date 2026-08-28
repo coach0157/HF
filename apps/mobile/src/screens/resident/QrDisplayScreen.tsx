@@ -17,6 +17,9 @@ import QRCode from "react-native-qrcode-svg";
 import { api, ApiError } from "../../lib/api";
 import type { VisitorPass } from "../../lib/types";
 import type { ResidentTabParamList } from "../../navigation/types";
+import { Button } from "../../components/Button";
+import { Badge, type BadgeVariant } from "../../components/Badge";
+import { colors, spacing } from "../../theme";
 
 const STATUS_LABEL: Record<VisitorPass["status"], string> = {
   UNUSED: "ยังไม่ใช้",
@@ -24,6 +27,13 @@ const STATUS_LABEL: Record<VisitorPass["status"], string> = {
   EXITED: "ออกแล้ว",
   EXPIRED: "หมดอายุ",
   REVOKED: "ยกเลิกแล้ว",
+};
+const STATUS_BADGE_VARIANT: Record<VisitorPass["status"], BadgeVariant> = {
+  UNUSED: "info",
+  ENTERED: "success",
+  EXITED: "neutral",
+  EXPIRED: "neutral",
+  REVOKED: "danger",
 };
 
 export function QrDisplayScreen({
@@ -86,18 +96,18 @@ export function QrDisplayScreen({
       </Text>
       <Text style={styles.meta}>{pass.usageType === "SINGLE" ? "ใช้ครั้งเดียว" : "ใช้ได้หลายครั้ง"}</Text>
 
-      <View style={styles.statusBadge}>
-        <Text style={styles.statusText}>{STATUS_LABEL[pass.status]}</Text>
-      </View>
+      <Badge label={STATUS_LABEL[pass.status]} variant={STATUS_BADGE_VARIANT[pass.status]} style={styles.statusBadge} />
 
-      <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-        <Text style={styles.shareText}>แชร์ QR</Text>
-      </TouchableOpacity>
+      <Button title="แชร์ QR" onPress={handleShare} style={styles.shareButton} />
 
       {canRevoke && (
-        <TouchableOpacity style={styles.revokeButton} onPress={handleRevoke} disabled={revoking}>
-          <Text style={styles.revokeText}>{revoking ? "กำลังยกเลิก..." : "ยกเลิก QR นี้"}</Text>
-        </TouchableOpacity>
+        <Button
+          title={revoking ? "กำลังยกเลิก..." : "ยกเลิก QR นี้"}
+          onPress={handleRevoke}
+          variant="danger"
+          loading={revoking}
+          style={styles.revokeButton}
+        />
       )}
 
       <TouchableOpacity
@@ -111,28 +121,18 @@ export function QrDisplayScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", padding: 24, backgroundColor: "#fff" },
-  qrWrap: { marginTop: 24, marginBottom: 20, padding: 16, backgroundColor: "#fff" },
-  visitorName: { fontSize: 20, fontWeight: "700" },
-  meta: { fontSize: 13, color: "#666", marginTop: 4, textAlign: "center" },
-  statusBadge: {
-    marginTop: 12,
-    backgroundColor: "#2980b9",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  container: { flex: 1, alignItems: "center", padding: spacing.xl, backgroundColor: colors.background },
+  qrWrap: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.lg,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
   },
-  statusText: { color: "#fff", fontWeight: "600" },
-  shareButton: {
-    marginTop: 24,
-    backgroundColor: "#1d6f42",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-  },
-  shareText: { color: "#fff", fontWeight: "700" },
-  revokeButton: { marginTop: 12, paddingVertical: 10 },
-  revokeText: { color: "#c0392b", fontWeight: "600" },
-  doneButton: { marginTop: 20, paddingVertical: 10 },
-  doneText: { color: "#999" },
+  visitorName: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
+  meta: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, textAlign: "center" },
+  statusBadge: { marginTop: spacing.md },
+  shareButton: { marginTop: spacing.xl, alignSelf: "stretch" },
+  revokeButton: { marginTop: spacing.md, alignSelf: "stretch" },
+  doneButton: { marginTop: spacing.lg, paddingVertical: spacing.sm + 2 },
+  doneText: { color: colors.textMuted },
 });

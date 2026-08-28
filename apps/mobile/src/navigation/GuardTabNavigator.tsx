@@ -16,6 +16,7 @@ import { ChatListScreen } from "../screens/guard/ChatListScreen";
 import { ChatRoomScreen } from "../screens/shared/ChatRoomScreen";
 import { GuardProfileScreen } from "../screens/guard/ProfileScreen";
 import type { ChatStackParamList, GuardTabParamList } from "./types";
+import { colors } from "../theme";
 
 // Nested stack so ChatListScreen can drill into the shared ChatRoomScreen —
 // same pattern as ResidentTabNavigator's ChatStackNavigator.
@@ -33,7 +34,13 @@ const Tab = createBottomTabNavigator<GuardTabParamList>();
 
 export function GuardTabNavigator() {
   return (
-    <Tab.Navigator>
+    <Tab.Navigator
+      screenOptions={{
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+      }}
+    >
       <Tab.Screen name="Home" component={GuardHomeScreen} options={{ title: "หน้าแรก" }} />
       <Tab.Screen name="ScanQr" component={ScanQrScreen} options={{ title: "สแกน QR" }} />
       <Tab.Screen
