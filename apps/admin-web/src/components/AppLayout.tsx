@@ -38,6 +38,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           <Link to="/entry-logs">ประวัติเข้า-ออก</Link>
           <Link to="/transport-providers">ทำเนียบรถรับจ้าง</Link>
           <Link to="/maintenance-tickets">แจ้งซ่อม</Link>
+          <Link to="/chat">แชท</Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {session && <span>{session.name}</span>}

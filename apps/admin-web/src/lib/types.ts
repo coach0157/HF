@@ -133,3 +133,34 @@ export interface MaintenanceTicket {
   ticketNumber: string;
   createdAt: string;
 }
+
+// Epic 8 — Chat (spec 2.3 / docs/PHASE2_BACKLOG.md Epic 8, ADR-004/005 in
+// docs/ARCHITECTURE.md §8.1-8.2). Shapes mirror apps/backend's
+// chat.service.ts return values (hand-kept-in-sync, same as every other
+// type in this file).
+export type ChatRoomType = 'DIRECT' | 'GROUP';
+
+export interface ChatMessage {
+  id: string;
+  villageId: string;
+  chatRoomId: string;
+  senderId: string;
+  message: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+}
+
+// Return shape of GET /chat-rooms (ChatService.listRooms) — a ChatRoom row
+// enriched with the caller's own read state, a preview of the last message,
+// and (for DIRECT rooms only) the other participant's basic identity.
+export interface ChatRoomSummary {
+  id: string;
+  villageId: string;
+  type: ChatRoomType;
+  name: string | null;
+  residentsCanPost: boolean;
+  lastMessage: ChatMessage | null;
+  lastReadAt: string | null;
+  unreadCount: number;
+  otherUser: { id: string; name: string; phone: string; role: UserRole } | null;
+}

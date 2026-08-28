@@ -14,6 +14,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { api, ApiError } from "../../lib/api";
 import { clearSession } from "../../lib/auth";
+import { disconnectChatSocket } from "../../lib/chat";
 import { useAuth } from "../../context/AuthContext";
 import type { House } from "../../lib/types";
 
@@ -49,6 +50,7 @@ export function ProfileScreen() {
         Alert.alert("ออกจากระบบ", "ไม่สามารถแจ้งเซิร์ฟเวอร์ได้ แต่จะออกจากระบบในเครื่องนี้");
       }
     } finally {
+      disconnectChatSocket();
       await clearSession();
       setSession(null);
       setLoggingOut(false);

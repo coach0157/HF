@@ -34,10 +34,16 @@ export class UsersController {
     return user;
   }
 
-  @Roles("ADMIN")
+  // Epic 8 (Chat): opened to RESIDENT/GUARD so the mobile chat screen can
+  // find an admin/guard to start a DIRECT chat with — see UsersService.list()'s
+  // doc comment for why this does NOT reopen a resident directory (spec
+  // 2.7's explicit "no resident directory" decision still holds: a
+  // non-ADMIN caller only ever gets ADMIN/GUARD rows back, enforced in the
+  // service, not just here).
+  @Roles("ADMIN", "RESIDENT", "GUARD")
   @Get()
-  list(@Query("role") role?: UserRole) {
-    return this.usersService.list({ role });
+  list(@Query("role") role: UserRole | undefined, @CurrentUser() user: TenantClaims) {
+    return this.usersService.list({ role }, user);
   }
 
   // Dev-agent addition (backend gap flagged in MVP_BACKLOG.md Epic 7): the

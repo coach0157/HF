@@ -18,6 +18,16 @@ export type AuthStackParamList = {
   OtpVerify: { phone: string };
 };
 
+// Epic 8 — Chat (spec 2.3 / docs/PHASE2_BACKLOG.md Epic 8). Shared by both
+// the resident and guard "Chat" tab's nested stack (ChatStackNavigator in
+// each of ResidentTabNavigator.tsx / GuardTabNavigator.tsx) — the list
+// screen differs per role (resident: 3 fixed targets; guard: dynamic
+// DIRECT-room list) but both drill into the same shared ChatRoomScreen.
+export type ChatStackParamList = {
+  ChatList: undefined;
+  ChatRoom: { chatRoomId: string; title: string };
+};
+
 export type ResidentTabParamList = {
   Home: undefined;
   InviteGuest: undefined;
@@ -27,6 +37,7 @@ export type ResidentTabParamList = {
   Maintenance: undefined;
   CreateMaintenance: undefined;
   Announcements: undefined;
+  Chat: undefined;
   Profile: undefined;
 };
 
@@ -36,6 +47,7 @@ export type GuardTabParamList = {
   ManualEntry: undefined;
   ExitConfirm: undefined;
   SosList: undefined;
+  Chat: undefined;
   Profile: undefined;
 };
 

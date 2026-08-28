@@ -7,7 +7,8 @@ import {
 import { Observable, from } from "rxjs";
 import { lastValueFrom } from "rxjs";
 import { PrismaService } from "../prisma/prisma.service";
-import { tenantClaimsStorage, tenantRequestStorage } from "./tenant-context";
+import { tenantClaimsStorage } from "./tenant-context";
+import { runInTenantTransaction } from "./tenant-transaction";
 
 /**
  * Step 2 of the multi-tenant RLS pattern (step 1 is TenantContextMiddleware).
@@ -29,9 +30,11 @@ import { tenantClaimsStorage, tenantRequestStorage } from "./tenant-context";
  * data leak. SET LOCAL inside a transaction cannot leak this way.
  *
  * The controller handler (and everything it calls) then runs *inside* that
- * same transaction — see the `tenantRequestStorage.run(...)` below — so
- * every Prisma query issued via `getTenantPrismaClient()` executes against
- * a Postgres session where the RLS policies in
+ * same transaction — via `runInTenantTransaction()` (see
+ * `common/rls/tenant-transaction.ts`, extracted per ADR-005 so the WebSocket
+ * gateway can share this exact sequence instead of hand-rolling its own) —
+ * so every Prisma query issued via `getTenantPrismaClient()` executes
+ * against a Postgres session where the RLS policies in
  * apps/backend/prisma/sql/rls-policies.sql are actively filtering rows to
  * `village_id = current_setting('app.current_village_id')::uuid`.
  *
@@ -61,15 +64,9 @@ export class RlsInterceptor implements NestInterceptor {
     }
 
     return from(
-      this.prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT set_config('app.current_village_id', ${claims.villageId}, true)`;
-        await tx.$executeRaw`SELECT set_config('app.current_user_id', ${claims.userId}, true)`;
-        await tx.$executeRaw`SELECT set_config('app.current_role', ${claims.role}, true)`;
-
-        return tenantRequestStorage.run({ ...claims, tx }, () =>
-          lastValueFrom(next.handle()),
-        );
-      }),
+      runInTenantTransaction(this.prisma, claims, () =>
+        lastValueFrom(next.handle()),
+      ),
     );
   }
 }

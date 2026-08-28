@@ -19,12 +19,62 @@ function mockClaims(overrides: Partial<TenantClaims> = {}): TenantClaims {
 
 describe("UsersService", () => {
   let service: UsersService;
-  let tx: { user: { findUnique: jest.Mock } };
+  let tx: { user: { findUnique: jest.Mock; findMany: jest.Mock } };
 
   beforeEach(() => {
     service = new UsersService();
-    tx = { user: { findUnique: jest.fn() } };
+    tx = { user: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) } };
     (getTenantPrismaClient as jest.Mock).mockReturnValue(tx);
+  });
+
+  describe("list — Epic 8 staff-directory restriction for non-admin callers", () => {
+    it("ADMIN gets the unrestricted list, respecting any role filter", async () => {
+      await service.list({ role: "RESIDENT" as any }, mockClaims({ role: "ADMIN", houseId: null }));
+      expect(tx.user.findMany).toHaveBeenCalledWith({
+        where: { role: "RESIDENT" },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+
+    it("ADMIN with no role filter gets everyone", async () => {
+      await service.list({}, mockClaims({ role: "ADMIN", houseId: null }));
+      expect(tx.user.findMany).toHaveBeenCalledWith({
+        where: undefined,
+        orderBy: { createdAt: "desc" },
+      });
+    });
+
+    it("RESIDENT with no filter only ever gets ADMIN/GUARD rows (no resident directory)", async () => {
+      await service.list({}, mockClaims({ role: "RESIDENT" }));
+      expect(tx.user.findMany).toHaveBeenCalledWith({
+        where: { role: { in: ["ADMIN", "GUARD"] } },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+
+    it("RESIDENT explicitly asking for role=RESIDENT is silently coerced to staff-only", async () => {
+      await service.list({ role: "RESIDENT" as any }, mockClaims({ role: "RESIDENT" }));
+      expect(tx.user.findMany).toHaveBeenCalledWith({
+        where: { role: { in: ["ADMIN", "GUARD"] } },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+
+    it("RESIDENT asking for role=GUARD gets exactly GUARD (a valid staff sub-filter)", async () => {
+      await service.list({ role: "GUARD" as any }, mockClaims({ role: "RESIDENT" }));
+      expect(tx.user.findMany).toHaveBeenCalledWith({
+        where: { role: "GUARD" },
+        orderBy: { createdAt: "desc" },
+      });
+    });
+
+    it("GUARD caller is subject to the same staff-only restriction as RESIDENT", async () => {
+      await service.list({}, mockClaims({ role: "GUARD", houseId: null }));
+      expect(tx.user.findMany).toHaveBeenCalledWith({
+        where: { role: { in: ["ADMIN", "GUARD"] } },
+        orderBy: { createdAt: "desc" },
+      });
+    });
   });
 
   describe("findOne — ownership scoping (backend gap: GET /users/:id opened to RESIDENT/GUARD)", () => {
