@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Village Security",
+    "slug": "village-mobile",
+    "scheme": "villagesecurity",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.villagesecurity.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ใช้กล้องเพื่อสแกน QR แขก และถ่ายรูปบัตรประชาชน/ทะเบียนรถ (เฉพาะ รปภ.)",
+        "NSLocationWhenInUseUsageDescription": "ใช้พิกัดเพื่อแนบตำแหน่งเมื่อกดปุ่ม SOS"
+      }
+    },
+    "android": {
+      "package": "app.villagesecurity.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "ใช้กล้องเพื่อสแกน QR แขก และถ่ายรูปบัตรประชาชน/ทะเบียนรถ (เฉพาะ รปภ.)"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png"
+        }
+      ]
+    ],
+    "extra": {
+      "apiBaseUrl": "http://localhost:3001"
+    }
+  }
+}

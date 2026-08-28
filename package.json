@@ -5,14 +5,17 @@
   "description": "Village Security & Community App — monorepo root (npm workspaces)",
   "workspaces": [
     "apps/backend",
-    "apps/admin-web"
+    "apps/admin-web",
+    "apps/mobile"
   ],
   "scripts": {
     "dev:backend": "npm run start:dev --workspace apps/backend",
     "dev:admin": "npm run dev --workspace apps/admin-web",
+    "dev:mobile": "npm run start --workspace apps/mobile",
     "build": "npm run build:backend && npm run build:admin",
     "build:backend": "npm run build --workspace apps/backend",
     "build:admin": "npm run build --workspace apps/admin-web",
+    "typecheck:mobile": "npm run typecheck --workspace apps/mobile",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "prisma:generate": "npm run prisma:generate --workspace apps/backend",

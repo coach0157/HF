@@ -1,8 +1,10 @@
 # Architecture — Village Security & Community App
 
-Status: scaffold complete and validated against a real PostgreSQL instance
-(see "Validated during scaffolding" at the bottom). Source of truth for
-product scope: [`village-security-app-spec.md`](../village-security-app-spec.md).
+Status: backend + admin-web scaffold complete and validated against a real
+PostgreSQL instance (see "Validated during scaffolding" in §6); mobile
+(`apps/mobile`) scaffolded and typecheck-validated in a later round (§7) —
+screens are TODO stubs, not yet implemented. Source of truth for product
+scope: [`village-security-app-spec.md`](../village-security-app-spec.md).
 Source of truth for MVP task breakdown: [`MVP_BACKLOG.md`](./MVP_BACKLOG.md).
 
 This document exists so a Dev agent can pick up any module and implement it
@@ -31,6 +33,20 @@ apps/
       pages/                one file per spec 1.3 / backlog Epic 5 screen
       routes/                ProtectedRoute (client-side UX guard only)
       lib/                  api.ts (fetch wrapper), auth.ts (session storage)
+  mobile/                   Expo (React Native + TypeScript) — Resident AND
+                            Guard app in one codebase, see §7
+    App.tsx                 AuthProvider + RootNavigator
+    src/
+      lib/                  api.ts, auth.ts (expo-secure-store), types.ts,
+                            config.ts — mirrors admin-web/src/lib, async
+      context/               AuthContext.tsx (session state)
+      navigation/             RootNavigator (role switch), AuthNavigator,
+                            ResidentTabNavigator, GuardTabNavigator
+      screens/
+        auth/                 PhoneLogin, OtpVerify (shared)
+        resident/             one file per spec 1.1 screen
+        guard/                 one file per spec 1.2 screen
+      components/             shared widgets (e.g. SosHoldButton)
 infra/
   postgres/init/01-init.sql runs once on first container start — creates the
                             non-superuser `village_app` DB role RLS needs
@@ -329,3 +345,134 @@ Postgres, to prove the RLS pattern actually holds:
 Test data from step 5 was cleaned up afterward; the DB was left in a clean
 seeded state (one sample village/admin/house) and the container stopped
 (`docker compose down`, data volume preserved).
+
+---
+
+## 7. Mobile app (`apps/mobile`) — Expo, one codebase, role-based navigation
+
+Status: scaffold only. Navigation, `lib/api.ts`/`lib/auth.ts`, and every
+screen file exist and typecheck; every screen body is a TODO stub (same
+"scaffold now, Dev agent implements later" pattern the backend/admin-web
+scaffold used — see `MVP_BACKLOG.md`'s Epic 6/7 for the task breakdown).
+Reuses 100% of the existing backend API — **no new endpoints were added for
+mobile**, only two backend gaps were found and are reported (not fixed) in
+Epic 6/7's "ข้อจำกัด backend" lists.
+
+### ADR-002 — One Expo app for both Resident and Guard, not two apps
+
+**Decision:** a single Expo (React Native + TypeScript) codebase at
+`apps/mobile` serves both roles. After login, `RootNavigator`
+(`src/navigation/RootNavigator.tsx`) reads `session.role` from `AuthContext`
+and mounts `ResidentTabNavigator` or `GuardTabNavigator` — two completely
+separate screen trees that happen to share one Auth stack, one
+`lib/api.ts`, and one `lib/auth.ts`.
+
+**Why not two apps (`apps/mobile-resident` + `apps/mobile-guard`):**
+- Auth (phone+OTP login, JWT storage/refresh, session context) and the API
+  client are identical between roles — spec 3.3's endpoints are the same
+  backend for both. Two apps would either duplicate that code or force a
+  third `packages/mobile-shared` package into the monorepo this early —
+  exactly the kind of premature complexity ADR-001 (npm workspaces, no
+  Nx/Turborepo) already argued against for the web side.
+- The two role's screen trees (`src/screens/resident/`, `src/screens/guard/`)
+  and navigators (`ResidentTabNavigator`, `GuardTabNavigator`) are still
+  fully separate — there's no forced coupling of UI, only of
+  auth/API/session plumbing. A Dev agent implementing the Guard scan screen
+  never touches Resident screen files and vice versa.
+- One app means one login screen a village needs to hand out (fewer support
+  questions: "which app do I install?"), and one Expo/EAS project to
+  configure, build, and later push OTA updates to — meaningfully less MVP
+  ops overhead for a project already juggling backend + admin-web + mobile
+  in one 6-8 week phase (spec §4).
+- The realistic downside — Resident-only users carrying Guard code (and
+  vice versa) in their bundle — is small at this app's size and is exactly
+  what Hermes bytecode + Metro's tree-shaking of unreached screen modules
+  mitigates; it's not zero cost, but far cheaper than the alternative's
+  duplicated auth/API layer.
+
+**Revisit when:** the two roles' feature sets diverge enough that shared
+auth/API plumbing stops being the dominant shared surface area (e.g. Guard
+gains a large offline-first data-sync layer Resident never needs) — split
+into two apps then, reusing `lib/` as a `packages/mobile-shared` package at
+that point (mirrors ADR-001's own "revisit when a third app needs shared
+code" trigger).
+
+### ADR-003 — Expo (managed workflow), React Navigation, not Expo Router
+
+**Decision:** Expo SDK 57, TypeScript, `@react-navigation/native` +
+`native-stack` + `bottom-tabs` for routing (not `expo-router`'s
+file-based routing).
+
+**Why Expo over bare React Native:** spec 3.1 explicitly recommends
+React Native/Flutter; the team already has React skill from admin-web
+(spec 3.1's own reasoning for React Native over Flutter). Expo's managed
+workflow means no Xcode/Android Studio native project to maintain by hand —
+this machine has no emulator installed (see task constraints), so a
+scaffold that only needs to `npm install` + `tsc --noEmit` cleanly, without
+ever invoking a native build, is the only kind of scaffold that can be
+validated here at all. `expo-camera`'s `CameraView` gives QR scanning
+(spec 1.2) as a built-in SDK component (no separate barcode library), and
+`expo-notifications` + `expo-secure-store` cover push and secure session
+storage without any native module hand-linking.
+
+**Why React Navigation over Expo Router:** Expo Router's file-based routing
+is the newer, increasingly-default choice, but it entangles the
+Auth-vs-Resident-vs-Guard role switch (ADR-002) with the filesystem layout
+in a way that's harder to reason about explicitly than
+`RootNavigator`'s plain `if (!session) ... else if (role === 'RESIDENT')
+...` branch. React Navigation's imperative navigator composition matches
+how `apps/backend`'s module boundaries and `apps/admin-web`'s
+`react-router-dom` routes are already reasoned about in this repo — one
+more file (`RootNavigator.tsx`) you can read top-to-bottom instead of
+inferring routing from directory structure. Revisit if the screen count
+grows enough that file-based routing's reduced boilerplate starts to win.
+
+### How it reuses / differs from admin-web's pattern
+
+| Concern | admin-web (`apps/admin-web/src/lib`) | mobile (`apps/mobile/src/lib`) |
+|---|---|---|
+| API client | `api.ts` — fetch wrapper, 401 → refresh → retry, redirects via `window.location.href` | Same retry/refresh logic, but every session read is `await`ed (see below) and there's no `window.location` — an unrecoverable 401 calls `onSessionExpired()`, a callback `AuthContext` registers, so `RootNavigator` can swap back to the Auth stack |
+| Session storage | `auth.ts` — `localStorage`, synchronous reads | `auth.ts` — `expo-secure-store` (iOS Keychain / Android Keystore), **async** reads — a phone is far more likely to be lost/stolen than an office workstation, so the 30-day refresh token needs OS-level encryption at rest, not plaintext `localStorage`-equivalent |
+| Response types | `types.ts` — hand-kept in sync with Prisma models | Same file, copied and extended with `VisitorPass`/`VisitorPassScanResult` (types admin-web never needed since it has no QR scan screen) |
+| Route guarding | `ProtectedRoute` component wrapping `react-router-dom` routes | `RootNavigator`'s session check plays the same role, structurally simpler since there's no nested route tree to guard, just one top-level switch |
+| Both are UX-only guards | Neither is a security boundary — the backend's `JwtAuthGuard`/`RolesGuard` (`apps/backend/src/common/guards/`) is the real authority in both cases, per spec 3.4 | (same) |
+
+### Screen-by-screen TODO map
+
+Every file in `src/screens/resident/` and `src/screens/guard/` carries a doc
+comment naming the exact backend endpoint(s)/DTO field names it must call —
+written so a Dev agent can implement each screen without re-reading spec.md
+or the backend source. Two design decisions were deliberately left open in
+those comments rather than pre-decided here, since they're UI/product calls
+rather than architecture ones:
+- `ExitConfirmScreen.tsx`: whether guard exit-confirm reuses `ScanQrScreen`
+  in an "exit mode" or is a fully separate manual list.
+- `HomeScreen.tsx` (guard): whether a guard-shift on/off-duty toggle
+  belongs on the Guard app itself or stays admin-web-only (admin-web's
+  `GuardShiftsPage` already has one).
+
+### Validated during this scaffolding round
+
+- `npx create-expo-app apps/mobile --template blank-typescript`, then
+  `npx expo install @react-navigation/native @react-navigation/native-stack
+  @react-navigation/bottom-tabs react-native-screens
+  react-native-safe-area-context expo-camera expo-secure-store
+  expo-notifications expo-device react-native-qrcode-svg react-native-svg`
+  — `expo install` (not plain `npm install`) resolves each package to the
+  exact version compatible with SDK 57, matching how `expo-secure-store`'s
+  config plugin got auto-registered into `app.json`.
+- `apps/mobile` added to root `package.json`'s `workspaces` array; a root
+  `npm install` (hoisting all three apps' `node_modules`) completed with no
+  resolution conflicts against `apps/backend`/`apps/admin-web`'s existing
+  dependency trees.
+- `npm run typecheck --workspace apps/mobile` (`tsc --noEmit`, extending
+  `expo/tsconfig.base`) — **zero errors** across `App.tsx`, every
+  `lib/`/`context/`/`navigation/`/`screens/`/`components/` file.
+- Re-ran `npm run build:admin` and `npm run build:backend` from the repo
+  root after the workspace/hoisting change — both still succeed with no new
+  TypeScript errors, confirming adding `apps/mobile` to the workspace didn't
+  perturb either existing app's dependency resolution.
+- Not run (no emulator on this machine, out of scope per the task): `expo
+  start`, an actual Android/iOS build, or any on-device testing. That
+  remains the Dev agent's first manual verification step before trusting
+  the navigation wiring at runtime, not just at typecheck time.

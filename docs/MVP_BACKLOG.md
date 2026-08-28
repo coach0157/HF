@@ -6,15 +6,16 @@
 
 ## 1. Scope สรุป
 
-**อยู่ใน scope MVP รอบนี้ (backend API + admin web เท่านั้น ไม่มี mobile app จริง):**
+**อยู่ใน scope MVP รอบนี้ (backend API + admin web + mobile app scaffold):**
 - Auth: login ด้วยเบอร์โทร + OTP, ออก JWT ที่มี `village_id` + `role`
 - Visitor QR: สร้าง/revoke QR, entry log (scan/manual), exit-confirm flow (ไม่ auto-close)
 - Announcement: สร้าง/ดึงฟีด/read receipt, 3 ระดับความสำคัญ, target scope
 - SOS/Emergency: trigger, routing ผ่าน `guard_shifts` (on_duty เท่านั้น), acknowledge
 - Admin Dashboard (เว็บ): จัดการประกาศ, ดู SOS, จัดการสมาชิก/บ้านพื้นฐาน, จัดการ guard shift พื้นฐาน
 - Multi-tenant foundation: `villages` เป็น tenant หลัก, RLS กัน tenant รั่วข้ามหมู่บ้าน (จำเป็นต่อทุกโมดูลข้างบน จึงรวมเป็น epic พื้นฐานก่อน Auth)
+- **Resident/Guard Mobile App (Epic 6, 7):** โครง Expo app เดียว (role-based navigation) ที่ `apps/mobile` — รอบนี้เป็น **scaffold + navigation + TODO stub screens เท่านั้น** ยังไม่ implement UI จริง (ดู Epic 6/7 ด้านล่าง); เรียกใช้ backend endpoint ที่มีอยู่แล้วทั้งหมด **ไม่มีการเพิ่ม endpoint ใหม่**
 
-**ไม่อยู่ใน scope รอบนี้ (เฟส 2/3 ตามสเปก):** Chat, ทำเนียบลูกบ้าน, แจ้งซ่อม (Maintenance), จองพื้นที่ส่วนกลาง (Booking), ชำระเงิน (Payment), LPR/CCTV, แอปมือถือจริงของลูกบ้าน/รปภ. (มีแค่ API รองรับให้ทีม mobile ต่อยอดภายหลัง)
+**ไม่อยู่ใน scope รอบนี้ (เฟส 2/3 ตามสเปก):** Chat, ทำเนียบลูกบ้าน, แจ้งซ่อม (Maintenance), จองพื้นที่ส่วนกลาง (Booking), ชำระเงิน (Payment), LPR/CCTV — ทั้งฝั่ง backend และ mobile UI ของโมดูลเหล่านี้
 
 ---
 
@@ -183,6 +184,67 @@
 
 ---
 
+### Epic 6 — Resident Mobile App
+
+**User Story (อิงสเปก 1.1):** ในฐานะลูกบ้าน ฉันต้องการแอปมือถือที่กดปุ่ม SOS ได้ทันที, สร้าง QR เชิญแขก, ดูประวัติเข้า-ออก และติดตามประกาศ โดยไม่ต้องเปิดเว็บ/โทรหา รปภ. เอง เพื่อความสะดวกและความปลอดภัยในชีวิตประจำวัน
+
+**Acceptance Criteria (จากสเปก 1.1, จำกัดเฉพาะ endpoint ที่มีอยู่แล้ว — ดู "ข้อจำกัด backend" ท้ายรายการ):**
+- Login ด้วยเบอร์โทร + OTP เช่นเดียวกับ role อื่น (`POST /auth/otp/request` → `POST /auth/login`), เก็บ session ด้วย secure storage บนเครื่อง ไม่ใช่ localStorage/plain storage
+- หน้าแรก: ปุ่ม SOS สีแดง **ต้องกดค้างอย่างน้อย 2 วินาทีก่อนยิง** `POST /sos-alerts`, การ์ดลัดไปหน้าเชิญแขกและประวัติเข้า-ออก, ฟีดประกาศล่าสุด 3 รายการ
+- หน้าเชิญแขก/สร้าง QR: ฟอร์มตรงกับ `CreateVisitorPassDto` เป๊ะ (visitorName, visitorPhone?, vehiclePlate?, validFrom, validTo, usageType), แสดง QR เต็มจอ (จาก `qrToken`) + แชร์ + ปุ่ม revoke (`PATCH /visitor-passes/:id/revoke`)
+- หน้าประวัติเข้า-ออก: timeline จาก `GET /entry-logs` (scope เป็นบ้านของ user เองโดย backend อัตโนมัติ), ปุ่ม "ยืนยันแขกออก" (`PATCH /entry-logs/:id/confirm-exit`) ตาม dual-confirm flow ของสเปก 2.1 (resident เป็นหนึ่งในสองผู้ยืนยันได้)
+- หน้าประกาศ: feed จาก `GET /announcements` พร้อม badge สีตาม `level` (ปกติ/สำคัญ/ฉุกเฉิน), กดอ่าน → `POST /announcements/:id/read`
+- หน้าเพิ่มเติม/โปรไฟล์: ข้อมูลบ้านจาก `GET /users/me`, ปุ่ม logout (`POST /auth/logout` + clear secure storage)
+
+**ข้อจำกัด backend ที่ต้อง report ไม่ใช่แก้เอง (พบระหว่าง scaffold):**
+- ไม่มี `GET /visitor-passes` (list-by-resident) — `visitor-pass.controller.ts` มีแค่ create/revoke/scan/sync-revoked วันนี้ ต้องมี endpoint นี้ก่อนหน้า "รายการ QR ที่สร้างไว้" จะ implement ได้จริง
+- `GET /houses/:id` เป็น GUARD/ADMIN-only วันนี้ — resident ต้องการดู house_no/zone ของตัวเองในหน้าโปรไฟล์ อาจต้องเปิดสิทธิ์ให้ resident เห็นบ้านตัวเอง
+
+**Implementation Tasks (scaffold รอบนี้ — ดู "ขอบเขตรอบนี้" ด้านล่าง):**
+- [x] Scaffold Expo (React Native + TypeScript) project ที่ `apps/mobile` (ใช้ codebase เดียวกับ Guard app — ดู ARCHITECTURE.md's mobile section สำหรับเหตุผล)
+- [x] Navigation: `AuthNavigator` (PhoneLogin → OtpVerify) + `ResidentTabNavigator` (Home/Announcements/Profile tabs, InviteGuest/QrDisplay/EntryHistory เป็น drill-in จาก Home)
+- [x] `lib/api.ts` + `lib/auth.ts` (expo-secure-store) + `lib/types.ts` ตาม pattern เดียวกับ `apps/admin-web/src/lib` แต่ปรับเป็น async ทั้งหมด
+- [x] TODO stub screens ทุกหน้า พร้อม doc comment อ้างอิง endpoint/DTO ที่ต้องเรียกเป๊ะๆ (ห้าม implement UI จริงรอบนี้)
+- [ ] (Dev agent ถัดไป) Implement ฟอร์ม/ฟังก์ชันจริงตามรายละเอียดใน doc comment ของแต่ละไฟล์ใน `src/screens/resident/`
+- [ ] (Dev agent ถัดไป) เชื่อม `expo-camera` (ถ่ายรูปไม่เกี่ยวกับ resident โดยตรง แต่ resident อาจแนบรูปแขกในอนาคต — ไม่ใช่ MVP), `expo-location` (พิกัด SOS), `react-native-qrcode-svg` (แสดง QR)
+- [ ] (Dev agent ถัดไป) Push notification receiver (`expo-notifications`) สำหรับแจ้งเตือนแขกมาถึง/ประกาศฉุกเฉิน — ต้องลงทะเบียน push token กับ backend ก่อน (ยังไม่มี endpoint รับ push token วันนี้ — ต้อง report เป็น backend gap เพิ่มเติมถ้าจะทำจริง)
+- [ ] Unit/component test เมื่อเริ่ม implement (ยังไม่มี test setup ในรอบ scaffold นี้)
+
+**Priority:** P1 (backend ทุกโมดูลที่ mobile ต้องใช้เป็น P0 และเสร็จแล้ว — mobile UI เองไม่ใช่ blocker ของ MVP backend/admin-web) — **Dependency:** Epic 1, 2, 3, 4 (ต้องมี API ให้เรียกก่อน — เสร็จแล้วทั้งหมด)
+
+---
+
+### Epic 7 — Guard Mobile App
+
+**User Story (อิงสเปก 1.2):** ในฐานะ รปภ. ฉันต้องการแอปมือถือที่สแกน QR แขกได้ทันที, บันทึกแขกที่ไม่มี QR ได้, ยืนยันแขกออกได้ และรับแจ้งเหตุ SOS แบบ real-time เพื่อปฏิบัติหน้าที่หน้าป้อมได้ครบโดยไม่ต้องใช้กระดาษ/วิทยุอย่างเดียว
+
+**Acceptance Criteria (จากสเปก 1.2):**
+- Login ด้วยเบอร์โทร + OTP เหมือน Resident App
+- หน้าแรก: ปุ่มใหญ่ "สแกน QR" กลางจอ, สรุปจำนวนเข้า-ออกวันนี้ (คำนวณฝั่ง client จาก `GET /entry-logs?date=today` เพราะไม่มี summary endpoint แยก)
+- หน้าสแกน QR: กล้อง (`expo-camera` CameraView, built-in barcode scanning ของ SDK 57) → `GET /visitor-passes/:token` แสดงข้อมูลแขก/host → ปุ่ม "ยืนยันเข้า" (`POST /entry-logs` พร้อม `qrToken`) / "ปฏิเสธ" (ไม่มี endpoint reject — แค่ไม่บันทึก)
+- หน้าบันทึกด้วยมือ: ถ่ายรูปบัตร/ทะเบียน (base64 `photoDataUrl`, บังคับสำหรับ path นี้) + กรอกข้อมูล → `POST /entry-logs` ไม่มี `qrToken`
+- หน้ายืนยันแขกออก: `PATCH /entry-logs/:id/confirm-exit` — path เดียวที่ set `exit_time` ได้ ตามสเปก 2.1 ห้าม auto-close จากการสแกนอย่างเดียว
+- หน้ารับแจ้งเหตุ SOS: รายการจาก `GET /sos-alerts?status=PENDING` (polling ตาม pattern เดียวกับ `admin-web`'s SosPage จนกว่าจะมี push/WebSocket จริง), พิกัด/เลขที่บ้าน, ปุ่มโทรกลับ (`tel:`), ปุ่ม acknowledge (`PATCH /sos-alerts/:id/acknowledge`)
+
+**ข้อจำกัด backend ที่ต้อง report ไม่ใช่แก้เอง (พบระหว่าง scaffold):**
+- `GET /users/:id` เป็น ADMIN-only วันนี้ — SOS list screen ต้องการเบอร์โทรของผู้แจ้งเหตุเพื่อทำปุ่มโทรกลับ ต้องเปิดสิทธิ์ให้ GUARD เรียกได้ (อย่างน้อย field `phone`/`name`) หรือให้ `GET /sos-alerts` แนบเบอร์โทรมาด้วยเลย
+- ไม่มี entry/exit summary endpoint (`GET /entry-logs/summary?date=`) — หน้าแรกต้อง page ผ่าน `GET /entry-logs` เองซึ่งไม่ efficient ถ้าข้อมูลเยอะ พิจารณาเพิ่มในรอบถัดไป
+
+**Implementation Tasks (scaffold รอบนี้ — ดู "ขอบเขตรอบนี้" ด้านล่าง):**
+- [x] Navigation: ใช้ `AuthNavigator` ร่วมกับ Resident + `GuardTabNavigator` (Home/ScanQr/ManualEntry/ExitConfirm/SosList tabs) ต่อจาก `RootNavigator` ที่แยกตาม `role` ใน JWT/session
+- [x] TODO stub screens ทุกหน้า พร้อม doc comment อ้างอิง endpoint/DTO ที่ต้องเรียกเป๊ะๆ รวมถึง design decision ที่ยังไม่ตัดสิน (เช่น exit-confirm จะ reuse ScanQrScreen หรือแยกหน้า)
+- [ ] (Dev agent ถัดไป) Implement `expo-camera` CameraView + barcode scanning จริงในหน้าสแกน QR
+- [ ] (Dev agent ถัดไป) Implement ฟอร์ม manual entry + camera capture (`takePictureAsync({ base64: true })`)
+- [ ] (Dev agent ถัดไป) Implement SOS list พร้อม polling/real-time + `tel:`/maps deep link
+- [ ] (Dev agent ถัดไป) Offline QR verification design (สเปก 3.4's "Offline scan กับ revocation") — stub sync endpoint (`GET /visitor-passes/sync/revoked`) มีอยู่แล้วฝั่ง backend แต่ยังไม่มี local cache/verify logic ฝั่งแอป — ยังไม่ทำรอบนี้ตาม MVP_BACKLOG เดิม
+- [ ] Unit/component test เมื่อเริ่ม implement
+
+**Priority:** P1 (เหตุผลเดียวกับ Epic 6) — **Dependency:** Epic 1, 2, 4 (ต้องมี API ให้เรียกก่อน — เสร็จแล้วทั้งหมด)
+
+**ขอบเขตรอบนี้ (Epic 6 และ 7 ทั้งคู่):** สร้าง **scaffold โปรเจกต์จริงที่ build/typecheck ผ่าน** (navigation, lib/api, lib/auth, TODO stub ทุกหน้าจอ) เท่านั้น — **ไม่ implement UI/business logic จริง** ในรอบนี้ Dev agent รอบถัดไปรับช่วงต่อจาก TODO comment ในแต่ละไฟล์ ไม่มีการแก้ backend/admin-web ยกเว้นรายการ "ข้อจำกัด backend" ข้างต้นที่ report ไว้เฉยๆ
+
+---
+
 ## 3. ลำดับความสำคัญและ Dependency
 
 | Epic | Priority | Depends on | หมายเหตุ |
@@ -193,8 +255,10 @@
 | 3. Announcement | P0 | Epic 0, 1 | พัฒนาขนานกับ Epic 2, 4 ได้ |
 | 4. SOS / Emergency | P0 | Epic 0, 1 | ต้องมี `guard_shifts` (สร้างใน epic นี้เอง) — พัฒนาขนานกับ Epic 2, 3 ได้ |
 | 5. Admin Dashboard (เว็บ) | P0 (ประกาศ, SOS view) / P1 (ส่วนที่เหลือ) | Epic 1–4 | เริ่ม UI shell/login ขนานได้ตั้งแต่ Epic 1 เสร็จ แต่ฟีเจอร์แต่ละหน้าต้องรอ API ของ epic ที่เกี่ยวข้อง |
+| 6. Resident Mobile App | P1 (scaffold เสร็จรอบนี้; UI จริงรอ Dev agent ถัดไป) | Epic 1, 2, 3, 4 | ใช้ API เดิมทั้งหมด ไม่มี endpoint ใหม่; มี backend gap 2 จุดต้อง report (ดู Epic 6) |
+| 7. Guard Mobile App | P1 (scaffold เสร็จรอบนี้; UI จริงรอ Dev agent ถัดไป) | Epic 1, 2, 4 | codebase เดียวกับ Epic 6 (1 Expo app, role-based nav); มี backend gap 2 จุดต้อง report (ดู Epic 7) |
 
-**แนวทางลำดับการทำงานจริง:** Epic 0 → Epic 1 → (Epic 2, 3, 4 ขนานกัน โดยทีม backend แบ่งงานตาม module) → Epic 5 ทยอยต่อ UI ทันทีที่แต่ละ API ของ Epic 2/3/4 พร้อม (ไม่ต้องรอครบทั้งหมด)
+**แนวทางลำดับการทำงานจริง:** Epic 0 → Epic 1 → (Epic 2, 3, 4 ขนานกัน โดยทีม backend แบ่งงานตาม module) → Epic 5 ทยอยต่อ UI ทันทีที่แต่ละ API ของ Epic 2/3/4 พร้อม (ไม่ต้องรอครบทั้งหมด) → Epic 6/7 (mobile scaffold ทำขนานกับ Epic 5 ได้ เพราะพึ่ง API ชุดเดียวกัน ไม่พึ่ง Admin Dashboard)
 
 ---
 
@@ -208,7 +272,8 @@
 - Admin Dashboard: login ได้, จัดการประกาศได้ครบ, เห็นรายการ SOS พร้อมพิกัด/ปุ่มโทรกลับ, จัดการสมาชิก/บ้าน/guard shift พื้นฐานได้
 - Automated test: unit test ครอบคลุม critical path ที่ระบุไว้ในแต่ละ epic ผ่านหมดใน CI, มี integration test อย่างน้อย 1 เคสต่อ epic
 - Security/PDPA: entry_logs เก็บย้อนหลังได้ 6 เดือน, รูปบัตร ปชช./ทะเบียนรถ แยก bucket + ลบอัตโนมัติหลัง 90 วัน, มี audit log การเข้าถึงข้อมูลอ่อนไหวโดยแอดมิน, ไม่มี secret ฝังในโค้ด
-- API มีเอกสาร (OpenAPI/Swagger) พร้อมให้ทีม mobile ต่อยอดในเฟสถัดไป (แม้ยังไม่สร้างแอปมือถือใน MVP นี้)
+- API มีเอกสาร (OpenAPI/Swagger) พร้อมให้ทีม mobile ต่อยอด
+- Mobile (Epic 6/7): `apps/mobile` (Expo/React Native, TypeScript) scaffold สร้างแล้ว — `npm install` และ `npm run typecheck --workspace apps/mobile` ผ่านทั้งคู่, navigation (Auth/Resident tabs/Guard tabs) เดินได้ครบ, ทุกหน้าจอเป็น TODO stub ที่อ้างอิง endpoint ตรงตาม backend จริง — **ยังไม่ implement UI/business logic จริง**, รอ Dev agent รอบถัดไป
 - Deploy ขึ้น staging environment และผ่าน smoke test ของทุก flow หลักก่อนปิด MVP
 
-**Out of scope ยืนยันอีกครั้ง (ห้ามทำในรอบนี้):** Chat, Maintenance ticket, Facility booking, Payment, LPR/CCTV, mobile app จริงของลูกบ้าน/รปภ.
+**Out of scope ยืนยันอีกครั้ง (ห้ามทำในรอบนี้):** Chat, Maintenance ticket, Facility booking, Payment, LPR/CCTV (ทั้ง backend และ mobile UI) — และสำหรับ mobile โดยเฉพาะ: การ implement UI จริงของ Epic 6/7 (รอบนี้ทำแค่ scaffold), offline QR verification (สเปก 3.4), push notification registration จริง
