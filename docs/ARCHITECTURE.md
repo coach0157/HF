@@ -3,9 +3,15 @@
 Status: backend + admin-web scaffold complete and validated against a real
 PostgreSQL instance (see "Validated during scaffolding" in §6); mobile
 (`apps/mobile`) scaffolded and typecheck-validated in a later round (§7) —
-screens are TODO stubs, not yet implemented. Source of truth for product
+screens are TODO stubs, not yet implemented. Phase 2 (Chat, Maintenance,
+Transport Directory — §8) is at the **planning/schema stage**: architecture
+decisions are made, `schema.prisma` is updated and migrated against a real
+local Postgres, but no module code (controller/service/DTO) or UI exists yet
+— that's the next Dev agent's work, scoped in
+[`PHASE2_BACKLOG.md`](./PHASE2_BACKLOG.md). Source of truth for product
 scope: [`village-security-app-spec.md`](../village-security-app-spec.md).
 Source of truth for MVP task breakdown: [`MVP_BACKLOG.md`](./MVP_BACKLOG.md).
+Source of truth for Phase 2 task breakdown: [`PHASE2_BACKLOG.md`](./PHASE2_BACKLOG.md).
 
 This document exists so a Dev agent can pick up any module and implement it
 without re-deriving the multi-tenant/RLS pattern, the module boundaries, or
@@ -476,3 +482,253 @@ rather than architecture ones:
   start`, an actual Android/iOS build, or any on-device testing. That
   remains the Dev agent's first manual verification step before trusting
   the navigation wiring at runtime, not just at typecheck time.
+
+---
+
+## 8. Phase 2 — Chat, Maintenance, Transport Directory
+
+Status: **planning + schema only**, done in this round. No
+`src/modules/chat|maintenance|transport-provider/` exists yet — this section
+gives a Dev agent the architecture decisions and the already-migrated schema
+to build against. Task breakdown: [`PHASE2_BACKLOG.md`](./PHASE2_BACKLOG.md)
+Epics 8-10.
+
+### 8.1 ADR-004 — Chat real-time transport: Socket.io (`@nestjs/websockets`)
+
+**Decision:** `@nestjs/websockets` + `@nestjs/platform-socket.io` (i.e.
+Socket.io, not Firebase Realtime DB, and not raw `ws`). Add
+`@nestjs/websockets@^11.x`, `@nestjs/platform-socket.io@^11.x`,
+`socket.io@^4.8.x` to `apps/backend`, and `socket.io-client@^4.8.x` to both
+`apps/admin-web` and `apps/mobile`. The `@nestjs/*` packages must stay on the
+same 11.x line as `@nestjs/core` (see §4's Nest-11-not-12 ADR) — they're
+released in lockstep by the Nest team, so no new peer-dep conflict is
+expected.
+
+**Why Socket.io over Firebase Realtime DB** (spec 3.1 offers both as
+options): this stack is already fully Postgres + RLS centric — every other
+module's authorization, tenant isolation, and audit trail runs through one
+system (`getTenantPrismaClient()` + Postgres RLS, §3). Firebase Realtime DB
+would fork that into two separate authorization/data systems with two
+different security models to keep in sync (Firebase Security Rules vs.
+Postgres RLS), for a project that has already invested heavily in making the
+Postgres-RLS story airtight (§3's whole pooled-connection empty-string fix).
+Socket.io keeps chat message persistence in the same Postgres tables
+(`ChatMessage` etc.), queryable with the exact same Prisma/RLS pattern every
+other module uses — one mental model, one audit surface, no added vendor
+billing/quota, and it runs on the same self-hosted infra the rest of the
+stack already assumes (spec 3.1's hosting row: AWS/GCP/DigitalOcean, no
+Firebase project).
+
+**Why Socket.io over raw `ws`:** Socket.io's room abstraction
+(`socket.join(roomId)` / namespace broadcast) maps directly onto "a chat
+room" — no need to hand-roll room membership tracking in memory. Its
+automatic reconnection and fallback transport handling matters specifically
+for the mobile client (residents/guards on flaky village wifi/cellular), and
+`socket.io-client` works unmodified in both a Vite web app and Expo/React
+Native — no extra native module linking, consistent with why Expo was chosen
+for mobile in the first place (§7 ADR-003).
+
+**Revisit when:** the backend needs to scale to multiple Node instances —
+Socket.io's default in-memory adapter only broadcasts within one process; a
+Redis adapter (`@socket.io/redis-adapter`) would be needed then. Out of
+scope for Phase 2 (single-instance deployment, same assumption the rest of
+this scaffold already makes).
+
+### 8.2 ADR-005 — WebSocket authentication & RLS scoping
+
+The whole RLS pattern in §3 is built around one HTTP request = one
+middleware pass (`TenantContextMiddleware`) + one guard check
+(`JwtAuthGuard`) + one transaction (`RlsInterceptor`). A persistent
+WebSocket connection has no equivalent single-shot request lifecycle — it's
+one connection carrying many discrete events over time — so each piece of
+that pattern needs a WS-specific analogue, not a copy-paste:
+
+1. **Handshake auth (connection-time, analogous to
+   `TenantContextMiddleware` + `JwtAuthGuard` combined).** The client passes
+   the access JWT via Socket.io's supported `auth` handshake field —
+   `io(url, { auth: { token: accessToken } })` — not a header (avoids
+   header-manipulation quirks on React Native's socket transport) and not a
+   query string (leaks the token into server access logs). `ChatGateway`'s
+   `handleConnection(socket)` decodes and verifies the token using the same
+   `JwtService` config `TenantContextMiddleware` uses for REST, and either
+   stores the resulting `TenantClaims` on `socket.data.claims` or calls
+   `socket.disconnect(true)` immediately on failure. Unlike the HTTP split
+   (middleware decodes without rejecting, guard rejects), there is no
+   separate "reject" stage for a WS connection attempt — decode-and-reject
+   happens in one place because Socket.io has no per-connection guard
+   pipeline the way Nest HTTP has middleware → guards.
+
+2. **Per-event authorization (analogous to `JwtAuthGuard` re-checked on
+   every request).** Nest supports `@UseGuards`/`@UseInterceptors` on
+   individual `@SubscribeMessage` handlers, same as HTTP route decorators.
+   Every handler re-reads `socket.data.claims` (already verified at
+   handshake) before doing anything — this is cheap since it's just an
+   object read, not a re-verify.
+
+3. **Per-event RLS scoping (analogous to `RlsInterceptor`'s per-request
+   transaction).** This is the one that must NOT be hand-rolled separately
+   in the gateway. `RlsInterceptor`'s transaction-open +
+   `SET LOCAL app.current_village_id/current_user_id/current_role` sequence
+   (§3.2) is extracted into a shared helper —
+   `runInTenantTransaction(claims, fn)` in `common/rls/` — that both
+   `RlsInterceptor` (HTTP) and a new `WsRlsInterceptor` (WS, applied per
+   `@SubscribeMessage` handler) call. Reasoning: the entire point of
+   centralizing RLS setup in one interceptor (§3) was so a Dev agent adding
+   a new module can never forget a `SET LOCAL` call and accidentally leak
+   cross-tenant data. Writing a second, separately-maintained copy of that
+   three-line sequence directly inside `ChatGateway` would reintroduce
+   exactly the class of bug RLS was built to make impossible — "one missed
+   line in one code path." One shared helper, two callers, is the only
+   version of this that keeps that guarantee.
+
+4. **Room-level authorization is explicitly NOT covered by RLS.** RLS
+   isolates by `village_id` only — it guarantees a user can never see another
+   *village's* chat rows, but it does nothing to stop a resident from
+   joining a *different resident's* direct chat room within the same
+   village (both rows would pass the village-scoped policy). `ChatGateway`'s
+   `join_room`/`send_message` handlers must explicitly query
+   `ChatParticipant` for `(chatRoomId, userId)` membership before allowing a
+   join or an emit — an application-layer check on top of RLS, not a
+   replacement for it. This is called out explicitly because it's the first
+   module in this codebase where RLS + a `@Roles()` check is **not**
+   sufficient on its own (every REST module so far only needed
+   village-level + role-level authorization; chat needs a third,
+   room-level check).
+
+5. **Token refresh mid-connection.** Access tokens are short-lived (Epic 1's
+   `JWT_ACCESS_EXPIRES_IN`). Unlike a REST call, a live socket doesn't get a
+   401-and-retry per event. Socket.io auto-reconnects on transport drop, but
+   a proactively-expiring token needs the client to refresh via the existing
+   `POST /auth/refresh` (same call `lib/api.ts`'s 401 handler already makes)
+   *before* the reconnect attempt's handshake, not after a failed one — a
+   Dev-agent TODO for both `admin-web`'s and `mobile`'s Socket.io client
+   wrapper, not a backend concern.
+
+### 8.3 Maintenance ticket schema decisions
+
+`MaintenanceTicket` existed since the MVP round as a Phase-2-table-shape
+placeholder (schema only, no module code) — two things about it needed a
+real decision now that Phase 2 is actually being built out:
+
+- **`category`: `String` → enum `MaintenanceCategory`.** Spec 2.4
+  enumerates the category list literally
+  (`ไฟฟ้า/ประปา/ถนน/อื่นๆ` → `ELECTRICAL/PLUMBING/ROAD/OTHER`), exactly the
+  same shape every other spec-enumerated categorical field in this schema
+  already took (`AnnouncementLevel`, `VisitorPassStatus`,
+  `VisitorPassUsageType`, etc.) — the placeholder `String` was an
+  oversight from before that convention was consistently applied to every
+  new table, not a deliberate choice. Converted to match.
+- **`assignedTo`: stays a free-text `String`, deliberately NOT a `User`
+  FK.** Spec 2.4 says "แอดมินมอบหมายงานให้ทีมช่าง" (admin assigns to a repair
+  team), but Phase 2's roadmap (spec §4) does not introduce a technician
+  role or a technician-facing app/login — `UserRole` is still exactly
+  `RESIDENT | GUARD | ADMIN`. Making `assignedTo` a FK to `User` would force
+  inventing a whole technician account system (login flow, RBAC role,
+  onboarding) with no corresponding product requirement in this phase — pure
+  speculative scope. A free-text field (vendor/team name, filled in by the
+  admin who already knows their contractors) fully satisfies the literal AC
+  with zero speculative build-out. **Revisit when** a future phase gives
+  technicians their own app access — at that point this becomes a real FK
+  migration with a backfill step, not a schema surprise.
+- **`ticketNumber` + `MaintenanceTicketCounter` — new.** Spec 2.4's AC
+  literally requires "ระบบสร้างเลขที่ใบงาน (ticket)" — a human-facing ticket
+  number, which the existing UUID `id` doesn't serve. `ticketNumber` is
+  `@@unique([villageId, ticketNumber])` (unique per village, not globally —
+  matches the same denormalized-tenant-scoping pattern as
+  `@@unique([villageId, houseNo])` on `House`). Numbers are generated via a
+  new one-row-per-village `MaintenanceTicketCounter` table, incremented
+  atomically (`UPDATE ... SET last_seq = last_seq + 1 RETURNING last_seq`)
+  inside the same RLS-scoped transaction as the ticket `INSERT` — a plain
+  `SELECT COUNT(*) + 1` was deliberately rejected here because it races
+  under concurrent ticket creation from the same village (two residents
+  filing tickets in the same transaction window could both compute the same
+  "next" number), which a dedicated atomic counter row does not.
+
+### 8.4 Chat schema decisions
+
+- **`ChatRoom.residentsCanPost` (new, `Boolean @default(false)`).** Spec
+  2.3's group-chat AC is explicitly conditional: "แชทกลุ่มหมู่บ้าน (broadcast
+  แบบ read-only จากแอดมิน **หรือ**เปิดให้คุยกันได้ตามตั้งค่า)" — the spec
+  itself calls this a per-village *setting*, so it needed a column, not just
+  application logic guessing at a hardcoded default. Only meaningful for
+  `type = GROUP`; `DIRECT` rooms ignore it (both participants can always
+  post, enforced in the gateway/service, not by this flag). Defaults to
+  `false` (admin-only broadcast) — the safer, spec-first-listed behavior,
+  and the one that requires zero extra moderation tooling to ship safely.
+- **`ChatParticipant.lastReadAt` (new, `DateTime?`).** Supports an
+  unread-count/badge on the resident app's chat tabs (spec 1.1's
+  "นิติบุคคล"/"รปภ."/"กลุ่มหมู่บ้าน" tabs, and the home screen's general
+  notification-badge pattern). A single per-room "read up to" timestamp was
+  chosen over a per-message read-receipt table (the pattern `AnnouncementRead`
+  uses) because spec 2.3, unlike spec 2.2's announcements, never asks for a
+  literal read receipt — only an unread indicator is implied by the UI
+  mockup — so the cheaper single-column-per-participant design is
+  sufficient and avoids a row-per-message-per-participant table that would
+  otherwise grow unbounded.
+- **`ChatRoom`/`ChatParticipant`/`ChatMessage` otherwise unchanged** — the
+  MVP-round placeholder shape (direct/group type, participant join table,
+  message with optional image) was already correct for Phase 2's literal
+  AC; no other columns were missing.
+
+### 8.5 Transport Directory: new `TransportProvider` model
+
+Spec 2.7 replaced the earlier "ทำเนียบลูกบ้าน" (resident directory) concept —
+dropped for privacy/consent complexity — with an admin-curated phone book of
+recommended motorcycle-taxi/taxi/van drivers. It is explicitly **not** a
+ride-hailing API integration (no Grab/Bolt-style dispatch, no booking, no
+live vehicle location) — residents see a list and tap `tel:` to call
+directly, so the entire feature is a flat CRUD table:
+
+```
+TransportProvider (id, villageId, name, type[motorcycle/taxi/van/other],
+                    phone, serviceArea, isActive, createdAt)
+```
+
+- `type` is a new enum `TransportProviderType`, values taken directly from
+  spec 2.7's bracketed list.
+- `serviceArea` is a single nullable free-text field covering both "พื้นที่
+  ให้บริการ" and "หมายเหตุ (เช่น ราคาโดยประมาณ)" — spec 2.7 presents both as
+  one AC bullet joined by "/", so splitting it into two columns would be
+  over-fitting a distinction the spec itself doesn't draw.
+- `isActive` and a hard `DELETE` are both modeled (not just one or the
+  other) because spec 2.7 explicitly lists "เพิ่ม/แก้ไข/**ลบ**/เปิด-ปิดการ
+  แสดงผล" as four separate admin actions — delete and deactivate are
+  different operations in the spec's own words, not a single soft-delete
+  concept.
+- Indexed on `[villageId, isActive]` (the resident-facing "active only"
+  list) and `[villageId, type]` (the optional filter-by-type AC).
+
+### 8.6 Migrations applied this round
+
+Two migrations were generated and applied against the real local Postgres
+instance (`docker compose up -d db`), following the same `prisma migrate
+diff --script` + hand-placed migration folder + `prisma migrate deploy`
+workflow used for prior manually-authored migrations in this repo (e.g. the
+RLS-empty-string fix, §3.1) — `prisma migrate dev`'s interactive prompt
+doesn't run in this non-interactive environment:
+
+1. `20260828145655_phase2_chat_maintenance_transport` — the schema changes
+   in §8.3-8.5 (new enums, new columns, two new tables). Verified safe to
+   apply directly (not `--create-only` deferred) because `maintenance_tickets`
+   had zero rows in the local dev database at the time (no Phase 2 module
+   code exists yet to have written any), so the new `NOT NULL` columns
+   (`category`'s type change, `ticketNumber`) couldn't violate existing data.
+2. `20260828145708_rls_phase2_tables` — extends the RLS policy loop (§3.1)
+   to the two new tables (`maintenance_ticket_counters`,
+   `transport_providers`) only, not a re-run of the full table list (the
+   original `20260828072452_enable_rls` migration already covers every
+   pre-Phase-2 table and is immutable history — see that migration's own
+   comment). `prisma/sql/rls-policies.sql`'s `ARRAY[...]` was updated to
+   include both new tables so it stays the correct living reference for the
+   *current* full table list, even though it's no longer a literal 1:1
+   mirror of one single migration file.
+
+Both were verified directly against the running container: `\d+
+transport_providers` in `psql` shows `Policies (forced row security
+enabled)` with the same `tenant_isolation` policy text as every pre-existing
+table, and `pg_class.relrowsecurity`/`relforcerowsecurity` both read `t` for
+both new tables. `npx prisma generate` (client type regeneration) and `npm
+run build` (root — `build:backend` + `build:admin`) both succeed with no
+TypeScript errors; `npm run typecheck:mobile` also still passes (mobile
+doesn't reference any Phase 2 model yet, but confirms the workspace-wide
+dependency graph wasn't perturbed).

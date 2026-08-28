@@ -118,6 +118,35 @@ enum MaintenanceStatus {
   @@map("maintenance_status")
 }
 
+/// Phase 2 addition (Epic 9). Spec 2.4 enumerates the category list literally
+/// ("ไฟฟ้า/ประปา/ถนน/อื่นๆ") the same way spec enumerated e.g. announcement
+/// levels or visitor-pass status — every other such bracketed spec list became
+/// a Prisma enum in this schema (AnnouncementLevel, VisitorPassStatus, etc.),
+/// so `MaintenanceTicket.category` (originally a free String — schema was
+/// written before Phase 2 work started, see file header) is converted to
+/// match that established convention. See docs/ARCHITECTURE.md §8 for the
+/// full decision note.
+enum MaintenanceCategory {
+  ELECTRICAL @map("electrical")
+  PLUMBING   @map("plumbing")
+  ROAD       @map("road")
+  OTHER      @map("other")
+
+  @@map("maintenance_category")
+}
+
+/// Phase 2 addition (Epic 10 — Transport Directory, spec 2.7). Category list
+/// taken directly from spec 2.7's bracketed enumeration
+/// ("วินมอเตอร์ไซค์/แท็กซี่/รถตู้/อื่นๆ").
+enum TransportProviderType {
+  MOTORCYCLE @map("motorcycle")
+  TAXI       @map("taxi")
+  VAN        @map("van")
+  OTHER      @map("other")
+
+  @@map("transport_provider_type")
+}
+
 enum BillStatus {
   UNPAID @map("unpaid")
   PAID   @map("paid")
@@ -134,26 +163,28 @@ enum BillStatus {
 /// application layer (e.g. only a platform-level super-admin role, out of MVP
 /// scope, may list all villages).
 model Village {
-  id                String        @id @default(uuid()) @db.Uuid
-  name              String
-  address           String?
-  subscriptionPlan  String?       @map("subscription_plan")
-  status            VillageStatus @default(ACTIVE)
-  createdAt         DateTime      @default(now()) @map("created_at")
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String
+  address          String?
+  subscriptionPlan String?       @map("subscription_plan")
+  status           VillageStatus @default(ACTIVE)
+  createdAt        DateTime      @default(now()) @map("created_at")
 
-  users                User[]
-  houses               House[]
-  visitorPasses        VisitorPass[]
-  entryLogs            EntryLog[]
-  announcements        Announcement[]
-  sosAlerts            SosAlert[]
-  guardShifts          GuardShift[]
-  chatRooms            ChatRoom[]
-  maintenanceTickets   MaintenanceTicket[]
-  facilities           Facility[]
-  bills                Bill[]
-  auditLogs            AuditLog[]
-  refreshTokens        RefreshToken[]
+  users                     User[]
+  houses                    House[]
+  visitorPasses             VisitorPass[]
+  entryLogs                 EntryLog[]
+  announcements             Announcement[]
+  sosAlerts                 SosAlert[]
+  guardShifts               GuardShift[]
+  chatRooms                 ChatRoom[]
+  maintenanceTickets        MaintenanceTicket[]
+  maintenanceTicketCounters MaintenanceTicketCounter[]
+  transportProviders        TransportProvider[]
+  facilities                Facility[]
+  bills                     Bill[]
+  auditLogs                 AuditLog[]
+  refreshTokens             RefreshToken[]
 
   @@map("villages")
 }
@@ -176,19 +207,19 @@ model User {
   village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
   house   House?  @relation("HouseResidents", fields: [houseId], references: [id], onDelete: SetNull)
 
-  ownedHouses            House[]              @relation("HouseOwner")
+  ownedHouses            House[]             @relation("HouseOwner")
   houseMemberships       HouseMember[]
-  createdVisitorPasses   VisitorPass[]        @relation("VisitorPassCreatedBy")
-  recordedEntryLogs      EntryLog[]           @relation("EntryLogRecordedByGuard")
-  exitConfirmedEntryLogs EntryLog[]           @relation("EntryLogExitConfirmedBy")
-  createdAnnouncements   Announcement[]       @relation("AnnouncementCreatedByAdmin")
+  createdVisitorPasses   VisitorPass[]       @relation("VisitorPassCreatedBy")
+  recordedEntryLogs      EntryLog[]          @relation("EntryLogRecordedByGuard")
+  exitConfirmedEntryLogs EntryLog[]          @relation("EntryLogExitConfirmedBy")
+  createdAnnouncements   Announcement[]      @relation("AnnouncementCreatedByAdmin")
   announcementReads      AnnouncementRead[]
-  triggeredSosAlerts     SosAlert[]           @relation("SosAlertTriggeredBy")
-  acknowledgedSosAlerts  SosAlert[]           @relation("SosAlertAcknowledgedByGuard")
+  triggeredSosAlerts     SosAlert[]          @relation("SosAlertTriggeredBy")
+  acknowledgedSosAlerts  SosAlert[]          @relation("SosAlertAcknowledgedByGuard")
   guardShifts            GuardShift[]
   chatParticipants       ChatParticipant[]
   sentChatMessages       ChatMessage[]
-  maintenanceTickets     MaintenanceTicket[]  @relation("MaintenanceTicketCreatedBy")
+  maintenanceTickets     MaintenanceTicket[] @relation("MaintenanceTicketCreatedBy")
   bookings               Booking[]
   auditLogs              AuditLog[]
   refreshTokens          RefreshToken[]
@@ -213,14 +244,14 @@ model House {
   village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
   owner   User?   @relation("HouseOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
-  residents            User[]               @relation("HouseResidents")
-  members              HouseMember[]
-  entryLogs            EntryLog[]
-  sosAlerts            SosAlert[]
-  maintenanceTickets   MaintenanceTicket[]
-  bookings             Booking[]
-  bills                Bill[]
-  announcementTargets  AnnouncementTarget[]
+  residents           User[]               @relation("HouseResidents")
+  members             HouseMember[]
+  entryLogs           EntryLog[]
+  sosAlerts           SosAlert[]
+  maintenanceTickets  MaintenanceTicket[]
+  bookings            Booking[]
+  bills               Bill[]
+  announcementTargets AnnouncementTarget[]
 
   @@unique([villageId, houseNo])
   @@index([villageId, zone])
@@ -228,10 +259,10 @@ model House {
 }
 
 model HouseMember {
-  id        String  @id @default(uuid()) @db.Uuid
-  villageId String  @map("village_id") @db.Uuid
-  houseId   String  @map("house_id") @db.Uuid
-  userId    String  @map("user_id") @db.Uuid
+  id        String @id @default(uuid()) @db.Uuid
+  villageId String @map("village_id") @db.Uuid
+  houseId   String @map("house_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
   relation  String
 
   house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
@@ -247,18 +278,18 @@ model HouseMember {
 // ---------------------------------------------------------------------------
 
 model VisitorPass {
-  id            String               @id @default(uuid()) @db.Uuid
-  villageId     String               @map("village_id") @db.Uuid
-  createdByUserId String             @map("created_by_user_id") @db.Uuid
-  visitorName   String               @map("visitor_name")
-  visitorPhone  String?              @map("visitor_phone")
-  vehiclePlate  String?              @map("vehicle_plate")
-  qrToken       String               @unique @map("qr_token")
-  validFrom     DateTime             @map("valid_from")
-  validTo       DateTime             @map("valid_to")
-  usageType     VisitorPassUsageType @map("usage_type")
-  status        VisitorPassStatus    @default(UNUSED)
-  createdAt     DateTime             @default(now()) @map("created_at")
+  id              String               @id @default(uuid()) @db.Uuid
+  villageId       String               @map("village_id") @db.Uuid
+  createdByUserId String               @map("created_by_user_id") @db.Uuid
+  visitorName     String               @map("visitor_name")
+  visitorPhone    String?              @map("visitor_phone")
+  vehiclePlate    String?              @map("vehicle_plate")
+  qrToken         String               @unique @map("qr_token")
+  validFrom       DateTime             @map("valid_from")
+  validTo         DateTime             @map("valid_to")
+  usageType       VisitorPassUsageType @map("usage_type")
+  status          VisitorPassStatus    @default(UNUSED)
+  createdAt       DateTime             @default(now()) @map("created_at")
 
   village   Village    @relation(fields: [villageId], references: [id], onDelete: Cascade)
   createdBy User       @relation("VisitorPassCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
@@ -269,26 +300,26 @@ model VisitorPass {
 }
 
 model EntryLog {
-  id                      String                   @id @default(uuid()) @db.Uuid
-  villageId               String                   @map("village_id") @db.Uuid
-  passId                  String?                  @map("pass_id") @db.Uuid
-  houseId                 String                   @map("house_id") @db.Uuid
-  recordedByGuardId       String                   @map("recorded_by_guard_id") @db.Uuid
-  visitorName             String                   @map("visitor_name")
-  vehiclePlate            String?                  @map("vehicle_plate")
-  photoUrl                String?                  @map("photo_url")
-  entryTime               DateTime                 @map("entry_time")
-  exitTime                DateTime?                @map("exit_time")
-  exitConfirmedByUserId   String?                  @map("exit_confirmed_by_user_id") @db.Uuid
-  exitConfirmationMethod  ExitConfirmationMethod?   @map("exit_confirmation_method")
-  method                  EntryMethod
-  createdAt               DateTime                 @default(now()) @map("created_at")
+  id                     String                  @id @default(uuid()) @db.Uuid
+  villageId              String                  @map("village_id") @db.Uuid
+  passId                 String?                 @map("pass_id") @db.Uuid
+  houseId                String                  @map("house_id") @db.Uuid
+  recordedByGuardId      String                  @map("recorded_by_guard_id") @db.Uuid
+  visitorName            String                  @map("visitor_name")
+  vehiclePlate           String?                 @map("vehicle_plate")
+  photoUrl               String?                 @map("photo_url")
+  entryTime              DateTime                @map("entry_time")
+  exitTime               DateTime?               @map("exit_time")
+  exitConfirmedByUserId  String?                 @map("exit_confirmed_by_user_id") @db.Uuid
+  exitConfirmationMethod ExitConfirmationMethod? @map("exit_confirmation_method")
+  method                 EntryMethod
+  createdAt              DateTime                @default(now()) @map("created_at")
 
-  village           Village      @relation(fields: [villageId], references: [id], onDelete: Cascade)
-  pass              VisitorPass? @relation(fields: [passId], references: [id], onDelete: SetNull)
-  house             House        @relation(fields: [houseId], references: [id], onDelete: Cascade)
-  recordedByGuard   User         @relation("EntryLogRecordedByGuard", fields: [recordedByGuardId], references: [id], onDelete: Restrict)
-  exitConfirmedBy   User?        @relation("EntryLogExitConfirmedBy", fields: [exitConfirmedByUserId], references: [id], onDelete: SetNull)
+  village         Village      @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  pass            VisitorPass? @relation(fields: [passId], references: [id], onDelete: SetNull)
+  house           House        @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  recordedByGuard User         @relation("EntryLogRecordedByGuard", fields: [recordedByGuardId], references: [id], onDelete: Restrict)
+  exitConfirmedBy User?        @relation("EntryLogExitConfirmedBy", fields: [exitConfirmedByUserId], references: [id], onDelete: SetNull)
 
   // Supports `GET /entry-logs?house_id=&date=` and the 6-month retention search.
   @@index([villageId, houseId, entryTime])
@@ -300,22 +331,22 @@ model EntryLog {
 // ---------------------------------------------------------------------------
 
 model Announcement {
-  id                String                   @id @default(uuid()) @db.Uuid
-  villageId         String                   @map("village_id") @db.Uuid
-  createdByAdminId  String                   @map("created_by_admin_id") @db.Uuid
-  title             String
-  content           String
-  level             AnnouncementLevel        @default(NORMAL)
-  targetScope       AnnouncementTargetScope  @map("target_scope")
+  id               String                  @id @default(uuid()) @db.Uuid
+  villageId        String                  @map("village_id") @db.Uuid
+  createdByAdminId String                  @map("created_by_admin_id") @db.Uuid
+  title            String
+  content          String
+  level            AnnouncementLevel       @default(NORMAL)
+  targetScope      AnnouncementTargetScope @map("target_scope")
   // Only meaningful when targetScope = ZONE. Not in the spec's literal ER
   // (spec 3.2 lists target_scope but no column carries WHICH zone/house) —
   // added here as a Dev-agent schema extension. Zone is a simple string on
   // `houses.zone`, so a single nullable column is enough; HOUSE-scope needs
   // to target multiple specific houses, which is why that case gets its own
   // join table (`AnnouncementTarget`) instead of overloading this column.
-  targetZone        String?                  @map("target_zone")
-  imageUrl          String?                  @map("image_url")
-  createdAt         DateTime                 @default(now()) @map("created_at")
+  targetZone       String?                 @map("target_zone")
+  imageUrl         String?                 @map("image_url")
+  createdAt        DateTime                @default(now()) @map("created_at")
 
   village   Village              @relation(fields: [villageId], references: [id], onDelete: Cascade)
   createdBy User                 @relation("AnnouncementCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: Restrict)
@@ -377,10 +408,10 @@ model SosAlert {
   createdAt             DateTime  @default(now()) @map("created_at")
   resolvedAt            DateTime? @map("resolved_at")
 
-  village          Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
-  triggeredBy      User    @relation("SosAlertTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: Cascade)
-  house            House   @relation(fields: [houseId], references: [id], onDelete: Cascade)
-  acknowledgedBy   User?   @relation("SosAlertAcknowledgedByGuard", fields: [acknowledgedByGuardId], references: [id], onDelete: SetNull)
+  village        Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  triggeredBy    User    @relation("SosAlertTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: Cascade)
+  house          House   @relation(fields: [houseId], references: [id], onDelete: Cascade)
+  acknowledgedBy User?   @relation("SosAlertAcknowledgedByGuard", fields: [acknowledgedByGuardId], references: [id], onDelete: SetNull)
 
   @@index([villageId, status])
   @@map("sos_alerts")
@@ -408,10 +439,17 @@ model GuardShift {
 // ---------------------------------------------------------------------------
 
 model ChatRoom {
-  id        String       @id @default(uuid()) @db.Uuid
-  villageId String       @map("village_id") @db.Uuid
-  type      ChatRoomType
-  name      String?
+  id               String       @id @default(uuid()) @db.Uuid
+  villageId        String       @map("village_id") @db.Uuid
+  type             ChatRoomType
+  name             String?
+  // Phase 2 addition (Epic 8). Only meaningful when type = GROUP — spec 2.3:
+  // "แชทกลุ่มหมู่บ้าน (broadcast แบบ read-only จากแอดมิน หรือเปิดให้คุยกันได้
+  // ตามตั้งค่า)". Defaults to false (admin-only broadcast) — the safer,
+  // spec-first-listed behavior; an admin can flip it per-village to let
+  // residents post too. DIRECT rooms ignore this field (both participants can
+  // always post — enforced in ChatGateway/service, not by this flag).
+  residentsCanPost Boolean      @default(false) @map("residents_can_post")
 
   village      Village           @relation(fields: [villageId], references: [id], onDelete: Cascade)
   participants ChatParticipant[]
@@ -422,10 +460,18 @@ model ChatRoom {
 }
 
 model ChatParticipant {
-  id         String @id @default(uuid()) @db.Uuid
-  villageId  String @map("village_id") @db.Uuid
-  chatRoomId String @map("chat_room_id") @db.Uuid
-  userId     String @map("user_id") @db.Uuid
+  id         String    @id @default(uuid()) @db.Uuid
+  villageId  String    @map("village_id") @db.Uuid
+  chatRoomId String    @map("chat_room_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  // Phase 2 addition (Epic 8). Supports an unread-count/badge on the chat
+  // tabs (spec 1.1's "นิติบุคคล"/"รปภ."/"กลุ่มหมู่บ้าน" tabs) without needing
+  // a per-message read-receipt table (spec 2.3 doesn't ask for read receipts
+  // the way announcements explicitly do in spec 2.2 — a single per-room
+  // "read up to" timestamp is enough). Updated by a `mark_read`
+  // WS event / `PATCH /chat-rooms/:id/read` REST call (Dev agent TODO,
+  // Epic 8).
+  lastReadAt DateTime? @map("last_read_at")
 
   chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -452,28 +498,92 @@ model ChatMessage {
 }
 
 // ---------------------------------------------------------------------------
-// Maintenance tickets (Phase 2 — schema only)
+// Maintenance tickets (Phase 2, Epic 9 — see docs/ARCHITECTURE.md §8 for the
+// schema decisions made when this went from placeholder to Phase-2-ready)
 // ---------------------------------------------------------------------------
 
 model MaintenanceTicket {
-  id              String             @id @default(uuid()) @db.Uuid
-  villageId       String             @map("village_id") @db.Uuid
-  houseId         String             @map("house_id") @db.Uuid
-  createdByUserId String             @map("created_by_user_id") @db.Uuid
-  category        String
+  id              String              @id @default(uuid()) @db.Uuid
+  villageId       String              @map("village_id") @db.Uuid
+  houseId         String              @map("house_id") @db.Uuid
+  createdByUserId String              @map("created_by_user_id") @db.Uuid
+  // Phase 2: was a free `String`, converted to an enum to match every other
+  // spec-enumerated categorical field in this schema (see MaintenanceCategory
+  // above).
+  category        MaintenanceCategory
   description     String
-  imageUrl        String?            @map("image_url")
-  status          MaintenanceStatus  @default(OPEN)
-  assignedTo      String?            @map("assigned_to")
-  scheduledDate   DateTime?          @map("scheduled_date")
-  createdAt       DateTime           @default(now()) @map("created_at")
+  imageUrl        String?             @map("image_url")
+  status          MaintenanceStatus   @default(OPEN)
+  // Deliberately kept a free-text String, NOT a FK to User. Spec 2.4 says
+  // "แอดมินมอบหมายงานให้ทีมช่าง" but Phase 2 does not introduce a
+  // "technician" role/login — UserRole is still just RESIDENT/GUARD/ADMIN.
+  // A FK would force inventing a technician account system with no
+  // corresponding app access, which is out of Phase 2 scope per the spec's
+  // roadmap. Revisit if a future phase gives technicians their own app login.
+  assignedTo      String?             @map("assigned_to")
+  scheduledDate   DateTime?           @map("scheduled_date")
+  // Phase 2 addition: spec 2.4's AC literally requires "ระบบสร้างเลขที่
+  // ใบงาน (ticket)" — the UUID `id` above is not a human-facing ticket
+  // number. Generated atomically per-village via MaintenanceTicketCounter
+  // below (a plain `SELECT COUNT(*) + 1` would race under concurrent ticket
+  // creation from the same village).
+  ticketNumber    String              @map("ticket_number")
+  createdAt       DateTime            @default(now()) @map("created_at")
 
   village   Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
   house     House   @relation(fields: [houseId], references: [id], onDelete: Cascade)
   createdBy User    @relation("MaintenanceTicketCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
 
+  @@unique([villageId, ticketNumber])
   @@index([villageId, status])
   @@map("maintenance_tickets")
+}
+
+/// Phase 2 addition (Epic 9). One row per village, atomically incremented
+/// (`UPDATE ... SET last_seq = last_seq + 1 RETURNING last_seq`, inside the
+/// same RLS-scoped transaction as the ticket INSERT) to hand out gap-free,
+/// race-safe sequential ticket numbers — see MaintenanceTicket.ticketNumber's
+/// comment and docs/ARCHITECTURE.md §8.
+model MaintenanceTicketCounter {
+  villageId String @id @map("village_id") @db.Uuid
+  lastSeq   Int    @default(0) @map("last_seq")
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+
+  @@map("maintenance_ticket_counters")
+}
+
+// ---------------------------------------------------------------------------
+// Transport Directory (Phase 2, Epic 10 — spec 2.7). Replaces the earlier
+// "ทำเนียบลูกบ้าน" (resident directory) idea, which was dropped for privacy/
+// consent complexity (see spec 2.7's header note) — this is an admin-curated
+// phone book of motorcycle-taxi/taxi drivers the village recommends. NOT a
+// ride-hailing API integration: residents just see a list and tap `tel:` to
+// call, so there is deliberately no booking/queue/location-tracking state
+// here — a flat CRUD table is the whole feature.
+// ---------------------------------------------------------------------------
+
+model TransportProvider {
+  id          String                @id @default(uuid()) @db.Uuid
+  villageId   String                @map("village_id") @db.Uuid
+  name        String
+  type        TransportProviderType
+  phone       String
+  // Spec 2.7 groups "พื้นที่ให้บริการ/หมายเหตุ (เช่น ราคาโดยประมาณ)" as one
+  // AC bullet (service area AND free-form notes like approximate price) —
+  // kept as a single nullable free-text field rather than splitting it,
+  // matching how literally the spec presents it.
+  serviceArea String?               @map("service_area")
+  isActive    Boolean               @default(true) @map("is_active")
+  createdAt   DateTime              @default(now()) @map("created_at")
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+
+  // `isActive` for the resident-facing list (spec: "ลูกบ้านดูรายการที่เปิด
+  // ใช้งาน (active) ได้"), `type` for the optional filter-by-type AC.
+  @@index([villageId, isActive])
+  @@index([villageId, type])
+  @@map("transport_providers")
 }
 
 // ---------------------------------------------------------------------------
@@ -481,12 +591,12 @@ model MaintenanceTicket {
 // ---------------------------------------------------------------------------
 
 model Facility {
-  id          String   @id @default(uuid()) @db.Uuid
-  villageId   String   @map("village_id") @db.Uuid
+  id          String  @id @default(uuid()) @db.Uuid
+  villageId   String  @map("village_id") @db.Uuid
   name        String
   description String?
-  openTime    String?  @map("open_time")
-  closeTime   String?  @map("close_time")
+  openTime    String? @map("open_time")
+  closeTime   String? @map("close_time")
   rules       String?
 
   village  Village   @relation(fields: [villageId], references: [id], onDelete: Cascade)

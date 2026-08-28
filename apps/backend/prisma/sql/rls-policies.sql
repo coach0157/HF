@@ -1,12 +1,19 @@
 -- Row-Level Security policies for every tenant-owned table.
 --
--- STATUS: this file's content is already applied — it is the (untouched)
--- source for prisma/migrations/20260828072452_enable_rls/migration.sql,
--- which was generated and run against a real local Postgres during scaffold
--- validation (see docs/ARCHITECTURE.md "Validated during scaffolding" note).
--- Running `npm run prisma:migrate:dev` (or `prisma:migrate:deploy` in
--- staging/prod) against a fresh database replays both migrations and you get
--- RLS for free — no manual steps needed for the tables already listed below.
+-- STATUS: this file is the living source of truth for the FULL current table
+-- list + policy text, but it is no longer a 1:1 mirror of a single migration
+-- file. The original run was prisma/migrations/20260828072452_enable_rls/
+-- migration.sql (scaffold validation — see docs/ARCHITECTURE.md "Validated
+-- during scaffolding"). Phase 2 added two tables (maintenance_ticket_counters,
+-- transport_providers) after that migration was already applied to a real
+-- database, so their RLS coverage was shipped as a separate follow-up
+-- migration (prisma/migrations/20260828145708_rls_phase2_tables/migration.sql)
+-- rather than by editing the immutable original migration file. This file's
+-- ARRAY[...] below was updated to include them so it stays correct as
+-- documentation/reference, but replaying migration history top-to-bottom
+-- (`prisma migrate deploy` on a fresh database) is what actually applies RLS
+-- in practice — both migrations run in order and their combined effect
+-- matches what's below.
 --
 -- HOW TO EXTEND (Prisma has no schema syntax for RLS, so it can never be
 -- expressed in schema.prisma) — do this whenever a new tenant-owned table is
@@ -49,7 +56,8 @@ BEGIN
     'announcements', 'announcement_reads', 'announcement_targets',
     'sos_alerts', 'guard_shifts',
     'chat_rooms', 'chat_participants', 'chat_messages',
-    'maintenance_tickets', 'facilities', 'bookings',
+    'maintenance_tickets', 'maintenance_ticket_counters', 'transport_providers',
+    'facilities', 'bookings',
     'bills', 'payments', 'refresh_tokens', 'audit_logs'
   ]
   LOOP
