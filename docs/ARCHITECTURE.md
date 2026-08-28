@@ -115,17 +115,38 @@ so a forgotten filter fails closed (zero rows) instead of leaking.
    ALTER TABLE houses FORCE ROW LEVEL SECURITY;  -- applies even to the table owner
 
    CREATE POLICY tenant_isolation ON houses
-     USING (village_id = current_setting('app.current_village_id', true)::uuid)
-     WITH CHECK (village_id = current_setting('app.current_village_id', true)::uuid);
+     USING (village_id = NULLIF(current_setting('app.current_village_id', true), '')::uuid)
+     WITH CHECK (village_id = NULLIF(current_setting('app.current_village_id', true), '')::uuid);
    ```
 
    `FORCE` matters here specifically because `village_app` *owns* every
    table (it ran `prisma migrate`) — table owners bypass RLS by default,
    `FORCE` closes that hole. `current_setting(..., true)` (the `true` =
    `missing_ok`) returns `NULL` instead of erroring when the session
-   variable was never set — `village_id = NULL` evaluates to `NULL`
-   (falsy), so a connection that forgot to set tenant context sees **zero
-   rows**, not an error and not all rows. Default-deny by construction.
+   variable was never set on a connection **that has never once had that
+   GUC set in its lifetime**. `village_id = NULL` evaluates to `NULL`
+   (falsy), so such a connection sees **zero rows**, not an error and not
+   all rows. Default-deny by construction.
+
+   **Pooled-connection edge case (fixed 2026-08-28, migration
+   `20260828090000_rls_empty_string_village_id_deny`):** Postgres does not
+   reset a session GUC back to "never set" once any transaction on that
+   *pooled* connection has called `set_config('app.current_village_id', ...,
+   true)` — which happens on essentially every real request, since
+   `RlsInterceptor` does this globally. A **later** transaction on the same
+   pooled connection that forgets to set it again gets `current_setting(...,
+   true) = ''` (empty string), not `NULL` — and `''::uuid` **raises a
+   Postgres error** rather than evaluating to `NULL`. Both an error and zero
+   rows are equally fail-closed (no wrong-tenant data is ever returned
+   either way), but only zero rows matches the "default-deny, degrades
+   predictably" behavior this document commits to. The policy expression is
+   therefore `NULLIF(current_setting('app.current_village_id', true),
+   '')::uuid`, not the bare cast: `NULLIF` collapses the empty-string case
+   back to `NULL` *before* the `::uuid` cast runs, so both "never set" and
+   "reset to empty by a reused pooled connection" now behave identically —
+   **zero rows, never a thrown error** — for every RLS table, regardless of
+   connection reuse state. See `prisma/sql/rls-policies.sql` for the exact
+   policy text and `test/rls.e2e-spec.ts` for the e2e proof.
 
    This is generated for every table in one `DO $$ ... $$` loop over an
    explicit table list — see the file for the full list (17 tables). The

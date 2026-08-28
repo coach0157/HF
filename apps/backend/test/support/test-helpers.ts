@@ -10,21 +10,21 @@
  * `AUTH_LOOKUP_DATABASE_URL` populated immediately, not lazily at Nest
  * bootstrap time.
  */
-import * as path from 'node:path';
-import * as dotenv from 'dotenv';
+import * as path from "node:path";
+import * as dotenv from "dotenv";
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 // Login flow in these tests uses the dev OTP bypass code (see
 // common/otp/otp.service.ts: `isDev && devBypass && code === devBypass`) so
 // tests never need to scrape the mock SMS log for the real 6-digit code.
 // Must be set before AppModule/ConfigModule is compiled by any spec file.
-process.env.OTP_DEV_BYPASS_CODE = '000000';
+process.env.OTP_DEV_BYPASS_CODE = "000000";
 if (!process.env.NODE_ENV) {
-  process.env.NODE_ENV = 'development';
+  process.env.NODE_ENV = "development";
 }
 
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole } from "@prisma/client";
 
 export const rawPrisma = new PrismaClient();
 
@@ -49,7 +49,7 @@ let phoneCounter = 1;
 /** 10-digit Thai-format phone (matches every DTO's `/^0\d{9}$/`), unique per test process. */
 export function nextPhone(prefix: string): string {
   const n = phoneCounter++;
-  return `0${prefix}${String(n).padStart(7, '0')}`;
+  return `0${prefix}${String(n).padStart(7, "0")}`;
 }
 
 export interface Actor {
@@ -75,48 +75,88 @@ export interface VillageFixture {
  * `phonePrefix` should be a distinct 2-digit string per fixture to keep
  * phone numbers from colliding across villages within one test run.
  */
-export async function createVillageFixture(label: string, phonePrefix: string): Promise<VillageFixture> {
+export async function createVillageFixture(
+  label: string,
+  phonePrefix: string,
+): Promise<VillageFixture> {
   const village = await rawPrisma.village.create({
-    data: { name: `QA Test Village ${label}`, status: 'ACTIVE' },
+    data: { name: `QA Test Village ${label}`, status: "ACTIVE" },
   });
 
   return withVillageContext(village.id, async (tx) => {
     const house = await tx.house.create({
-      data: { villageId: village.id, houseNo: `QA-${label}`, zone: 'QA-ZONE' },
+      data: { villageId: village.id, houseNo: `QA-${label}`, zone: "QA-ZONE" },
     });
     const admin = await tx.user.create({
-      data: { villageId: village.id, name: `Admin ${label}`, phone: nextPhone(phonePrefix), role: 'ADMIN' },
+      data: {
+        villageId: village.id,
+        name: `Admin ${label}`,
+        phone: nextPhone(phonePrefix),
+        role: "ADMIN",
+      },
     });
     const resident = await tx.user.create({
       data: {
         villageId: village.id,
         name: `Resident ${label}`,
         phone: nextPhone(phonePrefix),
-        role: 'RESIDENT',
+        role: "RESIDENT",
         houseId: house.id,
       },
     });
     const guardOnDuty = await tx.user.create({
-      data: { villageId: village.id, name: `GuardOnDuty ${label}`, phone: nextPhone(phonePrefix), role: 'GUARD' },
+      data: {
+        villageId: village.id,
+        name: `GuardOnDuty ${label}`,
+        phone: nextPhone(phonePrefix),
+        role: "GUARD",
+      },
     });
     const guardOffDuty = await tx.user.create({
-      data: { villageId: village.id, name: `GuardOffDuty ${label}`, phone: nextPhone(phonePrefix), role: 'GUARD' },
+      data: {
+        villageId: village.id,
+        name: `GuardOffDuty ${label}`,
+        phone: nextPhone(phonePrefix),
+        role: "GUARD",
+      },
     });
 
     return {
       villageId: village.id,
       houseId: house.id,
-      admin: { id: admin.id, phone: admin.phone, role: admin.role, houseId: null },
-      resident: { id: resident.id, phone: resident.phone, role: resident.role, houseId: house.id },
-      guardOnDuty: { id: guardOnDuty.id, phone: guardOnDuty.phone, role: guardOnDuty.role, houseId: null },
-      guardOffDuty: { id: guardOffDuty.id, phone: guardOffDuty.phone, role: guardOffDuty.role, houseId: null },
+      admin: {
+        id: admin.id,
+        phone: admin.phone,
+        role: admin.role,
+        houseId: null,
+      },
+      resident: {
+        id: resident.id,
+        phone: resident.phone,
+        role: resident.role,
+        houseId: house.id,
+      },
+      guardOnDuty: {
+        id: guardOnDuty.id,
+        phone: guardOnDuty.phone,
+        role: guardOnDuty.role,
+        houseId: null,
+      },
+      guardOffDuty: {
+        id: guardOffDuty.id,
+        phone: guardOffDuty.phone,
+        role: guardOffDuty.role,
+        houseId: null,
+      },
     };
   });
 }
 
 /** `villages` has no RLS policy (see rls-policies.sql) and every child FK cascades. */
 export async function deleteVillage(villageId: string): Promise<void> {
-  await rawPrisma.village.delete({ where: { id: villageId } }).catch(() => undefined);
+  await rawPrisma.village
+    .delete({ where: { id: villageId } })
+    .catch(() => undefined);
 }
 
 export interface ApiResponse<T = any> {
@@ -134,7 +174,7 @@ export async function api<T = any>(
   const res = await fetch(`${baseUrl}${urlPath}`, {
     method,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
     },
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
@@ -152,18 +192,28 @@ export async function api<T = any>(
 }
 
 /** Full OTP-request + login round trip using the dev bypass code. Returns the raw response (caller checks status). */
-export async function loginAs(baseUrl: string, phone: string, villageId?: string): Promise<ApiResponse<any>> {
-  await api(baseUrl, 'POST', '/auth/otp/request', { body: { phone } });
-  return api(baseUrl, 'POST', '/auth/login', {
-    body: { phone, otp: '000000', ...(villageId ? { villageId } : {}) },
+export async function loginAs(
+  baseUrl: string,
+  phone: string,
+  villageId?: string,
+): Promise<ApiResponse<any>> {
+  await api(baseUrl, "POST", "/auth/otp/request", { body: { phone } });
+  return api(baseUrl, "POST", "/auth/login", {
+    body: { phone, otp: "000000", ...(villageId ? { villageId } : {}) },
   });
 }
 
 /** Convenience wrapper for tests that just need a bearer token and expect login to succeed. */
-export async function loginToken(baseUrl: string, phone: string, villageId?: string): Promise<string> {
+export async function loginToken(
+  baseUrl: string,
+  phone: string,
+  villageId?: string,
+): Promise<string> {
   const res = await loginAs(baseUrl, phone, villageId);
   if (res.status !== 201) {
-    throw new Error(`login failed for phone=${phone}: HTTP ${res.status} ${JSON.stringify(res.body)}`);
+    throw new Error(
+      `login failed for phone=${phone}: HTTP ${res.status} ${JSON.stringify(res.body)}`,
+    );
   }
   return res.body.accessToken;
 }

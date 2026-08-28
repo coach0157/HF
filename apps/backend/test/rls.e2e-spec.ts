@@ -22,15 +22,15 @@ import {
   VillageFixture,
   futureIso,
   pastIso,
-} from './support/test-helpers';
+} from "./support/test-helpers";
 
-describe('Row-Level Security (cross-tenant isolation, DB-level, no app code)', () => {
+describe("Row-Level Security (cross-tenant isolation, DB-level, no app code)", () => {
   let villageA: VillageFixture;
   let villageB: VillageFixture;
 
   beforeAll(async () => {
-    villageA = await createVillageFixture('RLS-A', '81');
-    villageB = await createVillageFixture('RLS-B', '82');
+    villageA = await createVillageFixture("RLS-A", "81");
+    villageB = await createVillageFixture("RLS-B", "82");
 
     // Seed one visitor_passes row per village too — the original TODO named
     // this table explicitly ("visitor_passes (or any RLS-protected table)").
@@ -39,11 +39,11 @@ describe('Row-Level Security (cross-tenant isolation, DB-level, no app code)', (
         data: {
           villageId: villageA.villageId,
           createdByUserId: villageA.resident.id,
-          visitorName: 'RLS probe A',
+          visitorName: "RLS probe A",
           qrToken: `rls-probe-token-a-${villageA.villageId}`,
           validFrom: new Date(pastIso(60_000)),
           validTo: new Date(futureIso(3_600_000)),
-          usageType: 'SINGLE',
+          usageType: "SINGLE",
         },
       }),
     );
@@ -52,11 +52,11 @@ describe('Row-Level Security (cross-tenant isolation, DB-level, no app code)', (
         data: {
           villageId: villageB.villageId,
           createdByUserId: villageB.resident.id,
-          visitorName: 'RLS probe B',
+          visitorName: "RLS probe B",
           qrToken: `rls-probe-token-b-${villageB.villageId}`,
           validFrom: new Date(pastIso(60_000)),
           validTo: new Date(futureIso(3_600_000)),
-          usageType: 'SINGLE',
+          usageType: "SINGLE",
         },
       }),
     );
@@ -68,22 +68,28 @@ describe('Row-Level Security (cross-tenant isolation, DB-level, no app code)', (
     await rawPrisma.$disconnect();
   });
 
-  it('houses: a query with NO village_id filter, scoped to village A, returns ONLY village A rows', async () => {
-    const houses = await withVillageContext(villageA.villageId, (tx) => tx.house.findMany());
+  it("houses: a query with NO village_id filter, scoped to village A, returns ONLY village A rows", async () => {
+    const houses = await withVillageContext(villageA.villageId, (tx) =>
+      tx.house.findMany(),
+    );
     expect(houses.length).toBeGreaterThan(0);
     expect(houses.every((h) => h.villageId === villageA.villageId)).toBe(true);
     expect(houses.some((h) => h.villageId === villageB.villageId)).toBe(false);
   });
 
-  it('visitor_passes: a query with NO village_id filter, scoped to village B, returns ONLY village B rows', async () => {
-    const passes = await withVillageContext(villageB.villageId, (tx) => tx.visitorPass.findMany());
+  it("visitor_passes: a query with NO village_id filter, scoped to village B, returns ONLY village B rows", async () => {
+    const passes = await withVillageContext(villageB.villageId, (tx) =>
+      tx.visitorPass.findMany(),
+    );
     expect(passes.length).toBeGreaterThan(0);
     expect(passes.every((p) => p.villageId === villageB.villageId)).toBe(true);
     expect(passes.some((p) => p.villageId === villageA.villageId)).toBe(false);
   });
 
-  it('users: likewise isolated per-village with no WHERE clause needed', async () => {
-    const usersA = await withVillageContext(villageA.villageId, (tx) => tx.user.findMany());
+  it("users: likewise isolated per-village with no WHERE clause needed", async () => {
+    const usersA = await withVillageContext(villageA.villageId, (tx) =>
+      tx.user.findMany(),
+    );
     expect(usersA.length).toBeGreaterThan(0);
     expect(usersA.every((u) => u.villageId === villageA.villageId)).toBe(true);
   });
@@ -109,7 +115,7 @@ describe('Row-Level Security (cross-tenant isolation, DB-level, no app code)', (
    * either outcome, so this test is deterministic regardless of whether
    * Prisma happens to hand back a fresh or previously-used connection.
    */
-  it('a query with app.current_village_id UNSET fails closed on every RLS table — either zero rows or a DB error, NEVER real data', async () => {
+  it("a query with app.current_village_id UNSET fails closed on every RLS table — either zero rows or a DB error, NEVER real data", async () => {
     for (const query of [
       () => rawPrisma.$transaction((tx) => tx.house.findMany()),
       () => rawPrisma.$transaction((tx) => tx.visitorPass.findMany()),
@@ -126,9 +132,11 @@ describe('Row-Level Security (cross-tenant isolation, DB-level, no app code)', (
     }
   });
 
-  it('setting app.current_village_id to an unrelated/nonexistent uuid also returns ZERO rows (not an error, not all rows)', async () => {
-    const bogusVillageId = '00000000-0000-0000-0000-000000000000';
-    const houses = await withVillageContext(bogusVillageId, (tx) => tx.house.findMany());
+  it("setting app.current_village_id to an unrelated/nonexistent uuid also returns ZERO rows (not an error, not all rows)", async () => {
+    const bogusVillageId = "00000000-0000-0000-0000-000000000000";
+    const houses = await withVillageContext(bogusVillageId, (tx) =>
+      tx.house.findMany(),
+    );
     expect(houses).toEqual([]);
   });
 });

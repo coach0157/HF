@@ -3,14 +3,19 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { EntryMethod, ExitConfirmationMethod, Prisma, PrismaClient } from '@prisma/client';
-import { getTenantPrismaClient } from '../../common/rls/tenant-context';
-import type { TenantClaims } from '../../common/rls/tenant-context';
-import { AuditService } from '../../common/audit/audit.service';
-import { FileStorageService } from '../../common/storage/file-storage.service';
-import { VisitorPassService } from '../visitor-pass/visitor-pass.service';
-import { CreateEntryLogDto } from './dto/create-entry-log.dto';
+} from "@nestjs/common";
+import {
+  EntryMethod,
+  ExitConfirmationMethod,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
+import { getTenantPrismaClient } from "../../common/rls/tenant-context";
+import type { TenantClaims } from "../../common/rls/tenant-context";
+import { AuditService } from "../../common/audit/audit.service";
+import { FileStorageService } from "../../common/storage/file-storage.service";
+import { VisitorPassService } from "../visitor-pass/visitor-pass.service";
+import { CreateEntryLogDto } from "./dto/create-entry-log.dto";
 
 export interface ListEntryLogsFilters {
   houseId?: string;
@@ -42,17 +47,20 @@ export class EntryLogService {
   }
 
   private async createFromQr(dto: CreateEntryLogDto, claims: TenantClaims) {
-    const pass = await this.visitorPassService.resolveForScan(dto.qrToken!, claims);
+    const pass = await this.visitorPassService.resolveForScan(
+      dto.qrToken!,
+      claims,
+    );
     const tx = getTenantPrismaClient<PrismaClient>();
 
-    if (pass.status === 'ENTERED') {
+    if (pass.status === "ENTERED") {
       // This is the guard re-scanning at the EXIT gate (spec 2.1: "QR ใบเดียว
       // ใช้สแกนได้ทั้งตอนเข้าและตอนออก"). Do NOT create a duplicate entry_log
       // or touch exit_time here — return the existing open log so the guard
       // UI can present the explicit "ยืนยันแขกออก" confirm-exit action.
       const openLog = await tx.entryLog.findFirst({
         where: { passId: pass.id, exitTime: null },
-        orderBy: { entryTime: 'desc' },
+        orderBy: { entryTime: "desc" },
       });
       if (openLog) {
         return { entryLog: openLog, alreadyEntered: true };
@@ -61,13 +69,21 @@ export class EntryLogService {
       // fall through and create a fresh entry rather than error the guard.
     }
 
-    const host = await tx.user.findUnique({ where: { id: pass.createdByUserId } });
+    const host = await tx.user.findUnique({
+      where: { id: pass.createdByUserId },
+    });
     if (!host?.houseId) {
-      throw new BadRequestException('The resident who created this pass has no house assigned');
+      throw new BadRequestException(
+        "The resident who created this pass has no house assigned",
+      );
     }
 
     const photoUrl = dto.photoDataUrl
-      ? await this.fileStorage.savePhoto('entry-logs', claims.villageId, dto.photoDataUrl)
+      ? await this.fileStorage.savePhoto(
+          "entry-logs",
+          claims.villageId,
+          dto.photoDataUrl,
+        )
       : undefined;
 
     const entryLog = await tx.entryLog.create({
@@ -100,20 +116,24 @@ export class EntryLogService {
   private async createManual(dto: CreateEntryLogDto, claims: TenantClaims) {
     if (!dto.visitorName || !dto.houseId || !dto.photoDataUrl) {
       throw new BadRequestException(
-        'Manual entry requires visitorName, houseId, and a photo of the ID card/plate (photoDataUrl)',
+        "Manual entry requires visitorName, houseId, and a photo of the ID card/plate (photoDataUrl)",
       );
     }
 
     const tx = getTenantPrismaClient<PrismaClient>();
     const house = await tx.house.findUnique({ where: { id: dto.houseId } });
     if (!house) {
-      throw new NotFoundException('House not found');
+      throw new NotFoundException("House not found");
     }
 
     // No QR here, so the photo IS the ID-card/plate photo (spec 2.1: "ถ่ายรูป
     // บัตร ปชช./ทะเบียนรถ") — route to the higher-security sensitive bucket
     // (spec 3.4), not the general entry-logs bucket.
-    const photoUrl = await this.fileStorage.savePhoto('sensitive-id', claims.villageId, dto.photoDataUrl);
+    const photoUrl = await this.fileStorage.savePhoto(
+      "sensitive-id",
+      claims.villageId,
+      dto.photoDataUrl,
+    );
 
     const entryLog = await tx.entryLog.create({
       data: {
@@ -140,22 +160,28 @@ export class EntryLogService {
     const tx = getTenantPrismaClient<PrismaClient>();
     const entryLog = await tx.entryLog.findUnique({ where: { id } });
     if (!entryLog) {
-      throw new NotFoundException('Entry log not found');
+      throw new NotFoundException("Entry log not found");
     }
     if (entryLog.exitTime) {
-      throw new BadRequestException('This entry has already been confirmed as exited');
+      throw new BadRequestException(
+        "This entry has already been confirmed as exited",
+      );
     }
 
     let method: ExitConfirmationMethod;
-    if (claims.role === 'GUARD') {
+    if (claims.role === "GUARD") {
       method = ExitConfirmationMethod.GUARD;
-    } else if (claims.role === 'RESIDENT') {
+    } else if (claims.role === "RESIDENT") {
       if (claims.houseId !== entryLog.houseId) {
-        throw new ForbiddenException('You can only confirm exit for visitors to your own house');
+        throw new ForbiddenException(
+          "You can only confirm exit for visitors to your own house",
+        );
       }
       method = ExitConfirmationMethod.RESIDENT;
     } else {
-      throw new ForbiddenException('Only a guard or the visited resident can confirm exit');
+      throw new ForbiddenException(
+        "Only a guard or the visited resident can confirm exit",
+      );
     }
 
     const updated = await tx.entryLog.update({
@@ -178,11 +204,16 @@ export class EntryLogService {
     const tx = getTenantPrismaClient<PrismaClient>();
     const where: Prisma.EntryLogWhereInput = {};
 
-    if (claims.role === 'RESIDENT') {
+    if (claims.role === "RESIDENT") {
       // Residents may only ever see their own house's history (spec 1.1
       // "หน้าประวัติเข้า-ออก") — ignore/override any house_id they pass.
       if (!claims.houseId) {
-        return { items: [], total: 0, page: filters.page, pageSize: filters.pageSize };
+        return {
+          items: [],
+          total: 0,
+          page: filters.page,
+          pageSize: filters.pageSize,
+        };
       }
       where.houseId = claims.houseId;
     } else if (filters.houseId) {
@@ -203,7 +234,7 @@ export class EntryLogService {
     const [items, total] = await Promise.all([
       tx.entryLog.findMany({
         where,
-        orderBy: { entryTime: 'desc' },
+        orderBy: { entryTime: "desc" },
         skip: (filters.page - 1) * filters.pageSize,
         take: filters.pageSize,
       }),
@@ -212,10 +243,10 @@ export class EntryLogService {
 
     // Spec 3.4 audit-trail requirement (c): admin listing/exporting entry
     // logs (which carry photo_url — sensitive) must be logged.
-    if (claims.role === 'ADMIN') {
+    if (claims.role === "ADMIN") {
       await this.auditService.log({
-        action: 'LIST_ENTRY_LOGS',
-        resourceType: 'entry_log',
+        action: "LIST_ENTRY_LOGS",
+        resourceType: "entry_log",
         metadata: {
           houseId: filters.houseId ?? null,
           date: filters.date ?? null,
@@ -233,18 +264,20 @@ export class EntryLogService {
     const tx = getTenantPrismaClient<PrismaClient>();
     const entryLog = await tx.entryLog.findUnique({ where: { id } });
     if (!entryLog) {
-      throw new NotFoundException('Entry log not found');
+      throw new NotFoundException("Entry log not found");
     }
-    if (claims.role === 'RESIDENT' && entryLog.houseId !== claims.houseId) {
-      throw new ForbiddenException('You can only view entry logs for your own house');
+    if (claims.role === "RESIDENT" && entryLog.houseId !== claims.houseId) {
+      throw new ForbiddenException(
+        "You can only view entry logs for your own house",
+      );
     }
 
     // Spec 3.4 audit-trail requirement (b): admin fetching a single entry
     // log's photo_url must be logged.
-    if (claims.role === 'ADMIN') {
+    if (claims.role === "ADMIN") {
       await this.auditService.log({
-        action: 'VIEW_ENTRY_LOG_PHOTO',
-        resourceType: 'entry_log',
+        action: "VIEW_ENTRY_LOG_PHOTO",
+        resourceType: "entry_log",
         resourceId: id,
       });
     }

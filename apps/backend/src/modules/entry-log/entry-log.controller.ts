@@ -1,17 +1,25 @@
-import { Controller, Get, Param, Patch, Post, Query, Body } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-import { EntryLogService } from './entry-log.service';
-import { CreateEntryLogDto } from './dto/create-entry-log.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { TenantClaims } from '../../common/rls/tenant-context';
-import { perUserThrottle } from '../../common/throttle/per-user-throttle';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Body,
+} from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
+import { EntryLogService } from "./entry-log.service";
+import { CreateEntryLogDto } from "./dto/create-entry-log.dto";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import type { TenantClaims } from "../../common/rls/tenant-context";
+import { perUserThrottle } from "../../common/throttle/per-user-throttle";
 
-@Controller('entry-logs')
+@Controller("entry-logs")
 export class EntryLogController {
   constructor(private readonly entryLogService: EntryLogService) {}
 
-  @Roles('GUARD')
+  @Roles("GUARD")
   // Spec 3.4: "ป้องกัน รปภ. บัญชีถูกยึด สร้าง entry log ปลอมจำนวนมาก". 100/hour
   // comfortably covers a busy gate's real traffic while catching a
   // compromised-guard-account abuse pattern.
@@ -24,22 +32,22 @@ export class EntryLogController {
   // The critical "no auto-close" endpoint (spec 2.1) — only path that ever
   // sets exit_time. Guard OR the visited resident (ownership checked in the
   // service).
-  @Roles('GUARD', 'RESIDENT')
-  @Patch(':id/confirm-exit')
-  confirmExit(@Param('id') id: string, @CurrentUser() user: TenantClaims) {
+  @Roles("GUARD", "RESIDENT")
+  @Patch(":id/confirm-exit")
+  confirmExit(@Param("id") id: string, @CurrentUser() user: TenantClaims) {
     return this.entryLogService.confirmExit(id, user);
   }
 
   // Guard/Admin oversight + Resident's own "ประวัติเข้า-ออก" screen (spec
   // 1.1) — residents are scoped to their own house_id in the service
   // regardless of what house_id they pass here.
-  @Roles('GUARD', 'ADMIN', 'RESIDENT')
+  @Roles("GUARD", "ADMIN", "RESIDENT")
   @Get()
   list(
-    @Query('house_id') houseId: string | undefined,
-    @Query('date') date: string | undefined,
-    @Query('page') page: string | undefined,
-    @Query('pageSize') pageSize: string | undefined,
+    @Query("house_id") houseId: string | undefined,
+    @Query("date") date: string | undefined,
+    @Query("page") page: string | undefined,
+    @Query("pageSize") pageSize: string | undefined,
     @CurrentUser() user: TenantClaims,
   ) {
     return this.entryLogService.list(
@@ -56,9 +64,9 @@ export class EntryLogController {
   // Single-record detail, including photo_url — the audit-logged "admin
   // views a sensitive photo" path (spec 3.4 requirement (b), see
   // entry-log.service.ts's findOne()).
-  @Roles('GUARD', 'ADMIN', 'RESIDENT')
-  @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: TenantClaims) {
+  @Roles("GUARD", "ADMIN", "RESIDENT")
+  @Get(":id")
+  findOne(@Param("id") id: string, @CurrentUser() user: TenantClaims) {
     return this.entryLogService.findOne(id, user);
   }
 }

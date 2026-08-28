@@ -1,4 +1,4 @@
-import { IsOptional, IsUUID } from 'class-validator';
+import { IsOptional, IsUUID } from "class-validator";
 
 export class CreateGuardShiftDto {
   // Admin-only: assign a shift to a specific guard (Epic 5 "จัดการ guard

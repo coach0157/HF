@@ -1,8 +1,13 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import type { TenantClaims } from '../rls/tenant-context';
-import { getTenantClaims } from '../rls/tenant-context';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { ROLES_KEY } from "../decorators/roles.decorator";
+import type { TenantClaims } from "../rls/tenant-context";
+import { getTenantClaims } from "../rls/tenant-context";
 
 /**
  * Enforces @Roles(...) metadata. Runs after JwtAuthGuard (Nest evaluates
@@ -21,10 +26,9 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<TenantClaims['role'][]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredRoles = this.reflector.getAllAndOverride<
+      TenantClaims["role"][]
+    >(ROLES_KEY, [context.getHandler(), context.getClass()]);
 
     if (!requiredRoles || requiredRoles.length === 0) {
       return true;
@@ -32,7 +36,9 @@ export class RolesGuard implements CanActivate {
 
     const claims = getTenantClaims();
     if (!claims || !requiredRoles.includes(claims.role)) {
-      throw new ForbiddenException(`Requires one of roles: ${requiredRoles.join(', ')}`);
+      throw new ForbiddenException(
+        `Requires one of roles: ${requiredRoles.join(", ")}`,
+      );
     }
     return true;
   }

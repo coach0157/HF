@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { GuardShiftStatus, PrismaClient, SosStatus } from '@prisma/client';
-import { getTenantPrismaClient } from '../../common/rls/tenant-context';
-import type { TenantClaims } from '../../common/rls/tenant-context';
-import { CreateSosAlertDto } from './dto/create-sos-alert.dto';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { GuardShiftStatus, PrismaClient, SosStatus } from "@prisma/client";
+import { getTenantPrismaClient } from "../../common/rls/tenant-context";
+import type { TenantClaims } from "../../common/rls/tenant-context";
+import { CreateSosAlertDto } from "./dto/create-sos-alert.dto";
 
 /**
  * Epic 4 — SOS / Emergency Alert. See MVP_BACKLOG.md Epic 4 and spec
@@ -14,7 +18,9 @@ import { CreateSosAlertDto } from './dto/create-sos-alert.dto';
 export class SosService {
   async trigger(dto: CreateSosAlertDto, claims: TenantClaims) {
     if (!claims.houseId) {
-      throw new BadRequestException('Only a resident with a house assignment can trigger SOS');
+      throw new BadRequestException(
+        "Only a resident with a house assignment can trigger SOS",
+      );
     }
 
     const tx = getTenantPrismaClient<PrismaClient>();
@@ -33,7 +39,11 @@ export class SosService {
     // `shiftEnd: null` guards against a stale ON_DUTY row that was never
     // properly closed out.
     const onDutyGuards = await tx.guardShift.findMany({
-      where: { villageId: claims.villageId, status: GuardShiftStatus.ON_DUTY, shiftEnd: null },
+      where: {
+        villageId: claims.villageId,
+        status: GuardShiftStatus.ON_DUTY,
+        shiftEnd: null,
+      },
       select: { guardUserId: true },
     });
 
@@ -50,22 +60,30 @@ export class SosService {
     // that doesn't exist yet in schema.prisma (no `villages.sos_radius_m`
     // or similar column), so this is a schema gap, not a missed wiring step.
 
-    return { alert, routedToGuardUserIds: onDutyGuards.map((g) => g.guardUserId) };
+    return {
+      alert,
+      routedToGuardUserIds: onDutyGuards.map((g) => g.guardUserId),
+    };
   }
 
   async acknowledge(id: string, claims: TenantClaims) {
     const tx = getTenantPrismaClient<PrismaClient>();
     const alert = await tx.sosAlert.findUnique({ where: { id } });
     if (!alert) {
-      throw new NotFoundException('SOS alert not found');
+      throw new NotFoundException("SOS alert not found");
     }
     if (alert.status !== SosStatus.PENDING) {
-      throw new BadRequestException(`Cannot acknowledge an alert with status ${alert.status}`);
+      throw new BadRequestException(
+        `Cannot acknowledge an alert with status ${alert.status}`,
+      );
     }
 
     return tx.sosAlert.update({
       where: { id },
-      data: { status: SosStatus.ACKNOWLEDGED, acknowledgedByGuardId: claims.userId },
+      data: {
+        status: SosStatus.ACKNOWLEDGED,
+        acknowledgedByGuardId: claims.userId,
+      },
     });
   }
 
@@ -75,14 +93,16 @@ export class SosService {
    * models (`sos_alerts.status` includes RESOLVED, `resolved_at` column
    * exists and was otherwise dead). Guard-only, same as acknowledge.
    */
-  async resolve(id: string, claims: TenantClaims) {
+  async resolve(id: string, _claims: TenantClaims) {
     const tx = getTenantPrismaClient<PrismaClient>();
     const alert = await tx.sosAlert.findUnique({ where: { id } });
     if (!alert) {
-      throw new NotFoundException('SOS alert not found');
+      throw new NotFoundException("SOS alert not found");
     }
     if (alert.status !== SosStatus.ACKNOWLEDGED) {
-      throw new BadRequestException(`Cannot resolve an alert with status ${alert.status}`);
+      throw new BadRequestException(
+        `Cannot resolve an alert with status ${alert.status}`,
+      );
     }
 
     return tx.sosAlert.update({
@@ -95,7 +115,7 @@ export class SosService {
     const tx = getTenantPrismaClient<PrismaClient>();
     return tx.sosAlert.findMany({
       where: { status: filters.status },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 }

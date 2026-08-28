@@ -1,5 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from "@nestjs/common";
+import { PrismaClient } from "@prisma/client";
 
 /**
  * Thin wrapper around the generated Prisma client. This is the ONLY place
@@ -17,12 +22,15 @@ import { PrismaClient } from '@prisma/client';
  *  - the `villages` table, which has no village_id / no RLS policy
  */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit() {
     await this.$connect();
-    this.logger.log('Prisma connected');
+    this.logger.log("Prisma connected");
   }
 
   async onModuleDestroy() {

@@ -1,5 +1,13 @@
-import { IsDateString, IsEnum, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
-import { VisitorPassUsageType } from '@prisma/client';
+import {
+  IsDateString,
+  IsEnum,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import { VisitorPassUsageType } from "@prisma/client";
 
 export class CreateVisitorPassDto {
   @MinLength(1)
@@ -7,7 +15,10 @@ export class CreateVisitorPassDto {
   visitorName!: string;
 
   @IsOptional()
-  @Matches(/^0\d{9}$/, { message: 'visitorPhone must be a 10-digit Thai phone number starting with 0' })
+  @Matches(/^0\d{9}$/, {
+    message:
+      "visitorPhone must be a 10-digit Thai phone number starting with 0",
+  })
   visitorPhone?: string;
 
   @IsOptional()

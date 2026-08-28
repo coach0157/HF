@@ -1,8 +1,18 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Announcement, AnnouncementTargetScope, Prisma, PrismaClient, UserRole } from '@prisma/client';
-import { getTenantPrismaClient } from '../../common/rls/tenant-context';
-import type { TenantClaims } from '../../common/rls/tenant-context';
-import { CreateAnnouncementDto } from './dto/create-announcement.dto';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  Announcement,
+  AnnouncementTargetScope,
+  Prisma,
+  PrismaClient,
+  UserRole,
+} from "@prisma/client";
+import { getTenantPrismaClient } from "../../common/rls/tenant-context";
+import type { TenantClaims } from "../../common/rls/tenant-context";
+import { CreateAnnouncementDto } from "./dto/create-announcement.dto";
 
 /**
  * Epic 3 — Announcement. See MVP_BACKLOG.md Epic 3 and spec 2.2/3.3.
@@ -17,13 +27,17 @@ import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 export class AnnouncementService {
   async create(dto: CreateAnnouncementDto, claims: TenantClaims) {
     if (dto.targetScope === AnnouncementTargetScope.ZONE && !dto.targetZone) {
-      throw new BadRequestException('targetZone is required when targetScope is ZONE');
+      throw new BadRequestException(
+        "targetZone is required when targetScope is ZONE",
+      );
     }
     if (
       dto.targetScope === AnnouncementTargetScope.HOUSE &&
       (!dto.targetHouseIds || dto.targetHouseIds.length === 0)
     ) {
-      throw new BadRequestException('targetHouseIds is required when targetScope is HOUSE');
+      throw new BadRequestException(
+        "targetHouseIds is required when targetScope is HOUSE",
+      );
     }
 
     const tx = getTenantPrismaClient<PrismaClient>();
@@ -35,12 +49,18 @@ export class AnnouncementService {
         content: dto.content,
         level: dto.level,
         targetScope: dto.targetScope,
-        targetZone: dto.targetScope === AnnouncementTargetScope.ZONE ? dto.targetZone : null,
+        targetZone:
+          dto.targetScope === AnnouncementTargetScope.ZONE
+            ? dto.targetZone
+            : null,
         imageUrl: dto.imageUrl,
       },
     });
 
-    if (dto.targetScope === AnnouncementTargetScope.HOUSE && dto.targetHouseIds) {
+    if (
+      dto.targetScope === AnnouncementTargetScope.HOUSE &&
+      dto.targetHouseIds
+    ) {
       await tx.announcementTarget.createMany({
         data: dto.targetHouseIds.map((houseId) => ({
           villageId: claims.villageId,
@@ -69,15 +89,24 @@ export class AnnouncementService {
     const tx = getTenantPrismaClient<PrismaClient>();
 
     if (announcement.targetScope === AnnouncementTargetScope.ALL) {
-      const users = await tx.user.findMany({ where: { role: UserRole.RESIDENT }, select: { id: true } });
+      const users = await tx.user.findMany({
+        where: { role: UserRole.RESIDENT },
+        select: { id: true },
+      });
       return users.map((u) => u.id);
     }
 
     if (announcement.targetScope === AnnouncementTargetScope.ZONE) {
       if (!announcement.targetZone) return [];
-      const houses = await tx.house.findMany({ where: { zone: announcement.targetZone }, select: { id: true } });
+      const houses = await tx.house.findMany({
+        where: { zone: announcement.targetZone },
+        select: { id: true },
+      });
       const users = await tx.user.findMany({
-        where: { role: UserRole.RESIDENT, houseId: { in: houses.map((h) => h.id) } },
+        where: {
+          role: UserRole.RESIDENT,
+          houseId: { in: houses.map((h) => h.id) },
+        },
         select: { id: true },
       });
       return users.map((u) => u.id);
@@ -89,7 +118,10 @@ export class AnnouncementService {
       select: { houseId: true },
     });
     const users = await tx.user.findMany({
-      where: { role: UserRole.RESIDENT, houseId: { in: targets.map((t) => t.houseId) } },
+      where: {
+        role: UserRole.RESIDENT,
+        houseId: { in: targets.map((t) => t.houseId) },
+      },
       select: { id: true },
     });
     return users.map((u) => u.id);
@@ -104,26 +136,33 @@ export class AnnouncementService {
     const tx = getTenantPrismaClient<PrismaClient>();
 
     if (claims.role === UserRole.ADMIN) {
-      return tx.announcement.findMany({ orderBy: { createdAt: 'desc' } });
+      return tx.announcement.findMany({ orderBy: { createdAt: "desc" } });
     }
 
     let zone: string | null = null;
     if (claims.houseId) {
-      const house = await tx.house.findUnique({ where: { id: claims.houseId } });
+      const house = await tx.house.findUnique({
+        where: { id: claims.houseId },
+      });
       zone = house?.zone ?? null;
     }
 
-    const or: Prisma.AnnouncementWhereInput[] = [{ targetScope: AnnouncementTargetScope.ALL }];
+    const or: Prisma.AnnouncementWhereInput[] = [
+      { targetScope: AnnouncementTargetScope.ALL },
+    ];
     if (zone) {
       or.push({ targetScope: AnnouncementTargetScope.ZONE, targetZone: zone });
     }
     if (claims.houseId) {
-      or.push({ targetScope: AnnouncementTargetScope.HOUSE, targets: { some: { houseId: claims.houseId } } });
+      or.push({
+        targetScope: AnnouncementTargetScope.HOUSE,
+        targets: { some: { houseId: claims.houseId } },
+      });
     }
 
     return tx.announcement.findMany({
       where: { OR: or },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: { reads: { where: { userId: claims.userId } } },
     });
   }
@@ -134,15 +173,23 @@ export class AnnouncementService {
    */
   async markRead(announcementId: string, claims: TenantClaims) {
     const tx = getTenantPrismaClient<PrismaClient>();
-    const announcement = await tx.announcement.findUnique({ where: { id: announcementId } });
+    const announcement = await tx.announcement.findUnique({
+      where: { id: announcementId },
+    });
     if (!announcement) {
-      throw new NotFoundException('Announcement not found');
+      throw new NotFoundException("Announcement not found");
     }
 
     return tx.announcementRead.upsert({
-      where: { announcementId_userId: { announcementId, userId: claims.userId } },
+      where: {
+        announcementId_userId: { announcementId, userId: claims.userId },
+      },
       update: {},
-      create: { villageId: claims.villageId, announcementId, userId: claims.userId },
+      create: {
+        villageId: claims.villageId,
+        announcementId,
+        userId: claims.userId,
+      },
     });
   }
 }

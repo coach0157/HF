@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
-import { OtpModule } from '../../common/otp/otp.module';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
+import { Module } from "@nestjs/common";
+import { OtpModule } from "../../common/otp/otp.module";
+import { AuthController } from "./auth.controller";
+import { AuthService } from "./auth.service";
+import { UsersController } from "./users.controller";
+import { UsersService } from "./users.service";
 
 /**
  * Epic 1 — Auth (phone + OTP, JWT). See MVP_BACKLOG.md Epic 1 and spec

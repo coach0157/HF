@@ -1,8 +1,8 @@
-import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import type { NextFunction, Request, Response } from 'express';
-import { tenantClaimsStorage, TenantClaims } from './tenant-context';
+import { Injectable, Logger, NestMiddleware } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import type { NextFunction, Request, Response } from "express";
+import { tenantClaimsStorage, TenantClaims } from "./tenant-context";
 
 /**
  * Step 1 of the multi-tenant RLS pattern (see docs/ARCHITECTURE.md for the
@@ -43,22 +43,24 @@ export class TenantContextMiddleware implements NestMiddleware {
     tenantClaimsStorage.run(claims, () => next());
   }
 
-  private async tryDecodeClaims(req: Request): Promise<TenantClaims | undefined> {
+  private async tryDecodeClaims(
+    req: Request,
+  ): Promise<TenantClaims | undefined> {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return undefined;
     }
 
-    const token = authHeader.slice('Bearer '.length);
+    const token = authHeader.slice("Bearer ".length);
 
     try {
       const payload = await this.jwtService.verifyAsync<{
         sub: string;
         villageId: string;
-        role: TenantClaims['role'];
+        role: TenantClaims["role"];
         houseId?: string | null;
       }>(token, {
-        secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+        secret: this.configService.get<string>("JWT_ACCESS_SECRET"),
       });
 
       return {

@@ -1,12 +1,12 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { CommonModule } from './common/common.module';
-import { TenantContextMiddleware } from './common/rls/tenant-context.middleware';
-import { AuthModule } from './modules/auth/auth.module';
-import { VisitorPassModule } from './modules/visitor-pass/visitor-pass.module';
-import { EntryLogModule } from './modules/entry-log/entry-log.module';
-import { AnnouncementModule } from './modules/announcement/announcement.module';
-import { SosModule } from './modules/sos/sos.module';
-import { GuardShiftModule } from './modules/guard-shift/guard-shift.module';
+import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
+import { CommonModule } from "./common/common.module";
+import { TenantContextMiddleware } from "./common/rls/tenant-context.middleware";
+import { AuthModule } from "./modules/auth/auth.module";
+import { VisitorPassModule } from "./modules/visitor-pass/visitor-pass.module";
+import { EntryLogModule } from "./modules/entry-log/entry-log.module";
+import { AnnouncementModule } from "./modules/announcement/announcement.module";
+import { SosModule } from "./modules/sos/sos.module";
+import { GuardShiftModule } from "./modules/guard-shift/guard-shift.module";
 
 @Module({
   imports: [
@@ -24,6 +24,6 @@ export class AppModule implements NestModule {
     // Step 1 of the RLS pattern — see docs/ARCHITECTURE.md. Applied to every
     // route; the middleware itself decides whether a token is present and
     // decodable, it never blocks the request (that's JwtAuthGuard's job).
-    consumer.apply(TenantContextMiddleware).forRoutes('*');
+    consumer.apply(TenantContextMiddleware).forRoutes("*");
   }
 }

@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 /**
  * Two shapes in one DTO, disambiguated by whether `qrToken` is present (spec

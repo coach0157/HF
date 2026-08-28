@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { SosController } from './sos.controller';
-import { SosService } from './sos.service';
+import { Module } from "@nestjs/common";
+import { SosController } from "./sos.controller";
+import { SosService } from "./sos.service";
 
 /**
  * Epic 4 — SOS / Emergency Alert. See MVP_BACKLOG.md Epic 4 and spec 2.2/3.4.

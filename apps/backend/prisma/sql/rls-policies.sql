@@ -23,12 +23,21 @@
 -- superuser DB role are both required) lives in docs/ARCHITECTURE.md.
 
 -- Helper macro (conceptually): every policy below reads
---   current_setting('app.current_village_id', true)::uuid
--- The `true` second argument makes Postgres return NULL instead of raising an
--- error when the setting was never SET for the current transaction. Since
--- `village_id = NULL` evaluates to NULL (falsy) in the USING clause, a
--- connection that forgot to set tenant context sees ZERO rows rather than an
--- error or, worse, ALL rows. This is a deliberate default-deny choice.
+--   NULLIF(current_setting('app.current_village_id', true), '')::uuid
+-- The `true` second argument to current_setting makes Postgres return NULL
+-- instead of raising an error when the setting was never SET for the current
+-- transaction. But on a POOLED connection that has previously had this GUC
+-- set at least once (i.e. every real connection after its first request),
+-- Postgres does not go back to NULL when a later transaction forgets to set
+-- it again — current_setting(..., true) instead returns '' (empty string),
+-- and '' cast directly to ::uuid RAISES a Postgres error rather than
+-- evaluating to NULL. NULLIF(..., '') normalizes that empty-string case back
+-- to NULL BEFORE the ::uuid cast ever runs, so both "never set" and "reset to
+-- empty by a reused pooled connection" collapse to the same NULL, and
+-- `village_id = NULL` evaluates to NULL (falsy) in the USING clause either
+-- way. A connection that forgot to set tenant context always sees ZERO rows,
+-- never an error and never all rows. This is a deliberate default-deny
+-- choice (see docs/ARCHITECTURE.md §3.1).
 
 DO $$
 DECLARE
@@ -53,8 +62,8 @@ BEGIN
 
     EXECUTE format(
       'CREATE POLICY tenant_isolation ON %I
-         USING (village_id = current_setting(''app.current_village_id'', true)::uuid)
-         WITH CHECK (village_id = current_setting(''app.current_village_id'', true)::uuid);',
+         USING (village_id = NULLIF(current_setting(''app.current_village_id'', true), '''')::uuid)
+         WITH CHECK (village_id = NULLIF(current_setting(''app.current_village_id'', true), '''')::uuid);',
       t
     );
   END LOOP;

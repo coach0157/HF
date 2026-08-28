@@ -1,5 +1,14 @@
-import { ArrayNotEmpty, IsArray, IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
-import { AnnouncementLevel, AnnouncementTargetScope } from '@prisma/client';
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import { AnnouncementLevel, AnnouncementTargetScope } from "@prisma/client";
 
 export class CreateAnnouncementDto {
   @MinLength(1)
@@ -28,7 +37,7 @@ export class CreateAnnouncementDto {
   @IsOptional()
   @IsArray()
   @ArrayNotEmpty()
-  @IsUUID('4', { each: true })
+  @IsUUID("4", { each: true })
   targetHouseIds?: string[];
 
   @IsOptional()

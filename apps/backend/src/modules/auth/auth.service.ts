@@ -1,21 +1,26 @@
-import { ConflictException, Injectable, OnModuleDestroy, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { createHash } from 'node:crypto';
-import { PrismaClient, User } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { OtpService } from '../../common/otp/otp.service';
-import { getTenantPrismaClient } from '../../common/rls/tenant-context';
+import {
+  ConflictException,
+  Injectable,
+  OnModuleDestroy,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { createHash } from "node:crypto";
+import { PrismaClient, User } from "@prisma/client";
+import { PrismaService } from "../../common/prisma/prisma.service";
+import { OtpService } from "../../common/otp/otp.service";
+import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 
 interface RefreshPayload {
   sub: string;
   villageId: string;
-  role: User['role'];
+  role: User["role"];
   houseId: string | null;
 }
 
 function hashToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+  return createHash("sha256").update(token).digest("hex");
 }
 
 /**
@@ -66,10 +71,10 @@ export class AuthService implements OnModuleDestroy {
     private readonly config: ConfigService,
   ) {
     this.refreshJwt = new JwtService({
-      secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+      secret: this.config.get<string>("JWT_REFRESH_SECRET"),
     });
     this.authLookupPrisma = new PrismaClient({
-      datasourceUrl: this.config.get<string>('AUTH_LOOKUP_DATABASE_URL'),
+      datasourceUrl: this.config.get<string>("AUTH_LOOKUP_DATABASE_URL"),
     });
   }
 
@@ -84,7 +89,7 @@ export class AuthService implements OnModuleDestroy {
   async login(phone: string, otp: string, villageId?: string) {
     const otpOk = this.otpService.verifyOtp(phone, otp);
     if (!otpOk) {
-      throw new UnauthorizedException('Invalid or expired OTP');
+      throw new UnauthorizedException("Invalid or expired OTP");
     }
 
     // Uses authLookupPrisma (BYPASSRLS, column-restricted role), not
@@ -94,15 +99,24 @@ export class AuthService implements OnModuleDestroy {
     // fields" query would fail with a permission error on password_hash etc.
     const candidates = await this.authLookupPrisma.user.findMany({
       where: { phone },
-      select: { id: true, villageId: true, phone: true, role: true, houseId: true, name: true },
+      select: {
+        id: true,
+        villageId: true,
+        phone: true,
+        role: true,
+        houseId: true,
+        name: true,
+      },
     });
     if (candidates.length === 0) {
-      throw new UnauthorizedException('No account found for this phone number');
+      throw new UnauthorizedException("No account found for this phone number");
     }
 
     let user = candidates[0];
     if (candidates.length > 1) {
-      const matched = villageId ? candidates.find((c) => c.villageId === villageId) : undefined;
+      const matched = villageId
+        ? candidates.find((c) => c.villageId === villageId)
+        : undefined;
       if (!matched) {
         const villages = await this.prisma.village.findMany({
           where: { id: { in: candidates.map((c) => c.villageId) } },
@@ -110,7 +124,7 @@ export class AuthService implements OnModuleDestroy {
         });
         throw new ConflictException({
           message:
-            'This phone number is registered in more than one village. Retry POST /auth/login with a villageId from the list below.',
+            "This phone number is registered in more than one village. Retry POST /auth/login with a villageId from the list below.",
           villages,
         });
       }
@@ -123,9 +137,10 @@ export class AuthService implements OnModuleDestroy {
   async refresh(oldRefreshToken: string) {
     let payload: RefreshPayload;
     try {
-      payload = await this.refreshJwt.verifyAsync<RefreshPayload>(oldRefreshToken);
+      payload =
+        await this.refreshJwt.verifyAsync<RefreshPayload>(oldRefreshToken);
     } catch {
-      throw new UnauthorizedException('Invalid or expired refresh token');
+      throw new UnauthorizedException("Invalid or expired refresh token");
     }
 
     const tokenHash = hashToken(oldRefreshToken);
@@ -135,8 +150,12 @@ export class AuthService implements OnModuleDestroy {
       }),
     );
 
-    if (!stored || stored.revokedAt || stored.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedException('Refresh token is no longer valid');
+    if (
+      !stored ||
+      stored.revokedAt ||
+      stored.expiresAt.getTime() < Date.now()
+    ) {
+      throw new UnauthorizedException("Refresh token is no longer valid");
     }
 
     // village_id is already known at this point (from the verified refresh
@@ -147,13 +166,16 @@ export class AuthService implements OnModuleDestroy {
       tx.user.findUnique({ where: { id: payload.sub } }),
     );
     if (!user) {
-      throw new UnauthorizedException('User no longer exists');
+      throw new UnauthorizedException("User no longer exists");
     }
 
     // Rotation: revoke the presented token before issuing a new pair, so a
     // captured-and-replayed old refresh token stops working immediately.
     await this.withVillageContext(payload.villageId, (tx) =>
-      tx.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } }),
+      tx.refreshToken.update({
+        where: { id: stored.id },
+        data: { revokedAt: new Date() },
+      }),
     );
 
     return this.issueTokenPair(user);
@@ -174,7 +196,10 @@ export class AuthService implements OnModuleDestroy {
   }
 
   private async issueTokenPair(
-    user: Pick<User, 'id' | 'villageId' | 'role' | 'houseId' | 'name' | 'phone'>,
+    user: Pick<
+      User,
+      "id" | "villageId" | "role" | "houseId" | "name" | "phone"
+    >,
   ) {
     const accessPayload = {
       sub: user.id,
@@ -184,7 +209,7 @@ export class AuthService implements OnModuleDestroy {
     };
     const accessToken = await this.jwtService.signAsync(accessPayload);
 
-    const refreshTtl = this.config.get<string>('JWT_REFRESH_EXPIRES_IN', '30d');
+    const refreshTtl = this.config.get<string>("JWT_REFRESH_EXPIRES_IN", "30d");
     const refreshToken = await this.refreshJwt.signAsync(accessPayload, {
       expiresIn: refreshTtl as unknown as number,
     });

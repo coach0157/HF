@@ -1,5 +1,5 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
-import type { PrismaClient } from '@prisma/client';
+import { AsyncLocalStorage } from "node:async_hooks";
+import type { PrismaClient } from "@prisma/client";
 
 /**
  * Claims decoded from the auth JWT (see spec 3.3: every JWT payload carries
@@ -9,7 +9,7 @@ import type { PrismaClient } from '@prisma/client';
 export interface TenantClaims {
   villageId: string;
   userId: string;
-  role: 'RESIDENT' | 'GUARD' | 'ADMIN';
+  role: "RESIDENT" | "GUARD" | "ADMIN";
   houseId?: string | null;
 }
 
@@ -43,7 +43,8 @@ export interface TenantRequestContext extends TenantClaims {
  * transaction to exist yet.
  */
 export const tenantClaimsStorage = new AsyncLocalStorage<TenantClaims>();
-export const tenantRequestStorage = new AsyncLocalStorage<TenantRequestContext>();
+export const tenantRequestStorage =
+  new AsyncLocalStorage<TenantRequestContext>();
 
 export function getTenantClaims(): TenantClaims | undefined {
   return tenantRequestStorage.getStore() ?? tenantClaimsStorage.getStore();
@@ -63,9 +64,9 @@ export function getTenantPrismaClient<T = PrismaClient>(): T {
   const store = tenantRequestStorage.getStore();
   if (!store) {
     throw new Error(
-      'getTenantPrismaClient() called outside of an RLS-scoped request context. ' +
-        'Every module service must run behind RlsInterceptor (applied globally in AppModule). ' +
-        'If this is intentionally cross-tenant/system code, use PrismaService directly instead.',
+      "getTenantPrismaClient() called outside of an RLS-scoped request context. " +
+        "Every module service must run behind RlsInterceptor (applied globally in AppModule). " +
+        "If this is intentionally cross-tenant/system code, use PrismaService directly instead.",
     );
   }
   return store.tx as T;

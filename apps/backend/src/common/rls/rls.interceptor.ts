@@ -1,8 +1,13 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
-import { Observable, from } from 'rxjs';
-import { lastValueFrom } from 'rxjs';
-import { PrismaService } from '../prisma/prisma.service';
-import { tenantClaimsStorage, tenantRequestStorage } from './tenant-context';
+import {
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  NestInterceptor,
+} from "@nestjs/common";
+import { Observable, from } from "rxjs";
+import { lastValueFrom } from "rxjs";
+import { PrismaService } from "../prisma/prisma.service";
+import { tenantClaimsStorage, tenantRequestStorage } from "./tenant-context";
 
 /**
  * Step 2 of the multi-tenant RLS pattern (step 1 is TenantContextMiddleware).
@@ -61,7 +66,9 @@ export class RlsInterceptor implements NestInterceptor {
         await tx.$executeRaw`SELECT set_config('app.current_user_id', ${claims.userId}, true)`;
         await tx.$executeRaw`SELECT set_config('app.current_role', ${claims.role}, true)`;
 
-        return tenantRequestStorage.run({ ...claims, tx }, () => lastValueFrom(next.handle()));
+        return tenantRequestStorage.run({ ...claims, tx }, () =>
+          lastValueFrom(next.handle()),
+        );
       }),
     );
   }

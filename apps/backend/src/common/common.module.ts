@@ -1,16 +1,16 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
-import { PrismaModule } from './prisma/prisma.module';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
-import { RlsInterceptor } from './rls/rls.interceptor';
-import { HealthController } from './health/health.controller';
-import { AuditModule } from './audit/audit.module';
-import { FileStorageModule } from './storage/file-storage.module';
+import { Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { JwtModule } from "@nestjs/jwt";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ScheduleModule } from "@nestjs/schedule";
+import { PrismaModule } from "./prisma/prisma.module";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { RolesGuard } from "./guards/roles.guard";
+import { RlsInterceptor } from "./rls/rls.interceptor";
+import { HealthController } from "./health/health.controller";
+import { AuditModule } from "./audit/audit.module";
+import { FileStorageModule } from "./storage/file-storage.module";
 
 /**
  * Cross-cutting infrastructure shared by every feature module:
@@ -36,14 +36,17 @@ import { FileStorageModule } from './storage/file-storage.module';
       global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_ACCESS_SECRET'),
+        secret: config.get<string>("JWT_ACCESS_SECRET"),
         // `expiresIn` is typed by @nestjs/jwt as `number | StringValue` (a
         // template-literal type from the `ms` package, e.g. "15m"). An
         // env-driven string can't be narrowed to that type at compile time,
         // so we assert it here; the value itself is still validated at
         // runtime by `ms` when jsonwebtoken signs the token.
         signOptions: {
-          expiresIn: config.get<string>('JWT_ACCESS_EXPIRES_IN', '15m') as unknown as number,
+          expiresIn: config.get<string>(
+            "JWT_ACCESS_EXPIRES_IN",
+            "15m",
+          ) as unknown as number,
         },
       }),
     }),

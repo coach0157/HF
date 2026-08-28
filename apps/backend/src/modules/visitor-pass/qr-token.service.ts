@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { VisitorPassUsageType } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import { VisitorPassUsageType } from "@prisma/client";
 
 export interface QrTokenPayload {
   passId: string;
@@ -28,11 +28,16 @@ export class QrTokenService {
   private readonly jwt: JwtService;
 
   constructor(private readonly config: ConfigService) {
-    this.jwt = new JwtService({ secret: this.config.get<string>('QR_TOKEN_SECRET') });
+    this.jwt = new JwtService({
+      secret: this.config.get<string>("QR_TOKEN_SECRET"),
+    });
   }
 
   sign(payload: QrTokenPayload, validTo: Date): string {
-    const secondsUntilExpiry = Math.max(1, Math.floor((validTo.getTime() - Date.now()) / 1000));
+    const secondsUntilExpiry = Math.max(
+      1,
+      Math.floor((validTo.getTime() - Date.now()) / 1000),
+    );
     return this.jwt.sign(payload, { expiresIn: secondsUntilExpiry });
   }
 

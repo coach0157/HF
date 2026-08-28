@@ -3,14 +3,19 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
-import { Prisma, PrismaClient, VisitorPass, VisitorPassStatus } from '@prisma/client';
-import { getTenantPrismaClient } from '../../common/rls/tenant-context';
-import type { TenantClaims } from '../../common/rls/tenant-context';
-import { AuditService } from '../../common/audit/audit.service';
-import { QrTokenService } from './qr-token.service';
-import { CreateVisitorPassDto } from './dto/create-visitor-pass.dto';
+} from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import {
+  Prisma,
+  PrismaClient,
+  VisitorPass,
+  VisitorPassStatus,
+} from "@prisma/client";
+import { getTenantPrismaClient } from "../../common/rls/tenant-context";
+import type { TenantClaims } from "../../common/rls/tenant-context";
+import { AuditService } from "../../common/audit/audit.service";
+import { QrTokenService } from "./qr-token.service";
+import { CreateVisitorPassDto } from "./dto/create-visitor-pass.dto";
 
 /**
  * Epic 2 — Visitor QR. Owns the `visitor_passes` state machine
@@ -27,18 +32,23 @@ export class VisitorPassService {
     private readonly auditService: AuditService,
   ) {}
 
-  async create(dto: CreateVisitorPassDto, claims: TenantClaims): Promise<VisitorPass> {
+  async create(
+    dto: CreateVisitorPassDto,
+    claims: TenantClaims,
+  ): Promise<VisitorPass> {
     const validFrom = new Date(dto.validFrom);
     const validTo = new Date(dto.validTo);
 
     if (Number.isNaN(validFrom.getTime()) || Number.isNaN(validTo.getTime())) {
-      throw new BadRequestException('validFrom/validTo must be valid ISO date-times');
+      throw new BadRequestException(
+        "validFrom/validTo must be valid ISO date-times",
+      );
     }
     if (validFrom >= validTo) {
-      throw new BadRequestException('validFrom must be before validTo');
+      throw new BadRequestException("validFrom must be before validTo");
     }
     if (validTo.getTime() <= Date.now()) {
-      throw new BadRequestException('validTo must be in the future');
+      throw new BadRequestException("validTo must be in the future");
     }
 
     // Client-generated id so the QR JWT payload (which must embed pass_id)
@@ -71,20 +81,27 @@ export class VisitorPassService {
     const tx = getTenantPrismaClient<PrismaClient>();
     const pass = await tx.visitorPass.findUnique({ where: { id } });
     if (!pass) {
-      throw new NotFoundException('Visitor pass not found');
+      throw new NotFoundException("Visitor pass not found");
     }
 
     const isOwner = pass.createdByUserId === claims.userId;
-    const isAdmin = claims.role === 'ADMIN';
+    const isAdmin = claims.role === "ADMIN";
     if (!isOwner && !isAdmin) {
-      throw new ForbiddenException('You can only revoke your own visitor passes');
+      throw new ForbiddenException(
+        "You can only revoke your own visitor passes",
+      );
     }
 
     if (pass.status === VisitorPassStatus.REVOKED) {
       return pass; // idempotent
     }
-    if (pass.status === VisitorPassStatus.EXITED || pass.status === VisitorPassStatus.EXPIRED) {
-      throw new BadRequestException(`Cannot revoke a pass with status ${pass.status}`);
+    if (
+      pass.status === VisitorPassStatus.EXITED ||
+      pass.status === VisitorPassStatus.EXPIRED
+    ) {
+      throw new BadRequestException(
+        `Cannot revoke a pass with status ${pass.status}`,
+      );
     }
 
     const updated = await tx.visitorPass.update({
@@ -98,10 +115,13 @@ export class VisitorPassService {
     // and not logged (keeps the audit log signal-to-noise usable).
     if (isAdmin && !isOwner) {
       await this.auditService.log({
-        action: 'REVOKE_VISITOR_PASS_OTHER_USER',
-        resourceType: 'visitor_pass',
+        action: "REVOKE_VISITOR_PASS_OTHER_USER",
+        resourceType: "visitor_pass",
         resourceId: id,
-        metadata: { ownerUserId: pass.createdByUserId, visitorName: pass.visitorName },
+        metadata: {
+          ownerUserId: pass.createdByUserId,
+          visitorName: pass.visitorName,
+        },
       });
     }
 
@@ -115,42 +135,51 @@ export class VisitorPassService {
    * runs). Used both by the guard-facing `GET /visitor-passes/:token`
    * endpoint and internally by EntryLogModule.
    */
-  async resolveForScan(token: string, claims: TenantClaims): Promise<VisitorPass> {
+  async resolveForScan(
+    token: string,
+    claims: TenantClaims,
+  ): Promise<VisitorPass> {
     let payload: { passId: string; villageId: string };
     try {
       payload = this.qrToken.verify(token);
     } catch {
-      throw new ForbiddenException('QR code is invalid or expired');
+      throw new ForbiddenException("QR code is invalid or expired");
     }
 
     if (payload.villageId !== claims.villageId) {
       // Cross-village QR — RLS would return nothing for the lookup below
       // anyway, but fail fast with a clear signal instead of a generic 404.
-      throw new NotFoundException('Visitor pass not found');
+      throw new NotFoundException("Visitor pass not found");
     }
 
     const tx = getTenantPrismaClient<PrismaClient>();
-    let pass = await tx.visitorPass.findUnique({ where: { id: payload.passId } });
+    let pass = await tx.visitorPass.findUnique({
+      where: { id: payload.passId },
+    });
     if (!pass || pass.qrToken !== token) {
-      throw new NotFoundException('Visitor pass not found');
+      throw new NotFoundException("Visitor pass not found");
     }
 
     if (pass.status === VisitorPassStatus.REVOKED) {
-      throw new ForbiddenException('This QR code has been revoked');
+      throw new ForbiddenException("This QR code has been revoked");
     }
 
     const now = new Date();
-    if (now > pass.validTo && pass.status !== VisitorPassStatus.EXPIRED && pass.status !== VisitorPassStatus.EXITED) {
+    if (
+      now > pass.validTo &&
+      pass.status !== VisitorPassStatus.EXPIRED &&
+      pass.status !== VisitorPassStatus.EXITED
+    ) {
       pass = await tx.visitorPass.update({
         where: { id: pass.id },
         data: { status: VisitorPassStatus.EXPIRED },
       });
     }
     if (pass.status === VisitorPassStatus.EXPIRED) {
-      throw new ForbiddenException('This QR code has expired');
+      throw new ForbiddenException("This QR code has expired");
     }
     if (now < pass.validFrom) {
-      throw new ForbiddenException('This QR code is not valid yet');
+      throw new ForbiddenException("This QR code is not valid yet");
     }
 
     return pass;
@@ -174,7 +203,13 @@ export class VisitorPassService {
     return {
       pass,
       host: host
-        ? { id: host.id, name: host.name, phone: host.phone, houseNo: host.house?.houseNo ?? null, zone: host.house?.zone ?? null }
+        ? {
+            id: host.id,
+            name: host.name,
+            phone: host.phone,
+            houseNo: host.house?.houseNo ?? null,
+            zone: host.house?.zone ?? null,
+          }
         : null,
     };
   }
@@ -192,18 +227,33 @@ export class VisitorPassService {
    */
   async markEntered(passId: string): Promise<VisitorPass> {
     const tx = getTenantPrismaClient<PrismaClient>();
-    const pass = await tx.visitorPass.findUniqueOrThrow({ where: { id: passId } });
+    const pass = await tx.visitorPass.findUniqueOrThrow({
+      where: { id: passId },
+    });
 
     if (pass.status === VisitorPassStatus.UNUSED) {
-      return tx.visitorPass.update({ where: { id: passId }, data: { status: VisitorPassStatus.ENTERED } });
+      return tx.visitorPass.update({
+        where: { id: passId },
+        data: { status: VisitorPassStatus.ENTERED },
+      });
     }
-    if (pass.status === VisitorPassStatus.EXITED && pass.usageType === 'MULTI') {
-      return tx.visitorPass.update({ where: { id: passId }, data: { status: VisitorPassStatus.ENTERED } });
+    if (
+      pass.status === VisitorPassStatus.EXITED &&
+      pass.usageType === "MULTI"
+    ) {
+      return tx.visitorPass.update({
+        where: { id: passId },
+        data: { status: VisitorPassStatus.ENTERED },
+      });
     }
     if (pass.status === VisitorPassStatus.EXITED) {
-      throw new BadRequestException('This single-use pass has already been used');
+      throw new BadRequestException(
+        "This single-use pass has already been used",
+      );
     }
-    throw new BadRequestException(`Cannot mark pass as entered from status ${pass.status}`);
+    throw new BadRequestException(
+      `Cannot mark pass as entered from status ${pass.status}`,
+    );
   }
 
   /** Transitions a pass ENTERED -> EXITED. Called only from confirm-exit. */
@@ -245,7 +295,7 @@ export class VisitorPassService {
     return tx.visitorPass.findMany({
       where,
       select: { id: true, qrToken: true, status: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 }

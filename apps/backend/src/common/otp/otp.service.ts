@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { randomInt } from 'node:crypto';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { randomInt } from "node:crypto";
 
 interface OtpEntry {
   code: string;
@@ -32,12 +32,18 @@ export class OtpService {
   private readonly maxAttempts = 5;
 
   constructor(private readonly config: ConfigService) {
-    this.ttlMs = Number(this.config.get<string>('OTP_TTL_SECONDS', '300')) * 1000;
+    this.ttlMs =
+      Number(this.config.get<string>("OTP_TTL_SECONDS", "300")) * 1000;
   }
 
   async requestOtp(phone: string): Promise<void> {
-    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-    this.store.set(phone, { code, expiresAt: Date.now() + this.ttlMs, attempts: 0, consumed: false });
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    this.store.set(phone, {
+      code,
+      expiresAt: Date.now() + this.ttlMs,
+      attempts: 0,
+      consumed: false,
+    });
     await this.sendViaProvider(phone, code);
   }
 
@@ -64,9 +70,11 @@ export class OtpService {
       return false;
     }
 
-    const devBypass = this.config.get<string>('OTP_DEV_BYPASS_CODE');
-    const isDev = this.config.get<string>('NODE_ENV', 'development') !== 'production';
-    const matches = entry.code === code || (isDev && devBypass && code === devBypass);
+    const devBypass = this.config.get<string>("OTP_DEV_BYPASS_CODE");
+    const isDev =
+      this.config.get<string>("NODE_ENV", "development") !== "production";
+    const matches =
+      entry.code === code || (isDev && devBypass && code === devBypass);
     if (!matches) return false;
 
     entry.consumed = true;
@@ -75,15 +83,18 @@ export class OtpService {
   }
 
   private async sendViaProvider(phone: string, code: string): Promise<void> {
-    const provider = this.config.get<string>('OTP_PROVIDER', 'mock');
-    if (provider === 'mock') {
-      // eslint-disable-next-line no-console
-      this.logger.log(`[mock OTP] phone=${phone} code=${code} (dev only — never do this in prod)`);
+    const provider = this.config.get<string>("OTP_PROVIDER", "mock");
+    if (provider === "mock") {
+      this.logger.log(
+        `[mock OTP] phone=${phone} code=${code} (dev only — never do this in prod)`,
+      );
       return;
     }
     // TODO(Dev agent / future): wire a real SMS gateway here (spec 3.1
     // doesn't mandate a specific vendor for MVP). Throwing rather than
     // silently no-op'ing so a misconfigured OTP_PROVIDER fails loudly.
-    throw new Error(`Unsupported OTP_PROVIDER "${provider}" — only "mock" is implemented`);
+    throw new Error(
+      `Unsupported OTP_PROVIDER "${provider}" — only "mock" is implemented`,
+    );
   }
 }

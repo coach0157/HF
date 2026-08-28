@@ -1,10 +1,10 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
-import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { randomUUID } from "node:crypto";
+import { promises as fs } from "node:fs";
+import * as path from "node:path";
 
-export type PhotoBucket = 'entry-logs' | 'sensitive-id';
+export type PhotoBucket = "entry-logs" | "sensitive-id";
 
 /**
  * Spec 3.4: "แยกนโยบายเก็บข้อมูลภาพบัตรประชาชน/ทะเบียนรถออกจากประวัติเข้า-ออกทั่วไป" —
@@ -33,10 +33,16 @@ export class FileStorageService {
   private readonly bucketNames: Record<PhotoBucket, string>;
 
   constructor(private readonly config: ConfigService) {
-    this.rootDir = path.resolve(process.cwd(), 'uploads');
+    this.rootDir = path.resolve(process.cwd(), "uploads");
     this.bucketNames = {
-      'entry-logs': this.config.get<string>('S3_BUCKET_ENTRY_LOGS', 'village-entry-logs'),
-      'sensitive-id': this.config.get<string>('S3_BUCKET_SENSITIVE_ID', 'village-sensitive-id-photos'),
+      "entry-logs": this.config.get<string>(
+        "S3_BUCKET_ENTRY_LOGS",
+        "village-entry-logs",
+      ),
+      "sensitive-id": this.config.get<string>(
+        "S3_BUCKET_SENSITIVE_ID",
+        "village-sensitive-id-photos",
+      ),
     };
   }
 
@@ -48,7 +54,11 @@ export class FileStorageService {
    * but nothing downstream should assume the string is directly fetchable
    * in this local dev implementation.
    */
-  async savePhoto(bucket: PhotoBucket, villageId: string, dataUrl: string): Promise<string> {
+  async savePhoto(
+    bucket: PhotoBucket,
+    villageId: string,
+    dataUrl: string,
+  ): Promise<string> {
     const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl);
     if (!match) {
       throw new BadRequestException(
@@ -56,12 +66,12 @@ export class FileStorageService {
       );
     }
     const [, mime, base64Data] = match;
-    const ext = mime.split('/')[1]?.replace('jpeg', 'jpg') || 'bin';
+    const ext = mime.split("/")[1]?.replace("jpeg", "jpg") || "bin";
     const filename = `${randomUUID()}.${ext}`;
     const dir = path.join(this.rootDir, this.bucketNames[bucket], villageId);
     await fs.mkdir(dir, { recursive: true });
     const filePath = path.join(dir, filename);
-    await fs.writeFile(filePath, Buffer.from(base64Data, 'base64'));
+    await fs.writeFile(filePath, Buffer.from(base64Data, "base64"));
 
     const ref = `local://${this.bucketNames[bucket]}/${villageId}/${filename}`;
     this.logger.debug(`Saved photo to ${filePath} (ref=${ref})`);
@@ -76,7 +86,9 @@ export class FileStorageService {
     // Bucket folder name is looked up by value, not trusted from the ref,
     // to avoid path traversal via a crafted photo_url.
     const bucketFolder = match[1];
-    const knownFolder = Object.values(this.bucketNames).includes(bucketFolder) ? bucketFolder : null;
+    const knownFolder = Object.values(this.bucketNames).includes(bucketFolder)
+      ? bucketFolder
+      : null;
     if (!knownFolder) return null;
     return path.join(this.rootDir, knownFolder, villageId, filename);
   }
@@ -87,8 +99,10 @@ export class FileStorageService {
     try {
       await fs.unlink(filePath);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-        this.logger.warn(`Failed to delete ${filePath}: ${(err as Error).message}`);
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+        this.logger.warn(
+          `Failed to delete ${filePath}: ${(err as Error).message}`,
+        );
       }
     }
   }
@@ -101,13 +115,13 @@ export class FileStorageService {
    * retention instead and are NOT cleaned up by this method.
    */
   async listStaleSensitivePhotos(maxAgeMs: number): Promise<string[]> {
-    const bucketDir = path.join(this.rootDir, this.bucketNames['sensitive-id']);
+    const bucketDir = path.join(this.rootDir, this.bucketNames["sensitive-id"]);
     const refs: string[] = [];
     let villageDirs: string[];
     try {
       villageDirs = await fs.readdir(bucketDir);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
       throw err;
     }
 
@@ -119,7 +133,9 @@ export class FileStorageService {
         const filePath = path.join(villageDir, filename);
         const stat = await fs.stat(filePath).catch(() => null);
         if (stat && now - stat.mtimeMs > maxAgeMs) {
-          refs.push(`local://${this.bucketNames['sensitive-id']}/${villageId}/${filename}`);
+          refs.push(
+            `local://${this.bucketNames["sensitive-id"]}/${villageId}/${filename}`,
+          );
         }
       }
     }

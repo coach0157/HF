@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import type { Prisma, PrismaClient } from '@prisma/client';
-import { getTenantClaims, getTenantPrismaClient } from '../rls/tenant-context';
+import { Injectable, Logger } from "@nestjs/common";
+import type { Prisma, PrismaClient } from "@prisma/client";
+import { getTenantClaims, getTenantPrismaClient } from "../rls/tenant-context";
 
 export interface AuditLogInput {
   action: string;
@@ -48,7 +48,8 @@ export class AuditService {
         action: input.action,
         resourceType: input.resourceType,
         resourceId: input.resourceId ?? null,
-        metadata: (input.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
+        metadata:
+          (input.metadata as Prisma.InputJsonValue | undefined) ?? undefined,
         ipAddress: input.ipAddress ?? null,
       },
     });

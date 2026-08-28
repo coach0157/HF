@@ -1,10 +1,10 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-import { AuthService } from './auth.service';
-import { RequestOtpDto } from './dto/request-otp.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshDto } from './dto/refresh.dto';
-import { Public } from '../../common/decorators/public.decorator';
+import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
+import { AuthService } from "./auth.service";
+import { RequestOtpDto } from "./dto/request-otp.dto";
+import { LoginDto } from "./dto/login.dto";
+import { RefreshDto } from "./dto/refresh.dto";
+import { Public } from "../../common/decorators/public.decorator";
 
 /**
  * `POST /auth/login` in spec 3.3 is documented as a single "phone + OTP"
@@ -16,7 +16,7 @@ import { Public } from '../../common/decorators/public.decorator';
  * access token (not @Public()) since only an authenticated caller should be
  * able to revoke a refresh token.
  */
-@Controller('auth')
+@Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -25,7 +25,7 @@ export class AuthController {
   // request is the classic SMS-pumping abuse target (spec 3.4's rate-limit
   // concern extends here even though it's written explicitly only for SOS).
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @Post('otp/request')
+  @Post("otp/request")
   @HttpCode(HttpStatus.NO_CONTENT)
   async requestOtp(@Body() dto: RequestOtpDto): Promise<void> {
     await this.authService.requestOtp(dto.phone);
@@ -33,18 +33,18 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @Post('login')
+  @Post("login")
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto.phone, dto.otp, dto.villageId);
   }
 
   @Public()
-  @Post('refresh')
+  @Post("refresh")
   async refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);
   }
 
-  @Post('logout')
+  @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Body() dto: RefreshDto): Promise<void> {
     await this.authService.logout(dto.refreshToken);

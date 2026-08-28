@@ -1,6 +1,6 @@
-import { Controller, Get } from '@nestjs/common';
-import { Public } from '../decorators/public.decorator';
-import { PrismaService } from '../prisma/prisma.service';
+import { Controller, Get } from "@nestjs/common";
+import { Public } from "../decorators/public.decorator";
+import { PrismaService } from "../prisma/prisma.service";
 
 /**
  * Plain infra health check — not part of any spec module. Useful for
@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
  * directly) since it just needs to prove the DB connection works, not read
  * tenant data.
  */
-@Controller('health')
+@Controller("health")
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -17,6 +17,6 @@ export class HealthController {
   @Get()
   async check() {
     await this.prisma.$queryRaw`SELECT 1`;
-    return { status: 'ok', db: 'connected' };
+    return { status: "ok", db: "connected" };
   }
 }

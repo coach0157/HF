@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { VisitorPassModule } from '../visitor-pass/visitor-pass.module';
-import { EntryLogController } from './entry-log.controller';
-import { EntryLogService } from './entry-log.service';
-import { SensitivePhotoCleanupService } from './sensitive-photo-cleanup.service';
+import { Module } from "@nestjs/common";
+import { VisitorPassModule } from "../visitor-pass/visitor-pass.module";
+import { EntryLogController } from "./entry-log.controller";
+import { EntryLogService } from "./entry-log.service";
+import { SensitivePhotoCleanupService } from "./sensitive-photo-cleanup.service";
 
 /**
  * Epic 2 — Entry/Exit Log (scan + manual). See MVP_BACKLOG.md Epic 2 and

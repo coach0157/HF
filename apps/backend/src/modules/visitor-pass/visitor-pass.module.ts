@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common';
-import { VisitorPassController } from './visitor-pass.controller';
-import { VisitorPassService } from './visitor-pass.service';
-import { QrTokenService } from './qr-token.service';
+import { Module } from "@nestjs/common";
+import { VisitorPassController } from "./visitor-pass.controller";
+import { VisitorPassService } from "./visitor-pass.service";
+import { QrTokenService } from "./qr-token.service";
 
 /**
  * Epic 2 — Visitor QR + Entry/Exit Log. See MVP_BACKLOG.md Epic 2 and spec

@@ -1,4 +1,4 @@
-import { getTenantClaims } from '../rls/tenant-context';
+import { getTenantClaims } from "../rls/tenant-context";
 
 /**
  * Shared helper for the per-account (not blanket per-IP) rate limits spec
@@ -18,7 +18,7 @@ export function perUserThrottle(limit: number, ttlMs: number) {
     default: {
       limit,
       ttl: ttlMs,
-      getTracker: async () => getTenantClaims()?.userId ?? 'anonymous',
+      getTracker: async () => getTenantClaims()?.userId ?? "anonymous",
     },
   };
 }

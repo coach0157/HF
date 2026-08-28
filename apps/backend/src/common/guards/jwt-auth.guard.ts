@@ -1,7 +1,12 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { getTenantClaims } from '../rls/tenant-context';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { getTenantClaims } from "../rls/tenant-context";
 
 /**
  * Rejects any request that doesn't carry a validly-signed JWT, UNLESS the
@@ -29,7 +34,7 @@ export class JwtAuthGuard implements CanActivate {
 
     const claims = getTenantClaims();
     if (!claims) {
-      throw new UnauthorizedException('Missing or invalid access token');
+      throw new UnauthorizedException("Missing or invalid access token");
     }
     return true;
   }

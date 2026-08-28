@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsNumber, IsOptional, Max, Min } from "class-validator";
 
 /**
  * `house_id` is deliberately NOT a client-supplied field — like `village_id`

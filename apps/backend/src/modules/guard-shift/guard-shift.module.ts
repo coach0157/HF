@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { GuardShiftController } from './guard-shift.controller';
-import { GuardShiftService } from './guard-shift.service';
+import { Module } from "@nestjs/common";
+import { GuardShiftController } from "./guard-shift.controller";
+import { GuardShiftService } from "./guard-shift.service";
 
 /**
  * Epic 4/5 — Guard shift management (on_duty/off_duty toggle). See
