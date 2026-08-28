@@ -7,6 +7,7 @@ import { EntryLogModule } from "./modules/entry-log/entry-log.module";
 import { AnnouncementModule } from "./modules/announcement/announcement.module";
 import { SosModule } from "./modules/sos/sos.module";
 import { GuardShiftModule } from "./modules/guard-shift/guard-shift.module";
+import { HouseModule } from "./modules/house/house.module";
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { GuardShiftModule } from "./modules/guard-shift/guard-shift.module";
     AnnouncementModule,
     SosModule,
     GuardShiftModule,
+    HouseModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -13,6 +13,7 @@ import {
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
 import { CreateAnnouncementDto } from "./dto/create-announcement.dto";
+import { UpdateAnnouncementDto } from "./dto/update-announcement.dto";
 
 /**
  * Epic 3 — Announcement. See MVP_BACKLOG.md Epic 3 and spec 2.2/3.3.
@@ -191,5 +192,86 @@ export class AnnouncementService {
         userId: claims.userId,
       },
     });
+  }
+
+  /**
+   * Dev-agent addition (see announcement.controller.ts's PATCH doc comment).
+   * Re-validates targetScope/targetZone/targetHouseIds the same way create()
+   * does when those fields are part of the update, and replaces the
+   * AnnouncementTarget rows wholesale when targetHouseIds is supplied
+   * (simpler and safer than a diff for MVP's low write-volume).
+   */
+  async update(
+    id: string,
+    dto: UpdateAnnouncementDto,
+    claims: TenantClaims,
+  ) {
+    const tx = getTenantPrismaClient<PrismaClient>();
+    const existing = await tx.announcement.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Announcement not found");
+    }
+
+    const nextScope = dto.targetScope ?? existing.targetScope;
+    if (nextScope === AnnouncementTargetScope.ZONE) {
+      const zone = dto.targetZone ?? existing.targetZone;
+      if (!zone) {
+        throw new BadRequestException(
+          "targetZone is required when targetScope is ZONE",
+        );
+      }
+    }
+    if (
+      nextScope === AnnouncementTargetScope.HOUSE &&
+      !dto.targetHouseIds &&
+      dto.targetScope // only require it when the caller is switching TO house scope
+    ) {
+      throw new BadRequestException(
+        "targetHouseIds is required when targetScope is HOUSE",
+      );
+    }
+
+    const announcement = await tx.announcement.update({
+      where: { id },
+      data: {
+        title: dto.title,
+        content: dto.content,
+        level: dto.level,
+        targetScope: dto.targetScope,
+        targetZone:
+          dto.targetScope === undefined
+            ? undefined
+            : dto.targetScope === AnnouncementTargetScope.ZONE
+              ? (dto.targetZone ?? existing.targetZone)
+              : null,
+        imageUrl: dto.imageUrl,
+      },
+    });
+
+    if (dto.targetHouseIds) {
+      await tx.announcementTarget.deleteMany({
+        where: { announcementId: id },
+      });
+      await tx.announcementTarget.createMany({
+        data: dto.targetHouseIds.map((houseId) => ({
+          villageId: claims.villageId,
+          announcementId: id,
+          houseId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    return announcement;
+  }
+
+  /** Cascades to announcement_reads/announcement_targets via FK onDelete. */
+  async remove(id: string): Promise<void> {
+    const tx = getTenantPrismaClient<PrismaClient>();
+    const existing = await tx.announcement.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException("Announcement not found");
+    }
+    await tx.announcement.delete({ where: { id } });
   }
 }
