@@ -47,12 +47,14 @@ export class SosService {
       select: { guardUserId: true },
     });
 
-    // TODO(Dev agent, future): real-time delivery (WebSocket or FCM push) to
-    // routedToGuardUserIds. Not implemented here — no FCM credentials
-    // (.env.example's FCM_* vars are blank) or WebSocket gateway exist in
-    // this MVP/dev environment; documented gap rather than a fake stub.
-    // Routing itself (deciding WHO gets notified) is fully implemented and
-    // independently testable/verifiable via this method's return value.
+    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
+    // push to routedToGuardUserIds via the shared `PushNotificationService`
+    // (src/common/push/, not yet implemented — Epic 11 is at the
+    // planning/schema stage; see PHASE2_BACKLOG.md Epic 11), fire-and-forget
+    // per ADR-006 (never make an on-duty guard's alert wait on a push
+    // vendor's API — see ADR-006's SOS-specific reasoning). Routing itself
+    // (deciding WHO gets notified) is fully implemented and independently
+    // testable/verifiable via this method's return value.
     //
     // TODO(Dev agent, future): optional neighbor notification within a
     // configurable radius (spec 2.2, haversine over houses.latitude/

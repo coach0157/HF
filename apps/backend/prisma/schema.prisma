@@ -185,6 +185,7 @@ model Village {
   bills                     Bill[]
   auditLogs                 AuditLog[]
   refreshTokens             RefreshToken[]
+  pushTokens                PushToken[]
 
   @@map("villages")
 }
@@ -223,6 +224,7 @@ model User {
   bookings               Booking[]
   auditLogs              AuditLog[]
   refreshTokens          RefreshToken[]
+  pushTokens             PushToken[]
 
   // Same phone number cannot be registered twice within the same village.
   // (A person living in two different villages could reuse a phone number —
@@ -688,6 +690,45 @@ model RefreshToken {
   @@index([villageId, userId])
   @@index([tokenHash])
   @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Push notification tokens (Phase 2, Epic 11 — see docs/ARCHITECTURE.md
+// ADR-006 for the full decision: Expo Push Notification Service, not raw
+// FCM, because apps/mobile already depends on `expo-notifications` and Expo
+// Push works unmodified with Expo Go (no native FCM/APNs credentials needed
+// from this project until an EAS standalone build is produced). One row per
+// (user, device) — a user can be logged in on more than one phone (e.g. a
+// resident's old and new phone, or two household members sharing one
+// account is explicitly NOT assumed; this is per *device* registration, not
+// per household).
+// ---------------------------------------------------------------------------
+
+model PushToken {
+  id            String   @id @default(uuid()) @db.Uuid
+  villageId     String   @map("village_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  // Expo's `ExponentPushToken[...]` string (from `expo-notifications`'s
+  // `getExpoPushTokenAsync()`) — NOT a raw FCM/APNs device token. Expo's
+  // push service resolves this to the right platform-native transport
+  // itself; the backend never talks to FCM/APNs directly (ADR-006).
+  expoPushToken String   @map("expo_push_token")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A given device's token can only be registered once per user — re-login
+  // on the same device re-registers the same token (upsert on this key, not
+  // a fresh row every time). Deliberately NOT globally unique on
+  // `expoPushToken` alone: if a stale token is reused by Expo across an
+  // uninstall/reinstall onto a *different* account, both rows are allowed to
+  // exist simultaneously rather than the second registration erroring — a
+  // background send-failure sweep (Dev-agent TODO, see ADR-006) is what
+  // actually prunes dead tokens, not a uniqueness constraint at write time.
+  @@unique([userId, expoPushToken])
+  @@index([villageId])
+  @@map("push_tokens")
 }
 
 // ---------------------------------------------------------------------------

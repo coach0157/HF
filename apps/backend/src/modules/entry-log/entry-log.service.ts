@@ -104,13 +104,15 @@ export class EntryLogService {
 
     await this.visitorPassService.markEntered(pass.id);
 
-    // TODO(Dev agent, future): FCM push to `host` within ~3s of a
-    // successful scan-in (soft target, spec 2.1). Not implemented here —
-    // FCM_PROJECT_ID/FCM_SERVICE_ACCOUNT_JSON are blank in this MVP/dev
-    // environment (see .env.example), so this is a documented gap rather
-    // than a stub pretending to send. When wired, call it AFTER this
+    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
+    // push to `host` within ~3s of a successful scan-in (soft target, spec
+    // 2.1), via the shared `PushNotificationService` (src/common/push/, not
+    // yet implemented — Epic 11 is at the planning/schema stage; see
+    // PHASE2_BACKLOG.md Epic 11). Not implemented here — documented gap
+    // rather than a stub pretending to send. When wired, call it AFTER this
     // transaction resolves (RlsInterceptor's documented trade-off: don't
-    // hold the request transaction open across a slow external call).
+    // hold the request transaction open across a slow external call), and
+    // fire-and-forget per ADR-006 (don't await it on this response path).
 
     return { entryLog, alreadyEntered: false };
   }

@@ -3,11 +3,14 @@
 Status: backend + admin-web scaffold complete and validated against a real
 PostgreSQL instance (see "Validated during scaffolding" in §6); mobile
 (`apps/mobile`) scaffolded and typecheck-validated in a later round (§7) —
-screens are TODO stubs, not yet implemented. Phase 2 (Chat, Maintenance,
-Transport Directory — §8) is at the **planning/schema stage**: architecture
-decisions are made, `schema.prisma` is updated and migrated against a real
-local Postgres, but no module code (controller/service/DTO) or UI exists yet
-— that's the next Dev agent's work, scoped in
+screens are TODO stubs, not yet implemented. Phase 2's Chat/Maintenance/
+Transport Directory (Epics 8-10, §8) and Push Notifications (Epic 11, §9,
+added after the user requested it once Epic 8-10 were done and tested) each
+went through their own planning/schema round before implementation: for each,
+architecture decisions are made and `schema.prisma` is updated and migrated
+against a real local Postgres in the planning round, with module code
+(controller/service/DTO) and UI following in a subsequent Dev-agent round —
+task breakdown for both in
 [`PHASE2_BACKLOG.md`](./PHASE2_BACKLOG.md). Source of truth for product
 scope: [`village-security-app-spec.md`](../village-security-app-spec.md).
 Source of truth for MVP task breakdown: [`MVP_BACKLOG.md`](./MVP_BACKLOG.md).
@@ -732,3 +735,250 @@ run build` (root — `build:backend` + `build:admin`) both succeed with no
 TypeScript errors; `npm run typecheck:mobile` also still passes (mobile
 doesn't reference any Phase 2 model yet, but confirms the workspace-wide
 dependency graph wasn't perturbed).
+
+---
+
+## 9. Push Notifications (Epic 11) — planning + schema round
+
+Status: **planning + schema only**, done in this round, requested by the user
+after Epic 8-10 (chat/maintenance/transport directory) were already
+implemented and tested. No `src/common/push/` exists yet — this section gives
+a Dev agent the architecture decisions and the already-migrated schema to
+build against. Task breakdown:
+[`PHASE2_BACKLOG.md`](./PHASE2_BACKLOG.md) Epic 11.
+
+**The gap this closes:** every trigger that should send a push has had its
+*routing logic* (deciding WHO gets notified) fully implemented since MVP —
+only the *transport* (actually delivering to a device) was ever a stub. Four
+call sites, three of them pre-existing TODOs, one newly added:
+
+| Trigger | File / method | Recipients already resolved as |
+|---|---|---|
+| QR scan-in | `entry-log.service.ts`'s `createFromQr()` | `host` (the pass's `createdByUserId`) |
+| SOS | `sos.service.ts`'s `trigger()` | `routedToGuardUserIds` (on-duty guards only) |
+| Announcement | `announcement.service.ts`'s `create()` | `recipientUserIds` (target-scope resolved) |
+| Chat message | `chat.gateway.ts`'s `onSendMessage()` | every `ChatParticipant` of the room except the sender — **new in this round**, no prior TODO (chat itself postdates the original push-gap reports) |
+
+SMS fallback for emergency-level announcements (spec 2.2) is explicitly
+**not** addressed here — it stays the same pre-existing, separately-tracked
+gap it always was; this round is push-only, per the user's explicit scope.
+
+### ADR-006 — Push transport: Expo Push Notification Service, not raw FCM
+
+**Decision:** `expo-server-sdk-node` on the backend (new dependency, added to
+`apps/backend/package.json` when a Dev agent implements Epic 11 — not
+installed in this planning round, same precedent as ADR-004 documenting
+`socket.io`'s versions before Epic 8 actually installed them) talks to
+Expo's push service, which in turn talks to FCM/APNs on Expo's
+infrastructure. `apps/mobile` already depends on `expo-notifications` (added
+during the mobile scaffold, §7's "Validated during this scaffolding round")
+and calls `getExpoPushTokenAsync()` to obtain an `ExponentPushToken[...]`
+string — the backend never talks to FCM or APNs directly, and never needs a
+Firebase project, service-account JSON, or APNs certificate of its own.
+
+**Why not raw FCM** (spec 3.1 names FCM as the recommended push provider,
+and `.env.example` has reserved `FCM_PROJECT_ID`/`FCM_SERVICE_ACCOUNT_JSON`
+since the MVP round for exactly this): those two env vars were always blank
+placeholders — no Dev agent ever actually obtained Firebase credentials,
+because doing so requires the *user* to create a Firebase project and hand
+over a service-account key, which was never available at any point in this
+build. Expo Push sidesteps that entirely: `apps/mobile` is built with Expo
+managed workflow (ADR-003) and runs under Expo Go during development, and
+Expo's own push infrastructure works against an Expo Go install with zero
+FCM/APNs credentials configured anywhere in this project — a Dev agent can
+implement and manually test all four triggers today, without waiting on the
+user to produce a Firebase account. `FCM_PROJECT_ID`/`FCM_SERVICE_ACCOUNT_JSON`
+are removed from `.env.example` in this round, replaced by an optional
+`EXPO_ACCESS_TOKEN` (Expo's enhanced-security push token, not required for
+Expo Go or this project's current scale — see
+[Expo's push notification docs](https://docs.expo.dev/push-notifications/overview/)
+for when it becomes necessary).
+
+**Revisit when:** the app is built as a standalone EAS build (no longer
+running under Expo Go) — Expo Push still works unmodified for standalone
+builds (Expo/EAS handles the underlying FCM/APNs credentials as part of the
+build config, not this backend), so this is not expected to force a
+transport change, only an EAS-side configuration step outside this repo. If
+a future requirement needs push delivery Expo's service can't provide (e.g.
+very high-volume/low-latency guarantees beyond what Expo's service offers),
+that would be the trigger to reconsider raw FCM — no such requirement exists
+today.
+
+### ADR-006 (cont'd) — Fire-and-forget, not awaited, at all four call sites
+
+**Decision:** every call to `PushNotificationService.send(...)` runs
+**after** the request's RLS-scoped transaction has already committed (§3.3's
+documented trade-off: don't hold the transaction open across a slow external
+call), and its own promise is not awaited by the response path — the HTTP
+response (or, for chat, the WS ack/broadcast) returns as soon as the
+database write is durable, before Expo's API call resolves. `send()` itself
+swallows/logs any failure (bad token, Expo API timeout, partial batch
+failure) rather than throwing.
+
+**Why fire-and-forget for all four, including SOS (life-safety, the
+strongest case FOR awaiting):** the temptation is to treat SOS differently —
+surely the most critical trigger should be the *most* guaranteed to have
+sent before the resident is told "your SOS was recorded"? The reasoning that
+rejects this: the resident's confirmation should mean "the alert is
+durably recorded and on-duty guards have been *routed*" (an already-committed
+DB row + a correctly-resolved `routedToGuardUserIds` list — both true the
+instant the transaction commits), not "a third-party push vendor's API call
+finished." Making the response wait on Expo's network round-trip would mean
+a slow or degraded Expo API turns an already-successful, already-durable SOS
+trigger into a slow or apparently-failed one from the resident's point of
+view — exactly backwards for the one endpoint spec 3.4 explicitly says must
+never be the bottleneck ("SOS/emergency endpoint ต้องมี rate-limit... แต่ไม่
+บล็อกจนทำให้เหตุฉุกเฉินจริงส่งไม่ทัน" — the same "don't block a real
+emergency" principle that motivated the rate-limit design applies equally to
+any other synchronous dependency on the response path, push included). The
+push notification is a best-effort *acceleration* of guard response time
+(the guard app's SOS list, polled or WebSocket-delivered per Epic 7/8, is
+the actual source of truth a guard's UI relies on) — not the mechanism that
+makes the alert "real." The same logic applies to the other three triggers,
+which have progressively weaker cases for awaiting: a delayed "guest
+arrived" push is inconvenient, not unsafe; a delayed announcement push
+matters less than the read-receipt/feed already being correct; a delayed
+chat push is the least time-sensitive of all (the message itself already
+delivered in real time to any open socket via `new_message`'s broadcast —
+push only covers the backgrounded-app case).
+
+**Consequence a Dev agent must design for:** because nothing awaits
+`send()`, a failure is invisible to the caller by construction. `push-
+notification.service.ts` must log every failure (chunk-level and, once Expo
+receipts are polled, token-level) at a severity that's actually monitored —
+this is a deliberate trade "response speed and endpoint robustness" for "a
+push failure needs its own observability path, not a thrown exception,"
+which is the same class of trade `RlsInterceptor`'s slow-external-call note
+(§3.3) already accepts for other external calls.
+
+### ADR-006 (cont'd) — Deep-link data schema
+
+**Decision:** every push notification's `data` payload (Expo's
+`sendPushNotificationsAsync()` accepts a JS object for this field
+unmodified) carries exactly:
+
+```ts
+{ type: "entry" | "sos" | "announcement" | "chat", id: string }
+```
+
+`type` names which of the four triggers produced the notification; `id` is
+that trigger's own primary key (`EntryLog.id`, `SosAlert.id`,
+`Announcement.id`, `ChatRoom.id` for chat — the room, not the individual
+`ChatMessage`, since tapping a chat push should open the conversation, not
+try to scroll to one message). `apps/mobile`'s
+`Notifications.addNotificationResponseReceivedListener()` handler (Dev-agent
+TODO, PHASE2_BACKLOG.md Epic 11) is the single place that switches on `type`
+and calls `navigation.navigate(...)` into the matching screen
+(`EntryHistoryScreen`, the Guard app's SOS list, `AnnouncementDetailScreen`,
+the chat room screen) — one small, exhaustively-typed union rather than a
+free-form string, so a Dev agent adding a fifth trigger later is forced to
+extend this type (and the switch statement) rather than silently inventing
+an ad hoc shape that the navigation handler doesn't know how to route.
+
+**Why `id` alone, not a richer payload (e.g. embedding `visitorName` or
+`houseNo` directly):** Expo push payloads have a real size ceiling and are
+delivered over the public internet to the OS-level push service — the
+payload should be the minimum needed to route, with the receiving screen
+re-fetching full detail from the same REST endpoint it would use anyway
+(`GET /entry-logs/:id`-equivalent, `GET /sos-alerts` filtered, etc.) via the
+already-authenticated `lib/api.ts` client, which also guarantees the
+displayed data is RLS-fresh (a push payload embedding stale data at
+send-time could theoretically outlive a since-changed record — the
+`{type, id}` + re-fetch pattern avoids that class of bug entirely).
+
+### 9.1 Schema: new `PushToken` model
+
+```prisma
+model PushToken {
+  id            String   @id @default(uuid()) @db.Uuid
+  villageId     String   @map("village_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  expoPushToken String   @map("expo_push_token")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, expoPushToken])
+  @@index([villageId])
+  @@map("push_tokens")
+}
+```
+
+- **One row per (user, device)**, not one row per user — spec doesn't
+  literally ask for multi-device support, but a resident switching phones
+  (or genuinely owning two) losing notifications on their old device the
+  moment they set up a new one, or vice versa, is an obvious real-world
+  failure mode a single-token-per-user design would hit immediately. Unique
+  on `(userId, expoPushToken)` so a re-login on the *same* device upserts
+  the existing row rather than accumulating duplicates.
+- **Deliberately not unique on `expoPushToken` alone.** A token could in
+  principle be reused by Expo across an uninstall/reinstall onto a different
+  account on the same physical device; rather than a write-time uniqueness
+  error (which would require deciding, at registration time, whose
+  registration "wins"), both rows are allowed to coexist and a background
+  dead-token sweep (Dev-agent TODO — process `sendPushNotificationsAsync()`'s
+  receipts for `DeviceNotRegistered` errors and delete the corresponding row)
+  is the actual mechanism that retires a stale token. This mirrors
+  `MaintenanceTicket.assignedTo`'s pattern of choosing the design that
+  doesn't force inventing conflict-resolution machinery a real product
+  requirement never asked for.
+- **RLS-covered like every other tenant table** (§3.1's uniform-coverage
+  extension) — `villageId` denormalized even though `userId` already scopes
+  the row indirectly, same reasoning as `Booking`/`Payment`/
+  `AnnouncementTarget`'s existing comments.
+- No `platform` (iOS/Android) or `deviceName` column — spec's AC never asks
+  for platform-specific behavior (e.g. different sound files per OS), and
+  Expo's push service itself is platform-agnostic from the caller's point of
+  view (it resolves the right native transport from the token format alone).
+  Add one if a real product need for platform-specific payload shaping shows
+  up later; speculative today.
+
+### 9.2 `PushNotificationService` design (`src/common/push/`)
+
+Not implemented in this round (planning/schema only), but its shape is
+decided so a Dev agent doesn't have to re-derive the module boundary:
+
+- `push-token.service.ts` — CRUD over `PushToken` (`registerToken`,
+  `removeToken`, `listTokensForUsers(userIds: string[])` for the batch
+  lookup every trigger needs, since all four already resolve a recipient
+  list, not a single user).
+- `push-notification.service.ts` (`PushNotificationService`) — the one
+  method every module calls: `send(userIds: string[], payload: { title,
+  body, data })`. Internally: resolve `userIds` → tokens via
+  `PushTokenService`, split into batches with `expo-server-sdk-node`'s
+  `chunkPushNotifications()` (Expo's own recommended batching helper — the
+  SDK enforces this because a single HTTP request has a payload/count
+  ceiling), call `sendPushNotificationsAsync()` per chunk, and never throw
+  (ADR-006's fire-and-forget decision) — log failures instead.
+- `push.module.ts` — `@Global()`, same pattern as `AuditModule` and
+  `FileStorageModule` (both already `@Global()` for the identical reason:
+  every feature module needs it, re-importing it everywhere would be
+  boilerplate with no isolation benefit since there's only ever one
+  implementation). Wired into `common.module.ts`'s `imports` array
+  alongside `AuditModule`/`FileStorageModule` when implemented.
+
+### 9.3 Migrations applied this round
+
+Two migrations were generated and applied against the real local Postgres
+instance (same `prisma migrate dev --create-only` + `prisma migrate deploy`
+workflow as §8.6 — `prisma migrate dev`'s interactive prompt doesn't run in
+this non-interactive environment; `--create-only` this time instead of a
+direct apply, matching how a schema-only-no-code-yet round should stage
+migrations without assuming a Dev agent won't tweak the model shape before
+first real use):
+
+1. `20260828223706_add_push_tokens` — creates `push_tokens` (§9.1's schema).
+2. `20260828223707_rls_push_tokens` — extends the RLS policy loop (§3.1) to
+   just the new table, following the exact same pattern (and the exact same
+   "don't re-run the full list, don't edit immutable prior migrations"
+   reasoning) as `20260828145708_rls_phase2_tables` did for Epic 8-10's two
+   tables. `prisma/sql/rls-policies.sql`'s `ARRAY[...]` was updated to
+   include `push_tokens` so it stays the correct living reference.
+
+Both were verified directly against the running container: `\d+ push_tokens`
+in `psql` shows `Policies (forced row security enabled)` with the same
+`tenant_isolation` policy text as every other table, and
+`pg_class.relrowsecurity`/`relforcerowsecurity` both read `t`. `npx prisma
+generate` and `npm run build` (root — `build:backend` + `build:admin`) both
+succeed with no TypeScript errors; `npm run typecheck:mobile` also still
+passes (mobile doesn't reference `PushToken` yet — no push code has been
+written — but this confirms the workspace-wide dependency graph wasn't
+perturbed by the schema change, same check §8.6 ran for Epic 8-10).

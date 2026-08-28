@@ -1,11 +1,14 @@
 # Phase 2 Backlog — ระบบความปลอดภัยและอำนวยความสะดวกหมู่บ้าน
 
-อ้างอิง: `village-security-app-spec.md` ข้อ 2.3 (Chat), 2.4 (Maintenance), 2.7
+อ้างอิง: `village-security-app-spec.md` ข้อ 2.1 (Access Control push trigger),
+2.2 (Announcement/SOS push trigger), 2.3 (Chat), 2.4 (Maintenance), 2.7
 (Transport Directory), ข้อ 4 (Roadmap — เฟส 2 = 4-6 สัปดาห์) — เอกสารนี้แปลง
 scope เฟส 2 เป็น backlog ระดับ implementation ในรูปแบบเดียวกับ
 [`MVP_BACKLOG.md`](./MVP_BACKLOG.md) ต่อจาก Epic 0-7 เดิม สถาปัตยกรรม/schema
-ที่ตัดสินใจไว้สำหรับ 3 epic นี้ถูกบันทึกเป็น ADR/decision note ใน
-[`ARCHITECTURE.md`](./ARCHITECTURE.md) §8
+ที่ตัดสินใจไว้สำหรับ 3 epic แรก (8-10) ถูกบันทึกเป็น ADR/decision note ใน
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) §8 — **Epic 11 (Push Notifications)**
+เพิ่มเข้ามาภายหลัง (ผู้ใช้ขอเพิ่มหลัง Epic 8-10 เสร็จและเทสผ่านแล้ว) มี
+ADR ของตัวเองที่ ARCHITECTURE.md ADR-006
 
 ---
 
@@ -15,6 +18,10 @@ scope เฟส 2 เป็น backlog ระดับ implementation ในร�
 - **Epic 8 — Chat:** แชท 1:1 ลูกบ้าน-นิติบุคคล/รปภ. + แชทกลุ่มหมู่บ้าน (WebSocket จริง)
 - **Epic 9 — Maintenance:** แจ้งซ่อม+รูป → ใบงาน (เลขที่ ticket) → มอบหมายช่าง → ติดตามสถานะ
 - **Epic 10 — Transport Directory:** ทำเนียบรถรับจ้าง/แท็กซี่ที่แอดมินดูแล ลูกบ้านกดโทรออก (`tel:`) — **ไม่ใช่การเชื่อม API เรียกรถจริง** (แทนที่ "ทำเนียบลูกบ้าน" เดิมที่ถูกตัดออกตามข้อ 2.7 ของสเปก)
+- **Epic 11 — Push Notifications:** ปิด gap "push notification stub" ที่ถูก report
+  ไว้ตั้งแต่ MVP Epic 2/3/4 (entry-log/announcement/sos) และ Phase 2 Epic 8
+  (chat) ให้เป็นการส่งจริงผ่าน **Expo Push Notification Service** — 4 trigger:
+  สแกน QR เข้าสำเร็จ, SOS, ประกาศ, ข้อความแชทใหม่ (ดูรายละเอียดด้านล่าง)
 
 **Dependency กับของเดิม:** ทั้ง 3 epic พึ่งพา **เฉพาะ Epic 0 (multi-tenant/RLS
 foundation) และ Epic 1 (Auth/RBAC)** เท่านั้น — ไม่ผูกกับ Epic 2-7 (Visitor QR,
@@ -31,10 +38,18 @@ local) ดูรายละเอียดทั้งหมดใน ARCHITECT
 - `MaintenanceTicket.category` เปลี่ยนจาก `String` → enum `MaintenanceCategory`, เพิ่ม `ticketNumber` (unique ต่อหมู่บ้าน) + ตารางใหม่ `MaintenanceTicketCounter` สำหรับออกเลขที่ใบงานแบบ atomic
 - ตารางใหม่ทั้งหมด: `TransportProvider` (+ enum `TransportProviderType`), `MaintenanceTicketCounter`
 
-**ไม่อยู่ใน scope รอบนี้:** business logic/controller/service, UI จริงของทั้ง 3
-โมดูล (backend module ยังไม่มี `src/modules/chat|maintenance|transport-provider/`
-เลย — Dev agent รอบถัดไปเริ่มจากศูนย์โดยอิง schema/ADR ที่ทำไว้แล้วในรอบนี้),
-Facility Booking/Payment/LPR (เฟส 3)
+**Epic 11's schema (เพิ่มภายหลัง Epic 8-10 เสร็จ):** ตารางใหม่ `PushToken`
+(unique ต่อ `(userId, expoPushToken)`, RLS เปิดแล้ว) — **แก้ schema จริงแล้ว**
+(migration `20260828223706_add_push_tokens` +
+`20260828223707_rls_push_tokens` ประยุกต์ใช้แล้วกับ DB local) ดูรายละเอียด
+เต็มใน ARCHITECTURE.md ADR-006
+
+**ไม่อยู่ใน scope รอบนี้:** business logic/controller/service, UI จริงของ
+Epic 8-10 ทั้ง 3 โมดูล (backend module ยังไม่มี
+`src/modules/chat|maintenance|transport-provider/` เลย ตอนที่เขียนแผนนี้ —
+Dev agent รอบถัดไปเริ่มจากศูนย์โดยอิง schema/ADR ที่ทำไว้แล้วในรอบนี้),
+ธุรกิจ logic การส่ง push จริงของ Epic 11 (ดูหัวข้อ Epic 11 ด้านล่างสำหรับ
+ขอบเขตที่ชัดเจน), Facility Booking/Payment/LPR (เฟส 3)
 
 ---
 
@@ -150,6 +165,157 @@ Facility Booking/Payment/LPR (เฟส 3)
 
 ---
 
+### Epic 11 — Push Notifications (Expo Push Notification Service)
+
+**บริบท:** ทุก trigger ที่ควรส่ง push ถูก report เป็น gap (TODO comment ใน
+service + "documented gap, not implemented" ใน docstring) มาตั้งแต่รอบ
+MVP/Phase 2 ก่อนหน้า — **routing logic (ใครควรได้รับ) implement ครบแล้วทุก
+จุด**, มีแค่ transport (การส่งจริงไปเครื่อง) เป็น stub:
+- `entry-log.service.ts`'s `createFromQr()` — TODO comment ระบุ "FCM push to
+  `host` within ~3s" ยังไม่ทำ
+- `sos.service.ts`'s `trigger()` — คืนค่า `routedToGuardUserIds` ที่ resolve
+  ครบแล้ว แต่ TODO comment ระบุ "real-time delivery... not implemented"
+- `announcement.service.ts`'s `create()` — คืนค่า `recipientUserIds` ที่
+  resolve ครบแล้ว แต่ TODO comment ระบุ "actual push/SMS provider wiring...
+  not implemented" (SMS fallback ของประกาศระดับฉุกเฉินยังคงเป็น gap เดิม
+  ที่ **ไม่ต้องแก้รอบนี้** ตามที่ผู้ใช้ระบุ — เฉพาะ push)
+- `chat.gateway.ts`'s `onSendMessage()` — ยังไม่มี TODO comment เพราะ chat
+  ถูก implement ก่อนที่ผู้ใช้จะขอ push เพิ่ม (trigger ใหม่ล่าสุดในรอบนี้)
+
+**Decision ที่ตัดสินใจไว้แล้ว:** ใช้ **Expo Push Notification Service**
+(`expo-server-sdk-node` ฝั่ง backend, `expo-notifications` ฝั่ง mobile —
+ติดตั้งอยู่แล้วตั้งแต่ scaffold รอบ MVP) แทนการเชื่อม raw Firebase FCM ตรง —
+เหตุผลเต็มอยู่ใน ARCHITECTURE.md ADR-006 รวมถึง fire-and-forget vs. await
+decision และ deep-link data schema
+
+**User Stories:**
+- ในฐานะลูกบ้าน ฉันต้องการได้รับแจ้งเตือนทันทีในมือถือเมื่อแขกของฉันมาถึง
+  ป้อมยาม โดยไม่ต้องเปิดแอปค้างไว้ (สเปก 2.1)
+- ในฐานะ รปภ. ที่กำลังปฏิบัติหน้าที่ ฉันต้องการได้รับแจ้งเตือนทันทีเมื่อมีคน
+  กด SOS เพื่อตอบสนองได้เร็วที่สุด (สเปก 2.2)
+- ในฐานะลูกบ้าน ฉันต้องการได้รับแจ้งเตือนเมื่อแอดมินออกประกาศ โดยเฉพาะ
+  ระดับสำคัญ/ฉุกเฉิน แม้ไม่ได้เปิดแอปอยู่ (สเปก 2.2)
+- ในฐานะลูกบ้าน/รปภ./แอดมิน ฉันต้องการได้รับแจ้งเตือนเมื่อมีข้อความแชทใหม่
+  เข้ามาในห้องที่ฉันอยู่ โดยไม่ต้องเปิดแอปแช่ไว้ดูตลอด (เพิ่มใหม่ล่าสุด
+  ต่อจาก Epic 8 เดิม)
+
+**Acceptance Criteria (4 trigger):**
+1. **สแกน QR เข้าสำเร็จ** (`entry-log.service.ts`'s `createFromQr()`) —
+   ส่ง push ไปยังเจ้าของบ้าน (`pass.createdByUserId`) หลัง transaction ของ
+   request ปิดแล้ว (ตาม §3.3's "don't hold the transaction open across a
+   slow external call") ภายใน ~3 วิ (soft target ตามสเปก 2.1 — ไม่ใช่ SLA
+   เข้มงวด, ขึ้นกับความเสถียรเครือข่าย/Expo push service) — ไม่ส่งซ้ำในกรณี
+   `alreadyEntered: true` (สแกนซ้ำที่จุดออก ไม่ใช่การมาถึงใหม่)
+2. **SOS ถูกกด** (`sos.service.ts`'s `trigger()`) — ส่ง push ไปยังทุก guard
+   ใน `routedToGuardUserIds` (on-duty เท่านั้น, resolve ไว้แล้ว) — เป็น
+   trigger ที่ **สำคัญที่สุด** (ความปลอดภัยชีวิต) จึงเป็นตัวชี้ขาดของ
+   fire-and-forget decision ใน ADR-006 (ต้องไม่ให้ push ช้าไปหน่วง response
+   ของ endpoint ที่ resident กำลังรอ confirm ว่า SOS ถูกบันทึกแล้ว)
+3. **ประกาศระดับฉุกเฉิน (และระดับอื่นด้วย)** (`announcement.service.ts`'s
+   `create()`) — ส่ง push ไปยังทุก user ใน `recipientUserIds` (resolve จาก
+   target_scope ไว้แล้ว) พร้อม metadata `level` ให้ client เลือกสี/เสียง
+   ตามสเปก 2.2 — **SMS fallback สำหรับระดับฉุกเฉินยังคงเป็น gap เดิมที่ไม่
+   แก้รอบนี้** (ระบุไว้ชัดเจนโดยผู้ใช้)
+4. **ข้อความแชทใหม่** (`chat.gateway.ts`'s `onSendMessage()`) — ส่ง push ไป
+   ยัง participant ทุกคนของห้องนั้น **ยกเว้นผู้ส่งเอง** — ใช้ query
+   `ChatParticipant` ของห้อง (มี pattern อยู่แล้วใน `chat.service.ts`'s
+   `assertMembership`/`listRooms`) กรอง `userId !== senderId` — เป็น
+   trigger ที่ผู้ใช้เพิ่งขอเพิ่มล่าสุด ไม่ได้อยู่ใน gap ที่ report ไว้เดิม
+- ทุก trigger ต้อง**ไม่ throw/ไม่ block response หลัก**ถ้าการส่ง push ล้มเหลว
+  (เครือข่าย Expo ล่ม, token หมดอายุ ฯลฯ) — ดู ADR-006's fire-and-forget
+  decision สำหรับเหตุผลแบบ per-trigger (ไม่ใช่ blanket เดียวกันหมด)
+- Deep-link data ที่แนบไปกับทุก push ต้องตรงตาม schema ที่กำหนดใน ADR-006
+  (`{ type: "entry" | "sos" | "announcement" | "chat", id: string }`) ให้
+  mobile ใช้ navigate ไปหน้าที่ถูกต้องตอนผู้ใช้กด notification
+- Push token ต้องรองรับหลายอุปกรณ์ต่อ user (resident เปลี่ยนเครื่อง/มีสอง
+  เครื่อง) และต้องลบ/ทำ inactive token ที่ Expo รายงานว่าส่งไม่สำเร็จถาวร
+  (`DeviceNotRegistered` receipt error) ไม่ให้ค้างส่งซ้ำไปเรื่อยๆ
+
+**Implementation Tasks — Backend:**
+- [ ] เพิ่ม dependency `expo-server-sdk-node` (เวอร์ชันล่าสุดที่รองรับ
+  Node 20+ ตาม `apps/backend/package.json`'s `engines.node` — Dev agent
+  ระบุ pin เวอร์ชันแบบเดียวกับที่ ADR-004 ทำกับ `socket.io`)
+- [ ] สร้าง `src/common/push/` module:
+  - `push-token.service.ts` — `registerToken(userId, expoPushToken, claims)`
+    (upsert บน `@@unique([userId, expoPushToken])`),
+    `removeToken(userId, expoPushToken)` (สำหรับ logout — ดู mobile task
+    ด้านล่าง), `listTokensForUsers(userIds: string[])` (batch lookup ข้าม
+    หลาย user ในครั้งเดียว สำหรับ SOS/announcement/chat ที่ resolve
+    recipient list ไว้แล้วเป็น array)
+  - `push-notification.service.ts` (`PushNotificationService`) — service
+    กลางที่ entry-log/sos/announcement/chat เรียกใช้ร่วมกัน มีเมธอดเดียว
+    `send(userIds: string[], payload: { title, body, data })` ที่ภายใน:
+    resolve userIds → tokens ผ่าน `PushTokenService`, chunk ตาม
+    `expo-server-sdk-node`'s `chunkPushNotifications()` (Expo's recommended
+    batching — จำกัดจำนวน notification ต่อ HTTP request), ยิงผ่าน
+    `sendPushNotificationsAsync()`, log แต่ไม่ throw เมื่อ error (ตาม
+    ADR-006's error-handling decision), และ (Dev agent อนาคต) ประมวลผล
+    push receipt เพื่อลบ token ที่ตายแล้ว
+  - `push.module.ts` — `@Global()` เหมือน `AuditModule`/`FileStorageModule`
+    (ทุก feature module เรียกใช้ได้โดยไม่ต้อง import ซ้ำ), wire เข้า
+    `common.module.ts`
+- [ ] `POST /push-tokens` (register — `@Roles("RESIDENT", "GUARD", "ADMIN")`,
+  body `{ expoPushToken: string }`, `userId` มาจาก JWT claims เท่านั้น)
+- [ ] `DELETE /push-tokens` (unregister เฉพาะ token ของตัวเอง — เรียกตอน
+  logout ให้เครื่องที่ logout แล้วไม่ได้รับ push อีกถ้า login คนละบัญชีบน
+  เครื่องเดิม)
+- [ ] เพิ่มเรียก `PushNotificationService.send(...)` ที่ 4 จุด (นอก
+  transaction เสมอ ตาม §3.3's trade-off note — ดู ADR-006 สำหรับตำแหน่ง
+  เรียกที่แน่นอนในแต่ละไฟล์):
+  - `entry-log.service.ts`'s `createFromQr()` — แทน TODO comment เดิม
+  - `sos.service.ts`'s `trigger()` — แทน TODO comment เดิม (ไม่แตะ TODO
+    ของ neighbor-radius notification — ยังเป็น schema gap เดิม ไม่ใช่ scope
+    รอบนี้)
+  - `announcement.service.ts`'s `create()` — แทน TODO comment เดิม (SMS
+    fallback ยังไม่ทำ — คง TODO ไว้)
+  - `chat.gateway.ts`'s `onSendMessage()` — เพิ่มใหม่ (ไม่มี TODO เดิม)
+- [ ] แก้ `.env.example`: ลบ/แทนที่ `FCM_PROJECT_ID`/`FCM_SERVICE_ACCOUNT_JSON`
+  (ค้างมาจากตอนที่ยังไม่ได้ตัดสินใจ transport) ด้วย `EXPO_ACCESS_TOKEN`
+  (optional — enhanced security ของ Expo push service, ไม่บังคับสำหรับ
+  Expo Go/dev)
+- [ ] Unit test: `PushNotificationService.send()` ไม่ throw เมื่อ Expo API
+  error/timeout (mock `expo-server-sdk-node`), chunking ทำงานถูกต้องเมื่อ
+  recipient list ยาวเกิน 1 chunk, `PushTokenService` upsert ไม่สร้าง row
+  ซ้ำเมื่อ register token เดิมซ้ำ
+- [ ] Integration test: 1 เคสต่อ trigger (mock Expo SDK ที่ transport
+  boundary) ยืนยันว่า payload/data ที่ส่งตรงตาม deep-link schema (ADR-006)
+  และ recipient list ตรงกับ routing logic ที่มีอยู่แล้ว (เช่น SOS ต้องไม่ส่ง
+  หา guard ที่ off-duty — routing เดิมยังถูกต้อง แค่เพิ่มการยืนยันว่า
+  `send()` ถูกเรียกด้วย list เดียวกับที่ routing คืนมา)
+
+**Implementation Tasks — mobile:**
+- [ ] `lib/push.ts` (ใหม่) — `registerForPushNotificationsAsync()`:
+  ขอ permission (`Notifications.requestPermissionsAsync()`), ดึง
+  `expo-notifications`'s `getExpoPushTokenAsync()`, เรียก
+  `POST /push-tokens` ผ่าน `lib/api.ts` เดิม (pattern เดียวกับทุก
+  authenticated call อื่น)
+- [ ] เรียก `registerForPushNotificationsAsync()` ใน `AuthContext.tsx`
+  หลัง `setSession()` สำเร็จ (ทั้ง flow login และ flow restore-session ตอน
+  app เปิดใหม่ — ดู `AuthContext.tsx`'s `useEffect` ที่เรียก `getSession()`
+  ตอน mount) — **ไม่ใช่**ใน `RootNavigator` เพราะต้องมี JWT ก่อนเรียก
+  `POST /push-tokens` ได้ และ context คือจุดที่ session state พร้อมใช้งาน
+  ก่อนสุด
+- [ ] เรียก `DELETE /push-tokens` ตอน logout (หาจุด logout handler ที่มีอยู่
+  แล้ว — clear secure storage) ก่อนเคลียร์ session ไม่ใช่หลัง (ต้องมี JWT
+  ตอนเรียก)
+- [ ] `Notifications.addNotificationResponseReceivedListener()` — handler
+  กลางที่ decode `data: { type, id }` ตาม deep-link schema (ADR-006) แล้ว
+  `navigation.navigate(...)` ไปหน้าที่ถูกต้องตาม `type` (สแกน/SOS/
+  ประกาศ/แชท) — วางใน `RootNavigator` หรือ root component ที่มี navigation
+  ref อยู่แล้ว (Dev agent ตัดสินใจตำแหน่งที่แน่นอนตอน implement)
+- [ ] Foreground notification handler (`Notifications.setNotificationHandler`)
+  — ตั้งค่า `shouldShowAlert: true` ให้แสดง banner แม้แอปเปิดอยู่หน้าจอ
+  (ต่างจาก background ที่ OS จัดการเอง)
+- [ ] Unit/component test เมื่อเริ่ม implement (ยังไม่มี test setup สำหรับ
+  push flow วันนี้)
+
+**Priority:** P1 — **Dependency:** ทุก 4 trigger endpoint มีอยู่แล้ว (Epic
+2/3/4 จาก MVP, Epic 8 จาก Phase 2 รอบนี้) จึงพัฒนาได้ทันที ไม่ต้องรอ epic
+ไหนเพิ่ม — งานหลักคือเพิ่ม transport ใหม่เข้าไปแทนที่ TODO ที่มีอยู่แล้ว
+ไม่ใช่งาน routing logic ใหม่
+
+---
+
 ## 3. ลำดับความสำคัญและ Dependency
 
 | Epic | Priority | Depends on | หมายเหตุ |
@@ -157,14 +323,19 @@ Facility Booking/Payment/LPR (เฟส 3)
 | 8. Chat | P1 | Epic 0, 1 | Complexity สูงสุด — ต้องวาง WebSocket + RLS pattern ใหม่ (ADR-004/005) ก่อน ไม่ผูกกับ Epic 2-7 |
 | 9. Maintenance | P1 | Epic 0, 1 | Complexity กลาง (state machine + atomic ticket numbering) ไม่ผูกกับ Epic 2-7 |
 | 10. Transport Directory | P1 | Epic 0, 1 | Complexity ต่ำสุด — CRUD ล้วน ไม่มี real-time/state machine ไม่ผูกกับ Epic 2-7 |
+| 11. Push Notifications | P1 | Epic 2, 3, 4 (MVP), Epic 8 (Phase 2) | ไม่ใช่ routing logic ใหม่ — เติม transport ที่ 4 จุด TODO เดิม + 1 จุดใหม่ (chat) เข้าไปแทน ต้องรอทุก endpoint ที่จะ trigger push มีอยู่จริงก่อน (มีครบแล้ววันนี้) |
 
-**แนวทางลำดับการทำงานจริง:** ทั้ง 3 epic ไม่มี dependency ระหว่างกันเอง
+**แนวทางลำดับการทำงานจริง:** Epic 8-10 ไม่มี dependency ระหว่างกันเอง
 (schema/module แยกกันคนละตาราง) จึง**พัฒนาขนานกันได้เต็มที่**ถ้ามีมากกว่า 1 คน/
 ทีมย่อย ถ้าทำโดยทีมเดียวตามลำดับ แนะนำ **Epic 10 → Epic 9 → Epic 8**
 (เรียงจาก complexity ต่ำไปสูง ให้ Epic 10 เป็น "quick win" ยืนยันว่า pattern
 CRUD ใหม่ทำงานถูกต้องก่อน แล้วค่อยรับความซับซ้อนของ state machine ใน Epic 9
 และ WebSocket infra ใหม่ทั้งหมดใน Epic 8 ซึ่งมีความเสี่ยงทางสถาปัตยกรรมสูงสุด
-ควรมีเวลา buffer มากที่สุด)
+ควรมีเวลา buffer มากที่สุด) **Epic 11 ทำทีหลังสุด** (ตามลำดับที่ผู้ใช้ขอเพิ่ม
+จริง) แต่ไม่มี dependency ทางเทคนิคที่บังคับให้ทำทีหลัง Epic 8-10 เสร็จ
+ก่อน — Epic 11's 3 ใน 4 trigger point (entry-log/sos/announcement) พร้อมใช้
+ตั้งแต่ MVP เสร็จแล้ว มีแค่ trigger ที่ 4 (chat) ที่ต้องรอ Epic 8's
+`chat.gateway.ts` มีอยู่จริงก่อน
 
 ---
 
@@ -174,10 +345,15 @@ CRUD ใหม่ทำงานถูกต้องก่อน แล้ว�
 - Chat: 1:1 (นิติบุคคล/รปภ.) + กลุ่มหมู่บ้าน ส่ง/รับ real-time ผ่าน WebSocket ได้จริง, ประวัติค้นหาย้อนหลังผ่าน REST ได้, room-level authorization ทำงานถูกต้อง (ไม่ใช่แค่ tenant-level)
 - Maintenance: full flow สร้าง (มีเลขที่ใบงาน) → assign → เปลี่ยนสถานะไปข้างหน้าเท่านั้น → resident ติดตามสถานะได้
 - Transport Directory: admin CRUD + toggle active ครบ, resident เห็นเฉพาะ active พร้อมปุ่มโทรออกได้จริง
-- Automated test: unit test ครอบคลุม critical path ของทั้ง 3 epic (โดยเฉพาะ RLS-in-WebSocket, ticket-number concurrency, status transition guard), integration test อย่างน้อย 1 เคสต่อ epic
+- Push Notifications (Epic 11): ทั้ง 4 trigger (entry-log scan-in, SOS, announcement, chat message) ส่ง push จริงผ่าน Expo Push Notification Service ได้, mobile ลงทะเบียน/ลบ push token ตาม session lifecycle (login/logout) ได้จริง, กดแตะ notification แล้ว deep-link ไปหน้าที่ถูกต้องตาม `{type, id}` schema (ADR-006)
+- Automated test: unit test ครอบคลุม critical path ของทั้ง 4 epic (โดยเฉพาะ RLS-in-WebSocket, ticket-number concurrency, status transition guard, push send ไม่ throw เมื่อ Expo API ล้มเหลว), integration test อย่างน้อย 1 เคสต่อ epic
 - `npm run build` (root, backend+admin-web) และ `npm run typecheck:mobile` ผ่านทั้งคู่
-- Schema/migration: migration ของทั้ง 3 epic apply สำเร็จกับ DB จริง (local Postgres) แล้ว — ตรวจสอบแล้วในรอบ planning นี้ (ดู ARCHITECTURE.md §8 "Validated")
+- Schema/migration: migration ของทั้ง 4 epic (8-11) apply สำเร็จกับ DB จริง (local Postgres) แล้ว — ตรวจสอบแล้วในรอบ planning ของแต่ละ epic (ดู ARCHITECTURE.md §8 "Validated" สำหรับ Epic 8-10, ADR-006 สำหรับ Epic 11's `push_tokens`)
 
 **Out of scope ยืนยันอีกครั้ง (ห้ามทำในรอบ planning นี้ — เป็นงาน Dev รอบถัดไป):**
-Controller/Service/DTO จริงของทั้ง 3 module, admin-web/mobile UI จริง,
-WebSocket gateway implementation จริง, Facility Booking/Payment/LPR (เฟส 3)
+Controller/Service/DTO จริงของทั้ง 3 module (Epic 8-10 — schema เท่านั้นตอน
+วางแผนรอบแรก), `PushNotificationService`/`PushTokenService` จริงและการเรียก
+ใช้ที่ 4 trigger point ของ Epic 11 (schema เท่านั้นตอนวางแผนรอบนี้),
+admin-web/mobile UI จริง (รวมถึง mobile push registration จริง),
+WebSocket gateway implementation จริง (Epic 8 — implement แล้วในรอบถัดจาก
+planning), Facility Booking/Payment/LPR (เฟส 3)

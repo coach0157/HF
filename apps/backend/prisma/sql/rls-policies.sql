@@ -8,12 +8,16 @@
 -- transport_providers) after that migration was already applied to a real
 -- database, so their RLS coverage was shipped as a separate follow-up
 -- migration (prisma/migrations/20260828145708_rls_phase2_tables/migration.sql)
--- rather than by editing the immutable original migration file. This file's
--- ARRAY[...] below was updated to include them so it stays correct as
--- documentation/reference, but replaying migration history top-to-bottom
--- (`prisma migrate deploy` on a fresh database) is what actually applies RLS
--- in practice — both migrations run in order and their combined effect
--- matches what's below.
+-- rather than by editing the immutable original migration file. Epic 11
+-- (Push Notifications) added a third such table (push_tokens): the table
+-- itself was created by prisma/migrations/20260828223706_add_push_tokens/
+-- migration.sql, and its RLS coverage was shipped as a further follow-up
+-- migration (prisma/migrations/20260828223707_rls_push_tokens/migration.sql)
+-- the same way. This file's ARRAY[...] below was updated to include all of
+-- them so it stays correct as documentation/reference, but replaying
+-- migration history top-to-bottom (`prisma migrate deploy` on a fresh
+-- database) is what actually applies RLS in practice — every migration runs
+-- in order and their combined effect matches what's below.
 --
 -- HOW TO EXTEND (Prisma has no schema syntax for RLS, so it can never be
 -- expressed in schema.prisma) — do this whenever a new tenant-owned table is
@@ -58,7 +62,7 @@ BEGIN
     'chat_rooms', 'chat_participants', 'chat_messages',
     'maintenance_tickets', 'maintenance_ticket_counters', 'transport_providers',
     'facilities', 'bookings',
-    'bills', 'payments', 'refresh_tokens', 'audit_logs'
+    'bills', 'payments', 'refresh_tokens', 'audit_logs', 'push_tokens'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);

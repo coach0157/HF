@@ -76,11 +76,16 @@ export class AnnouncementService {
 
     // Spec 2.2: EMERGENCY level -> push + SMS fallback; every level carries
     // `level` in push metadata so the client can pick color/sound.
-    // TODO(Dev agent, future): actual push/SMS provider wiring — no FCM
-    // credentials or SMS gateway configured in this MVP/dev environment
-    // (.env.example only stubs OTP's SMS path, not a general SMS provider).
-    // Documented gap. Recipient targeting (WHO gets it) is fully implemented
-    // and returned here so it's independently verifiable/testable.
+    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
+    // push to recipientUserIds via the shared `PushNotificationService`
+    // (src/common/push/, not yet implemented — Epic 11 is at the
+    // planning/schema stage; see PHASE2_BACKLOG.md Epic 11), fire-and-forget
+    // per ADR-006. SMS fallback for EMERGENCY level is a SEPARATE, still-
+    // unaddressed gap — no SMS gateway configured in this MVP/dev
+    // environment (.env.example only stubs OTP's SMS path) and Epic 11's
+    // scope is push-only (explicitly excluded SMS per the user's request).
+    // Recipient targeting (WHO gets it) is fully implemented and returned
+    // here so it's independently verifiable/testable.
 
     return { announcement, recipientUserIds };
   }

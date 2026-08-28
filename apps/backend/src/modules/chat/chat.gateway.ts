@@ -164,6 +164,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // ChatParticipants of this room ever joined the Socket.io room in the
     // first place.
     this.server.to(dto.chatRoomId).emit("new_message", message);
+
+    // TODO(Dev agent, future — Epic 11, docs/ARCHITECTURE.md ADR-006): Expo
+    // push to every ChatParticipant of dto.chatRoomId EXCEPT claims.userId
+    // (the sender) — covers the backgrounded-app case; an open socket
+    // already got `new_message` above in real time. Via the shared
+    // `PushNotificationService` (src/common/push/, not yet implemented —
+    // Epic 11 is at the planning/schema stage; see PHASE2_BACKLOG.md
+    // Epic 11), fire-and-forget per ADR-006, and — unlike the HTTP call
+    // sites (entry-log/sos/announcement) — this runs OUTSIDE the request/
+    // response path entirely (WS event handlers don't have one to protect),
+    // but should still not be awaited before this handler's ack/return, for
+    // the same "don't let an external push vendor call gate this event
+    // handler" reasoning.
     return message;
   }
 
