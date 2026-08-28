@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { House, MaintenanceCategory, MaintenanceStatus, MaintenanceTicket, Paginated } from '../lib/types';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { Badge } from '../components/Badge';
+import type { BadgeVariant } from '../components/Badge';
+import { colors, radius, spacing } from '../theme';
 
 // Epic 9 — Maintenance (spec 2.4 / docs/PHASE2_BACKLOG.md Epic 9).
 // Admin oversight screen: list every ticket in the village (filter by
 // status/category), open a ticket's detail (incl. attached photo ref),
 // assign a team + scheduled date, and mark a ticket done. Pattern follows
 // EntryLogsPage.tsx (filter + paginated table) and TransportProvidersPage.tsx
-// (inline form) — no UI library, matching the rest of admin-web.
+// (form) — styled via shared Button/Card/Badge components.
 
 const CATEGORY_LABEL: Record<MaintenanceCategory, string> = {
   ELECTRICAL: 'ไฟฟ้า',
@@ -23,11 +28,34 @@ const STATUS_LABEL: Record<MaintenanceStatus, string> = {
   DONE: 'เสร็จสิ้น',
 };
 
-const STATUS_COLOR: Record<MaintenanceStatus, string> = {
-  OPEN: '#b45309',
-  IN_PROGRESS: '#1d4ed8',
-  DONE: '#15803d',
+const STATUS_BADGE_VARIANT: Record<MaintenanceStatus, BadgeVariant> = {
+  OPEN: 'warning',
+  IN_PROGRESS: 'info',
+  DONE: 'success',
 };
+
+const selectStyle = {
+  display: 'block',
+  padding: spacing.sm,
+  marginTop: spacing.xs,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+};
+const labelStyle = { display: 'block', marginBottom: spacing.md, fontSize: 14, color: colors.textPrimary };
+const inputStyle = {
+  display: 'block',
+  width: '100%',
+  marginTop: spacing.xs,
+  padding: spacing.sm,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  boxSizing: 'border-box' as const,
+  fontFamily: 'inherit',
+};
+const thStyle = { padding: spacing.sm, fontSize: 13, color: colors.textSecondary };
+const tdStyle = { padding: spacing.sm, fontSize: 14, color: colors.textPrimary };
 
 export function MaintenanceTicketsPage() {
   const [houses, setHouses] = useState<House[]>([]);
@@ -132,15 +160,15 @@ export function MaintenanceTicketsPage() {
 
   return (
     <div>
-      <h1>แจ้งซ่อม</h1>
+      <h1 style={{ color: colors.textPrimary }}>แจ้งซ่อม</h1>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 16 }}>
-        <label>
+      <div style={{ display: 'flex', gap: spacing.md, alignItems: 'flex-end', marginBottom: spacing.lg, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 14, color: colors.textPrimary }}>
           สถานะ
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as MaintenanceStatus | '')}
-            style={{ display: 'block', padding: 6 }}
+            style={selectStyle}
           >
             <option value="">ทั้งหมด</option>
             {(Object.keys(STATUS_LABEL) as MaintenanceStatus[]).map((s) => (
@@ -150,12 +178,12 @@ export function MaintenanceTicketsPage() {
             ))}
           </select>
         </label>
-        <label>
+        <label style={{ fontSize: 14, color: colors.textPrimary }}>
           หมวดหมู่
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value as MaintenanceCategory | '')}
-            style={{ display: 'block', padding: 6 }}
+            style={selectStyle}
           >
             <option value="">ทั้งหมด</option>
             {(Object.keys(CATEGORY_LABEL) as MaintenanceCategory[]).map((c) => (
@@ -165,74 +193,73 @@ export function MaintenanceTicketsPage() {
             ))}
           </select>
         </label>
-        <button onClick={handleSearch}>ค้นหา</button>
+        <Button onClick={handleSearch}>ค้นหา</Button>
       </div>
 
-      {listError && <p style={{ color: 'crimson' }}>{listError}</p>}
-      {result === null && !listError && <p>กำลังโหลด...</p>}
-      {result !== null && result.items.length === 0 && <p>ไม่พบใบงานแจ้งซ่อม</p>}
+      {listError && <p style={{ color: colors.danger }}>{listError}</p>}
+      {result === null && !listError && <p style={{ color: colors.textSecondary }}>กำลังโหลด...</p>}
+      {result !== null && result.items.length === 0 && <p style={{ color: colors.textSecondary }}>ไม่พบใบงานแจ้งซ่อม</p>}
 
-      <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-              <th style={{ padding: 8 }}>เลขที่ใบงาน</th>
-              <th style={{ padding: 8 }}>บ้าน</th>
-              <th style={{ padding: 8 }}>หมวดหมู่</th>
-              <th style={{ padding: 8 }}>สถานะ</th>
-              <th style={{ padding: 8 }}>ผู้รับผิดชอบ</th>
-              <th style={{ padding: 8 }}>วันนัดหมาย</th>
-              <th style={{ padding: 8 }}>แจ้งเมื่อ</th>
-              <th style={{ padding: 8 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {result?.items.map((t) => (
-              <tr
-                key={t.id}
-                style={{
-                  borderBottom: '1px solid #eee',
-                  background: t.id === selectedId ? '#f5f5f5' : undefined,
-                }}
-              >
-                <td style={{ padding: 8 }}>{t.ticketNumber}</td>
-                <td style={{ padding: 8 }}>{houseNo(t.houseId)}</td>
-                <td style={{ padding: 8 }}>{CATEGORY_LABEL[t.category]}</td>
-                <td style={{ padding: 8, color: STATUS_COLOR[t.status], fontWeight: 600 }}>
-                  {STATUS_LABEL[t.status]}
-                </td>
-                <td style={{ padding: 8 }}>{t.assignedTo ?? '—'}</td>
-                <td style={{ padding: 8 }}>
-                  {t.scheduledDate ? new Date(t.scheduledDate).toLocaleDateString('th-TH') : '—'}
-                </td>
-                <td style={{ padding: 8 }}>{new Date(t.createdAt).toLocaleString('th-TH')}</td>
-                <td style={{ padding: 8 }}>
-                  <button onClick={() => selectTicket(t)}>ดูรายละเอียด</button>
-                </td>
+      <div style={{ display: 'flex', gap: spacing.xl, alignItems: 'flex-start', flexWrap: 'wrap' as const }}>
+        <Card style={{ flex: 1, minWidth: 320, padding: 0, overflowX: 'auto' as const }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+                <th style={thStyle}>เลขที่ใบงาน</th>
+                <th style={thStyle}>บ้าน</th>
+                <th style={thStyle}>หมวดหมู่</th>
+                <th style={thStyle}>สถานะ</th>
+                <th style={thStyle}>ผู้รับผิดชอบ</th>
+                <th style={thStyle}>วันนัดหมาย</th>
+                <th style={thStyle}>แจ้งเมื่อ</th>
+                <th style={thStyle}></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {result?.items.map((t) => (
+                <tr
+                  key={t.id}
+                  style={{
+                    borderBottom: `1px solid ${colors.border}`,
+                    background: t.id === selectedId ? colors.secondaryLight : undefined,
+                  }}
+                >
+                  <td style={tdStyle}>{t.ticketNumber}</td>
+                  <td style={tdStyle}>{houseNo(t.houseId)}</td>
+                  <td style={tdStyle}>{CATEGORY_LABEL[t.category]}</td>
+                  <td style={tdStyle}>
+                    <Badge variant={STATUS_BADGE_VARIANT[t.status]}>{STATUS_LABEL[t.status]}</Badge>
+                  </td>
+                  <td style={tdStyle}>{t.assignedTo ?? '—'}</td>
+                  <td style={tdStyle}>{t.scheduledDate ? new Date(t.scheduledDate).toLocaleDateString('th-TH') : '—'}</td>
+                  <td style={tdStyle}>{new Date(t.createdAt).toLocaleString('th-TH')}</td>
+                  <td style={tdStyle}>
+                    <Button variant="secondary" onClick={() => selectTicket(t)}>
+                      ดูรายละเอียด
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
 
         {selected && (
-          <div style={{ border: '1px solid #ddd', padding: 16, minWidth: 320, maxWidth: 360 }}>
-            <h2 style={{ marginTop: 0 }}>ใบงาน {selected.ticketNumber}</h2>
-            <p>
+          <Card style={{ minWidth: 320, maxWidth: 360 }}>
+            <h2 style={{ marginTop: 0, fontSize: 18, color: colors.textPrimary }}>ใบงาน {selected.ticketNumber}</h2>
+            <p style={{ color: colors.textPrimary }}>
               <strong>บ้าน:</strong> {houseNo(selected.houseId)}
               <br />
               <strong>หมวดหมู่:</strong> {CATEGORY_LABEL[selected.category]}
               <br />
-              <strong>สถานะ:</strong>{' '}
-              <span style={{ color: STATUS_COLOR[selected.status], fontWeight: 600 }}>
-                {STATUS_LABEL[selected.status]}
-              </span>
+              <strong>สถานะ:</strong> <Badge variant={STATUS_BADGE_VARIANT[selected.status]}>{STATUS_LABEL[selected.status]}</Badge>
             </p>
-            <p>
+            <p style={{ color: colors.textPrimary }}>
               <strong>คำอธิบาย:</strong>
               <br />
               {selected.description}
             </p>
-            <p>
+            <p style={{ color: colors.textPrimary }}>
               <strong>รูปแนบ:</strong>{' '}
               {selected.imageUrl ? (
                 // Local-dev file storage returns a "local://bucket/village/file"
@@ -246,60 +273,50 @@ export function MaintenanceTicketsPage() {
             </p>
 
             {selected.status !== 'DONE' && (
-              <form onSubmit={handleAssign} style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 12 }}>
-                <h3 style={{ marginTop: 0 }}>มอบหมายงาน</h3>
-                <label style={{ display: 'block', marginBottom: 10 }}>
+              <form onSubmit={handleAssign} style={{ marginTop: spacing.lg, borderTop: `1px solid ${colors.border}`, paddingTop: spacing.md }}>
+                <h3 style={{ marginTop: 0, color: colors.textPrimary }}>มอบหมายงาน</h3>
+                <label style={labelStyle}>
                   ทีมช่าง/ผู้รับผิดชอบ
-                  <input
-                    type="text"
-                    value={assignedTo}
-                    onChange={(e) => setAssignedTo(e.target.value)}
-                    style={{ display: 'block', width: '100%', padding: 6 }}
-                  />
+                  <input type="text" value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} style={inputStyle} />
                 </label>
-                <label style={{ display: 'block', marginBottom: 10 }}>
+                <label style={labelStyle}>
                   วันนัดหมาย
-                  <input
-                    type="date"
-                    value={scheduledDate}
-                    onChange={(e) => setScheduledDate(e.target.value)}
-                    style={{ display: 'block', width: '100%', padding: 6 }}
-                  />
+                  <input type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} style={inputStyle} />
                 </label>
-                <button type="submit" disabled={actionLoading}>
+                <Button type="submit" loading={actionLoading} loadingText="กำลังบันทึก...">
                   {selected.status === 'OPEN' ? 'มอบหมายงาน (เริ่มดำเนินการ)' : 'บันทึกการมอบหมายใหม่'}
-                </button>
+                </Button>
               </form>
             )}
 
             {selected.status === 'IN_PROGRESS' && (
-              <div style={{ marginTop: 16, borderTop: '1px solid #eee', paddingTop: 12 }}>
-                <button onClick={handleMarkDone} disabled={actionLoading}>
+              <div style={{ marginTop: spacing.lg, borderTop: `1px solid ${colors.border}`, paddingTop: spacing.md }}>
+                <Button onClick={handleMarkDone} loading={actionLoading} loadingText="กำลังบันทึก...">
                   ทำเครื่องหมายเสร็จสิ้น
-                </button>
+                </Button>
               </div>
             )}
 
-            {actionError && <p style={{ color: 'crimson' }}>{actionError}</p>}
+            {actionError && <p style={{ color: colors.danger, fontSize: 13 }}>{actionError}</p>}
 
-            <button type="button" onClick={() => setSelectedId(null)} style={{ marginTop: 16 }}>
+            <Button type="button" variant="secondary" onClick={() => setSelectedId(null)} style={{ marginTop: spacing.lg }}>
               ปิด
-            </button>
-          </div>
+            </Button>
+          </Card>
         )}
       </div>
 
       {result && result.total > 0 && (
-        <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+        <div style={{ marginTop: spacing.md, display: 'flex', gap: spacing.md, alignItems: 'center' }}>
+          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             ก่อนหน้า
-          </button>
-          <span>
+          </Button>
+          <span style={{ fontSize: 14, color: colors.textPrimary }}>
             หน้า {page} / {totalPages} (ทั้งหมด {result.total} รายการ)
           </span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+          <Button variant="secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
             ถัดไป
-          </button>
+          </Button>
         </div>
       )}
     </div>

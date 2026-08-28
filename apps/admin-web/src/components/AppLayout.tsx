@@ -1,15 +1,30 @@
 import type { ReactNode } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getSession } from '../lib/auth';
+import { Button } from './Button';
+import { colors, font, spacing } from '../theme';
 
 /**
  * Shell nav for the admin dashboard, per spec 1.3 sections: Dashboard /
  * จัดการประกาศ / รายงาน (+ SOS view, members, guard shifts, entry logs from
- * MVP_BACKLOG.md Epic 5). Plain inline styles — MVP scope explicitly says
- * "ไม่ต้องสวยมาก แค่ใช้งานได้ครบ flow", not worth pulling in a UI library for.
+ * MVP_BACKLOG.md Epic 5). Styled per docs/DESIGN_SYSTEM.md tokens (visual
+ * only — same routes/behavior as before).
  */
+const NAV_ITEMS: { to: string; label: string }[] = [
+  { to: '/', label: 'Dashboard' },
+  { to: '/announcements', label: 'ประกาศ' },
+  { to: '/sos', label: 'SOS' },
+  { to: '/members', label: 'สมาชิก/บ้าน' },
+  { to: '/guard-shifts', label: 'เวรยาม' },
+  { to: '/entry-logs', label: 'ประวัติเข้า-ออก' },
+  { to: '/transport-providers', label: 'ทำเนียบรถรับจ้าง' },
+  { to: '/maintenance-tickets', label: 'แจ้งซ่อม' },
+  { to: '/chat', label: 'แชท' },
+];
+
 export function AppLayout({ children }: { children?: ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const session = getSession();
 
   function handleLogout() {
@@ -18,34 +33,50 @@ export function AppLayout({ children }: { children?: ReactNode }) {
   }
 
   return (
-    <div style={{ fontFamily: 'sans-serif' }}>
+    <div style={{ fontFamily: font.family, background: colors.background, minHeight: '100vh' }}>
       <nav
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '10px 16px',
-          borderBottom: '1px solid #ddd',
-          marginBottom: 16,
+          padding: `${spacing.md}px ${spacing.lg}px`,
+          background: colors.surface,
+          borderBottom: `1px solid ${colors.border}`,
+          marginBottom: spacing.lg,
+          flexWrap: 'wrap',
+          gap: spacing.sm,
         }}
       >
-        <div style={{ display: 'flex', gap: 12 }}>
-          <Link to="/">Dashboard</Link>
-          <Link to="/announcements">ประกาศ</Link>
-          <Link to="/sos">SOS</Link>
-          <Link to="/members">สมาชิก/บ้าน</Link>
-          <Link to="/guard-shifts">เวรยาม</Link>
-          <Link to="/entry-logs">ประวัติเข้า-ออก</Link>
-          <Link to="/transport-providers">ทำเนียบรถรับจ้าง</Link>
-          <Link to="/maintenance-tickets">แจ้งซ่อม</Link>
-          <Link to="/chat">แชท</Link>
+        <div style={{ display: 'flex', gap: spacing.xs, flexWrap: 'wrap' }}>
+          {NAV_ITEMS.map((item) => {
+            const active = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                style={{
+                  textDecoration: 'none',
+                  padding: `${spacing.xs + 2}px ${spacing.md}px`,
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: active ? 700 : 500,
+                  color: active ? colors.primaryDark : colors.textSecondary,
+                  background: active ? colors.primaryLight : 'transparent',
+                }}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {session && <span>{session.name}</span>}
-          <button onClick={handleLogout}>ออกจากระบบ</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+          {session && <span style={{ fontSize: 14, color: colors.textPrimary }}>{session.name}</span>}
+          <Button variant="danger" onClick={handleLogout} style={{ padding: `6px ${spacing.md}px`, fontSize: 13 }}>
+            ออกจากระบบ
+          </Button>
         </div>
       </nav>
-      <main style={{ padding: '0 16px 32px' }}>{children ?? <Outlet />}</main>
+      <main style={{ padding: `0 ${spacing.lg}px ${spacing.xxl}px` }}>{children ?? <Outlet />}</main>
     </div>
   );
 }

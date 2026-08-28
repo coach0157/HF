@@ -4,6 +4,9 @@ import { api, ApiError } from '../lib/api';
 import { disconnectChatSocket, getChatSocket } from '../lib/chat';
 import { getSession } from '../lib/auth';
 import type { AppUser, ChatMessage, ChatRoomSummary } from '../lib/types';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { colors, radius, spacing } from '../theme';
 
 /**
  * Epic 8 — Chat, admin-web "นิติบุคคล" persona (spec 2.3 /
@@ -36,6 +39,17 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+const inputStyle = {
+  width: '100%',
+  padding: spacing.sm,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  boxSizing: 'border-box' as const,
+  marginBottom: spacing.sm,
+  fontFamily: 'inherit',
+};
 
 export function ChatPage() {
   const session = getSession();
@@ -221,56 +235,64 @@ export function ChatPage() {
 
   return (
     <div>
-      <h1>แชท</h1>
-      <p style={{ color: connected ? '#15803d' : '#c0392b', fontSize: 13 }}>
+      <h1 style={{ color: colors.textPrimary }}>แชท</h1>
+      <p style={{ color: connected ? colors.primaryDark : colors.danger, fontSize: 13 }}>
         {connected ? '● เชื่อมต่อแล้ว' : '○ กำลังเชื่อมต่อ...'}
       </p>
 
-      <div style={{ display: 'flex', gap: 16, height: 560 }}>
-        <div style={{ width: 300, borderRight: '1px solid #eee', overflowY: 'auto' }}>
-          <button onClick={() => setShowNewChat((v) => !v)} style={{ margin: '0 0 8px' }}>
+      <Card style={{ display: 'flex', gap: spacing.lg, height: 560, padding: 0, overflow: 'hidden' }}>
+        <div style={{ width: 300, borderRight: `1px solid ${colors.border}`, overflowY: 'auto', padding: spacing.md }}>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => setShowNewChat((v) => !v)}
+            style={{ margin: `0 0 ${spacing.sm}px` }}
+          >
             + เริ่มแชทกับลูกบ้าน
-          </button>
+          </Button>
           {showNewChat && (
-            <form onSubmit={handleStartChat} style={{ marginBottom: 12, padding: 8, border: '1px solid #ddd' }}>
-              <select
-                value={newChatTargetId}
-                onChange={(e) => setNewChatTargetId(e.target.value)}
-                style={{ width: '100%', padding: 6, marginBottom: 6 }}
-              >
-                <option value="">เลือกลูกบ้าน</option>
-                {residents.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name} ({r.phone})
-                  </option>
-                ))}
-              </select>
-              {newChatError && <p style={{ color: 'crimson', fontSize: 12 }}>{newChatError}</p>}
-              <button type="submit">เริ่มแชท</button>
-            </form>
+            <Card style={{ marginBottom: spacing.md }} padding={spacing.sm}>
+              <form onSubmit={handleStartChat}>
+                <select
+                  value={newChatTargetId}
+                  onChange={(e) => setNewChatTargetId(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">เลือกลูกบ้าน</option>
+                  {residents.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.phone})
+                    </option>
+                  ))}
+                </select>
+                {newChatError && <p style={{ color: colors.danger, fontSize: 12 }}>{newChatError}</p>}
+                <Button type="submit">เริ่มแชท</Button>
+              </form>
+            </Card>
           )}
 
-          {roomsError && <p style={{ color: 'crimson' }}>{roomsError}</p>}
-          {rooms === null && !roomsError && <p>กำลังโหลด...</p>}
+          {roomsError && <p style={{ color: colors.danger }}>{roomsError}</p>}
+          {rooms === null && !roomsError && <p style={{ color: colors.textSecondary }}>กำลังโหลด...</p>}
           {rooms?.map((room) => (
             <div
               key={room.id}
               onClick={() => selectRoom(room.id)}
               style={{
-                padding: 10,
+                padding: spacing.sm + 2,
                 cursor: 'pointer',
-                background: room.id === selectedRoomId ? '#f0f4ff' : undefined,
-                borderBottom: '1px solid #f0f0f0',
+                borderRadius: 8,
+                background: room.id === selectedRoomId ? colors.secondaryLight : undefined,
+                marginBottom: spacing.xs,
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong style={{ fontSize: 14 }}>{roomLabel(room)}</strong>
+                <strong style={{ fontSize: 14, color: colors.textPrimary }}>{roomLabel(room)}</strong>
                 {room.unreadCount > 0 && (
                   <span
                     style={{
-                      background: '#dc2626',
+                      background: colors.danger,
                       color: '#fff',
-                      borderRadius: 10,
+                      borderRadius: radius.pill,
                       padding: '0 6px',
                       fontSize: 11,
                     }}
@@ -279,22 +301,22 @@ export function ChatPage() {
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 12, color: '#777', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
                 {room.lastMessage?.message ?? (room.lastMessage?.imageUrl ? '[รูปภาพ]' : 'ยังไม่มีข้อความ')}
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          {!selectedRoom && <p style={{ color: '#999' }}>เลือกห้องแชทจากรายการด้านซ้าย</p>}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: spacing.md }}>
+          {!selectedRoom && <p style={{ color: colors.textMuted }}>เลือกห้องแชทจากรายการด้านซ้าย</p>}
 
           {selectedRoom && (
             <>
-              <div style={{ borderBottom: '1px solid #eee', paddingBottom: 8, marginBottom: 8 }}>
-                <strong>{roomLabel(selectedRoom)}</strong>
+              <div style={{ borderBottom: `1px solid ${colors.border}`, paddingBottom: spacing.sm, marginBottom: spacing.sm }}>
+                <strong style={{ color: colors.textPrimary }}>{roomLabel(selectedRoom)}</strong>
                 {selectedRoom.type === 'GROUP' && (
-                  <div style={{ fontSize: 12, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, marginTop: spacing.xs, color: colors.textSecondary }}>
                     <label>
                       <input
                         type="checkbox"
@@ -303,22 +325,22 @@ export function ChatPage() {
                       />{' '}
                       เปิดให้ลูกบ้านโพสต์ในกลุ่มนี้ได้ (ปิด = แอดมินประกาศได้ฝ่ายเดียว)
                     </label>
-                    {settingsError && <p style={{ color: 'crimson' }}>{settingsError}</p>}
+                    {settingsError && <p style={{ color: colors.danger }}>{settingsError}</p>}
                   </div>
                 )}
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {messagesLoading && <p>กำลังโหลดข้อความ...</p>}
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+                {messagesLoading && <p style={{ color: colors.textSecondary }}>กำลังโหลดข้อความ...</p>}
                 {messages.map((m) => {
                   const mine = m.senderId === session?.userId;
                   return (
                     <div key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
                       <div
                         style={{
-                          background: mine ? '#1d6f42' : '#f1f1f1',
-                          color: mine ? '#fff' : '#222',
-                          borderRadius: 10,
+                          background: mine ? colors.primary : colors.background,
+                          color: mine ? '#fff' : colors.textPrimary,
+                          borderRadius: radius.input,
                           padding: '8px 12px',
                         }}
                       >
@@ -329,7 +351,7 @@ export function ChatPage() {
                         )}
                         {m.message && <div>{m.message}</div>}
                       </div>
-                      <div style={{ fontSize: 10, color: '#999', textAlign: mine ? 'right' : 'left' }}>
+                      <div style={{ fontSize: 10, color: colors.textMuted, textAlign: mine ? 'right' : 'left' }}>
                         {formatTime(m.createdAt)}
                       </div>
                     </div>
@@ -337,9 +359,9 @@ export function ChatPage() {
                 })}
               </div>
 
-              {sendError && <p style={{ color: 'crimson' }}>{sendError}</p>}
+              {sendError && <p style={{ color: colors.danger }}>{sendError}</p>}
 
-              <form onSubmit={handleSend} style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <form onSubmit={handleSend} style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.sm }}>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                   📎
                   <input type="file" accept="image/*" onChange={handleAttachImage} style={{ display: 'none' }} />
@@ -349,16 +371,22 @@ export function ChatPage() {
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
                   placeholder="พิมพ์ข้อความ..."
-                  style={{ flex: 1, padding: 8 }}
+                  style={{
+                    flex: 1,
+                    padding: spacing.sm,
+                    borderRadius: radius.input,
+                    border: `1px solid ${colors.border}`,
+                    fontSize: 14,
+                  }}
                 />
-                <button type="submit" disabled={!messageInput.trim()}>
+                <Button type="submit" disabled={!messageInput.trim()}>
                   ส่ง
-                </button>
+                </Button>
               </form>
             </>
           )}
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

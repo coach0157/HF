@@ -1,8 +1,22 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { EntryLog, House, Paginated } from '../lib/types';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { colors, radius, spacing } from '../theme';
 
 const METHOD_LABEL: Record<'QR' | 'MANUAL', string> = { QR: 'สแกน QR', MANUAL: 'บันทึกด้วยมือ' };
+
+const selectStyle = {
+  display: 'block',
+  padding: spacing.sm,
+  marginTop: spacing.xs,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+};
+const thStyle = { padding: spacing.sm, fontSize: 13, color: colors.textSecondary };
+const tdStyle = { padding: spacing.sm, fontSize: 14, color: colors.textPrimary };
 
 /**
  * Entry log oversight view — spec 1.3 "รายงาน: export ประวัติเข้า-ออก",
@@ -56,12 +70,12 @@ export function EntryLogsPage() {
 
   return (
     <div>
-      <h1>ประวัติเข้า-ออก</h1>
+      <h1 style={{ color: colors.textPrimary }}>ประวัติเข้า-ออก</h1>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 16 }}>
-        <label>
+      <div style={{ display: 'flex', gap: spacing.md, alignItems: 'flex-end', marginBottom: spacing.lg, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 14, color: colors.textPrimary }}>
           บ้าน
-          <select value={houseId} onChange={(e) => setHouseId(e.target.value)} style={{ display: 'block', padding: 6 }}>
+          <select value={houseId} onChange={(e) => setHouseId(e.target.value)} style={selectStyle}>
             <option value="">ทั้งหมด</option>
             {houses.map((h) => (
               <option key={h.id} value={h.id}>
@@ -70,55 +84,55 @@ export function EntryLogsPage() {
             ))}
           </select>
         </label>
-        <label>
+        <label style={{ fontSize: 14, color: colors.textPrimary }}>
           วันที่
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ display: 'block', padding: 6 }} />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={selectStyle} />
         </label>
-        <button onClick={handleSearch}>ค้นหา</button>
+        <Button onClick={handleSearch}>ค้นหา</Button>
       </div>
 
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-      {result === null && !error && <p>กำลังโหลด...</p>}
-      {result !== null && result.items.length === 0 && <p>ไม่พบข้อมูล</p>}
+      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      {result === null && !error && <p style={{ color: colors.textSecondary }}>กำลังโหลด...</p>}
+      {result !== null && result.items.length === 0 && <p style={{ color: colors.textSecondary }}>ไม่พบข้อมูล</p>}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-            <th style={{ padding: 8 }}>บ้าน</th>
-            <th style={{ padding: 8 }}>ผู้มาเยือน</th>
-            <th style={{ padding: 8 }}>ทะเบียนรถ</th>
-            <th style={{ padding: 8 }}>วิธีบันทึก</th>
-            <th style={{ padding: 8 }}>เวลาเข้า</th>
-            <th style={{ padding: 8 }}>เวลาออก</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result?.items.map((log) => (
-            <tr key={log.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: 8 }}>{houseNo(log.houseId)}</td>
-              <td style={{ padding: 8 }}>{log.visitorName ?? '—'}</td>
-              <td style={{ padding: 8 }}>{log.vehiclePlate ?? '—'}</td>
-              <td style={{ padding: 8 }}>{METHOD_LABEL[log.method]}</td>
-              <td style={{ padding: 8 }}>{new Date(log.entryTime).toLocaleString('th-TH')}</td>
-              <td style={{ padding: 8 }}>
-                {log.exitTime ? new Date(log.exitTime).toLocaleString('th-TH') : 'ยังไม่ยืนยันออก'}
-              </td>
+      <Card style={{ padding: 0, overflowX: 'auto' as const }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+              <th style={thStyle}>บ้าน</th>
+              <th style={thStyle}>ผู้มาเยือน</th>
+              <th style={thStyle}>ทะเบียนรถ</th>
+              <th style={thStyle}>วิธีบันทึก</th>
+              <th style={thStyle}>เวลาเข้า</th>
+              <th style={thStyle}>เวลาออก</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {result?.items.map((log) => (
+              <tr key={log.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                <td style={tdStyle}>{houseNo(log.houseId)}</td>
+                <td style={tdStyle}>{log.visitorName ?? '—'}</td>
+                <td style={tdStyle}>{log.vehiclePlate ?? '—'}</td>
+                <td style={tdStyle}>{METHOD_LABEL[log.method]}</td>
+                <td style={tdStyle}>{new Date(log.entryTime).toLocaleString('th-TH')}</td>
+                <td style={tdStyle}>{log.exitTime ? new Date(log.exitTime).toLocaleString('th-TH') : 'ยังไม่ยืนยันออก'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
 
       {result && result.total > 0 && (
-        <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+        <div style={{ marginTop: spacing.md, display: 'flex', gap: spacing.md, alignItems: 'center' }}>
+          <Button variant="secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
             ก่อนหน้า
-          </button>
-          <span>
+          </Button>
+          <span style={{ fontSize: 14, color: colors.textPrimary }}>
             หน้า {page} / {totalPages} (ทั้งหมด {result.total} รายการ)
           </span>
-          <button disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+          <Button variant="secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
             ถัดไป
-          </button>
+          </Button>
         </div>
       )}
     </div>

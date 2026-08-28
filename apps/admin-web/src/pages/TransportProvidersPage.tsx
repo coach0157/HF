@@ -2,17 +2,29 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { TransportProvider, TransportProviderType } from '../lib/types';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { Badge } from '../components/Badge';
+import type { BadgeVariant } from '../components/Badge';
+import { colors, radius, spacing } from '../theme';
 
 // Epic 10 — Transport Directory (spec 2.7 / docs/PHASE2_BACKLOG.md Epic 10).
 // Admin-only CRUD screen: "แอดมินเพิ่ม/แก้ไข/ลบ/เปิด-ปิดการแสดงผล
 // รายชื่อผู้ให้บริการรถรับจ้าง". Pattern follows MembersPage.tsx/
-// AnnouncementsPage.tsx (inline-styled form + table, no UI library).
+// AnnouncementsPage.tsx (styled form + table via shared Button/Card/Badge).
 
 const TYPE_LABEL: Record<TransportProviderType, string> = {
   MOTORCYCLE: 'วินมอเตอร์ไซค์',
   TAXI: 'แท็กซี่',
   VAN: 'รถตู้',
   OTHER: 'อื่นๆ',
+};
+
+const TYPE_BADGE_VARIANT: Record<TransportProviderType, BadgeVariant> = {
+  MOTORCYCLE: 'info',
+  TAXI: 'warning',
+  VAN: 'success',
+  OTHER: 'neutral',
 };
 
 interface FormState {
@@ -23,6 +35,21 @@ interface FormState {
 }
 
 const emptyForm: FormState = { name: '', type: 'MOTORCYCLE', phone: '', serviceArea: '' };
+
+const labelStyle = { display: 'block', marginBottom: spacing.md, fontSize: 14, color: colors.textPrimary };
+const inputStyle = {
+  display: 'block',
+  width: '100%',
+  marginTop: spacing.xs,
+  padding: spacing.sm,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  boxSizing: 'border-box' as const,
+  fontFamily: 'inherit',
+};
+const thStyle = { padding: spacing.sm, fontSize: 13, color: colors.textSecondary };
+const tdStyle = { padding: spacing.sm, fontSize: 14, color: colors.textPrimary };
 
 export function TransportProvidersPage() {
   const [providers, setProviders] = useState<TransportProvider[] | null>(null);
@@ -121,74 +148,82 @@ export function TransportProvidersPage() {
 
   return (
     <div>
-      <h1>ทำเนียบรถรับจ้าง / เรียกรถโดยสาร</h1>
+      <h1 style={{ color: colors.textPrimary }}>ทำเนียบรถรับจ้าง / เรียกรถโดยสาร</h1>
 
-      <form onSubmit={handleSubmit} style={{ border: '1px solid #ddd', padding: 16, marginBottom: 24, maxWidth: 480 }}>
-        <h2 style={{ marginTop: 0 }}>{editingId ? 'แก้ไขผู้ให้บริการ' : 'เพิ่มผู้ให้บริการใหม่'}</h2>
+      <Card style={{ marginBottom: spacing.xl, maxWidth: 480 }}>
+        <form onSubmit={handleSubmit}>
+          <h2 style={{ marginTop: 0, fontSize: 18, color: colors.textPrimary }}>
+            {editingId ? 'แก้ไขผู้ให้บริการ' : 'เพิ่มผู้ให้บริการใหม่'}
+          </h2>
 
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          ชื่อ/ชื่อเล่นคนขับ
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          />
-        </label>
+          <label style={labelStyle}>
+            ชื่อ/ชื่อเล่นคนขับ
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              style={inputStyle}
+            />
+          </label>
 
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          ประเภท
-          <select
-            value={form.type}
-            onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as TransportProviderType }))}
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          >
-            {(Object.keys(TYPE_LABEL) as TransportProviderType[]).map((t) => (
-              <option key={t} value={t}>
-                {TYPE_LABEL[t]}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label style={labelStyle}>
+            ประเภท
+            <select
+              value={form.type}
+              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as TransportProviderType }))}
+              style={inputStyle}
+            >
+              {(Object.keys(TYPE_LABEL) as TransportProviderType[]).map((t) => (
+                <option key={t} value={t}>
+                  {TYPE_LABEL[t]}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          เบอร์โทรศัพท์
-          <input
-            type="tel"
-            value={form.phone}
-            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            placeholder="0811111111"
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          />
-        </label>
+          <label style={labelStyle}>
+            เบอร์โทรศัพท์
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              placeholder="0811111111"
+              style={inputStyle}
+            />
+          </label>
 
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          พื้นที่ให้บริการ/หมายเหตุ (เช่น ราคาโดยประมาณ)
-          <input
-            type="text"
-            value={form.serviceArea}
-            onChange={(e) => setForm((f) => ({ ...f, serviceArea: e.target.value }))}
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          />
-        </label>
+          <label style={labelStyle}>
+            พื้นที่ให้บริการ/หมายเหตุ (เช่น ราคาโดยประมาณ)
+            <input
+              type="text"
+              value={form.serviceArea}
+              onChange={(e) => setForm((f) => ({ ...f, serviceArea: e.target.value }))}
+              style={inputStyle}
+            />
+          </label>
 
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
+          {error && <p style={{ color: colors.danger, fontSize: 13 }}>{error}</p>}
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={loading}>
-            {loading ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ให้บริการ'}
-          </button>
-          {editingId && (
-            <button type="button" onClick={cancelEdit}>
-              ยกเลิก
-            </button>
-          )}
-        </div>
-      </form>
+          <div style={{ display: 'flex', gap: spacing.sm }}>
+            <Button type="submit" loading={loading} loadingText="กำลังบันทึก...">
+              {editingId ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ให้บริการ'}
+            </Button>
+            {editingId && (
+              <Button type="button" variant="secondary" onClick={cancelEdit}>
+                ยกเลิก
+              </Button>
+            )}
+          </div>
+        </form>
+      </Card>
 
-      <label>
+      <label style={{ fontSize: 14, color: colors.textPrimary }}>
         กรองตามประเภท:{' '}
-        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TransportProviderType | 'ALL')}>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as TransportProviderType | 'ALL')}
+          style={{ padding: spacing.xs, borderRadius: radius.input, border: `1px solid ${colors.border}` }}
+        >
           <option value="ALL">ทั้งหมด</option>
           {(Object.keys(TYPE_LABEL) as TransportProviderType[]).map((t) => (
             <option key={t} value={t}>
@@ -198,38 +233,50 @@ export function TransportProvidersPage() {
         </select>
       </label>
 
-      {listError && <p style={{ color: 'crimson' }}>{listError}</p>}
-      {providers === null && !listError && <p>กำลังโหลด...</p>}
-      {providers !== null && providers.length === 0 && <p>ยังไม่มีผู้ให้บริการ</p>}
+      {listError && <p style={{ color: colors.danger }}>{listError}</p>}
+      {providers === null && !listError && <p style={{ color: colors.textSecondary }}>กำลังโหลด...</p>}
+      {providers !== null && providers.length === 0 && <p style={{ color: colors.textSecondary }}>ยังไม่มีผู้ให้บริการ</p>}
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-        <thead>
-          <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-            <th style={{ padding: 8 }}>ชื่อ</th>
-            <th style={{ padding: 8 }}>ประเภท</th>
-            <th style={{ padding: 8 }}>เบอร์โทร</th>
-            <th style={{ padding: 8 }}>พื้นที่/หมายเหตุ</th>
-            <th style={{ padding: 8 }}>สถานะ</th>
-            <th style={{ padding: 8 }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {providers?.map((p) => (
-            <tr key={p.id} style={{ borderBottom: '1px solid #eee', opacity: p.isActive ? 1 : 0.55 }}>
-              <td style={{ padding: 8 }}>{p.name}</td>
-              <td style={{ padding: 8 }}>{TYPE_LABEL[p.type]}</td>
-              <td style={{ padding: 8 }}>{p.phone}</td>
-              <td style={{ padding: 8 }}>{p.serviceArea ?? '—'}</td>
-              <td style={{ padding: 8 }}>{p.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</td>
-              <td style={{ padding: 8, display: 'flex', gap: 8 }}>
-                <button onClick={() => startEdit(p)}>แก้ไข</button>
-                <button onClick={() => toggleActive(p)}>{p.isActive ? 'ปิดการแสดงผล' : 'เปิดการแสดงผล'}</button>
-                <button onClick={() => handleDelete(p.id)}>ลบ</button>
-              </td>
+      <Card style={{ marginTop: spacing.md, padding: 0, overflowX: 'auto' as const }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+              <th style={thStyle}>ชื่อ</th>
+              <th style={thStyle}>ประเภท</th>
+              <th style={thStyle}>เบอร์โทร</th>
+              <th style={thStyle}>พื้นที่/หมายเหตุ</th>
+              <th style={thStyle}>สถานะ</th>
+              <th style={thStyle}></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {providers?.map((p) => (
+              <tr key={p.id} style={{ borderBottom: `1px solid ${colors.border}`, opacity: p.isActive ? 1 : 0.55 }}>
+                <td style={tdStyle}>{p.name}</td>
+                <td style={tdStyle}>
+                  <Badge variant={TYPE_BADGE_VARIANT[p.type]}>{TYPE_LABEL[p.type]}</Badge>
+                </td>
+                <td style={tdStyle}>{p.phone}</td>
+                <td style={tdStyle}>{p.serviceArea ?? '—'}</td>
+                <td style={tdStyle}>
+                  <Badge variant={p.isActive ? 'success' : 'neutral'}>{p.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</Badge>
+                </td>
+                <td style={{ ...tdStyle, display: 'flex', gap: spacing.sm, flexWrap: 'wrap' as const }}>
+                  <Button variant="secondary" onClick={() => startEdit(p)}>
+                    แก้ไข
+                  </Button>
+                  <Button variant="secondary" onClick={() => toggleActive(p)}>
+                    {p.isActive ? 'ปิดการแสดงผล' : 'เปิดการแสดงผล'}
+                  </Button>
+                  <Button variant="danger" onClick={() => handleDelete(p.id)}>
+                    ลบ
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }

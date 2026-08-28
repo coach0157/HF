@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { Announcement, AnnouncementLevel, AnnouncementTargetScope, House } from '../lib/types';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { Badge } from '../components/Badge';
+import type { BadgeVariant } from '../components/Badge';
+import { colors, radius, spacing } from '../theme';
 
 const LEVEL_LABEL: Record<AnnouncementLevel, string> = {
   NORMAL: 'ปกติ',
@@ -9,10 +14,10 @@ const LEVEL_LABEL: Record<AnnouncementLevel, string> = {
   EMERGENCY: 'ฉุกเฉิน',
 };
 
-const LEVEL_COLOR: Record<AnnouncementLevel, string> = {
-  NORMAL: '#555',
-  IMPORTANT: '#b8860b',
-  EMERGENCY: '#c0392b',
+const LEVEL_BADGE_VARIANT: Record<AnnouncementLevel, BadgeVariant> = {
+  NORMAL: 'success',
+  IMPORTANT: 'warning',
+  EMERGENCY: 'danger',
 };
 
 const SCOPE_LABEL: Record<AnnouncementTargetScope, string> = {
@@ -37,6 +42,19 @@ const emptyForm: FormState = {
   targetScope: 'ALL',
   targetZone: '',
   targetHouseIds: [],
+};
+
+const labelStyle = { display: 'block', marginBottom: spacing.md, fontSize: 14, color: colors.textPrimary };
+const inputStyle = {
+  display: 'block',
+  width: '100%',
+  marginTop: spacing.xs,
+  padding: spacing.sm,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  boxSizing: 'border-box' as const,
+  fontFamily: 'inherit',
 };
 
 export function AnnouncementsPage() {
@@ -140,138 +158,157 @@ export function AnnouncementsPage() {
 
   return (
     <div>
-      <h1>จัดการประกาศ</h1>
+      <h1 style={{ color: colors.textPrimary }}>จัดการประกาศ</h1>
 
-      <form onSubmit={handleSubmit} style={{ border: '1px solid #ddd', padding: 16, marginBottom: 24, maxWidth: 520 }}>
-        <h2 style={{ marginTop: 0 }}>{editingId ? 'แก้ไขประกาศ' : 'สร้างประกาศใหม่'}</h2>
+      <Card as="div" style={{ marginBottom: spacing.xl, maxWidth: 520 }}>
+        <form onSubmit={handleSubmit}>
+          <h2 style={{ marginTop: 0, fontSize: 18, color: colors.textPrimary }}>
+            {editingId ? 'แก้ไขประกาศ' : 'สร้างประกาศใหม่'}
+          </h2>
 
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          หัวข้อ
-          <input
-            type="text"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          />
-        </label>
-
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          เนื้อหา
-          <textarea
-            value={form.content}
-            onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-            rows={4}
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          />
-        </label>
-
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          ระดับความสำคัญ
-          <select
-            value={form.level}
-            onChange={(e) => setForm((f) => ({ ...f, level: e.target.value as AnnouncementLevel }))}
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          >
-            {(Object.keys(LEVEL_LABEL) as AnnouncementLevel[]).map((lvl) => (
-              <option key={lvl} value={lvl}>
-                {LEVEL_LABEL[lvl]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={{ display: 'block', marginBottom: 10 }}>
-          กลุ่มเป้าหมาย
-          <select
-            value={form.targetScope}
-            onChange={(e) => setForm((f) => ({ ...f, targetScope: e.target.value as AnnouncementTargetScope }))}
-            style={{ display: 'block', width: '100%', padding: 6 }}
-          >
-            {(Object.keys(SCOPE_LABEL) as AnnouncementTargetScope[]).map((scope) => (
-              <option key={scope} value={scope}>
-                {SCOPE_LABEL[scope]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {form.targetScope === 'ZONE' && (
-          <label style={{ display: 'block', marginBottom: 10 }}>
-            โซน
+          <label style={labelStyle}>
+            หัวข้อ
             <input
               type="text"
-              value={form.targetZone}
-              onChange={(e) => setForm((f) => ({ ...f, targetZone: e.target.value }))}
-              placeholder="เช่น A"
-              style={{ display: 'block', width: '100%', padding: 6 }}
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              style={inputStyle}
             />
           </label>
-        )}
 
-        {form.targetScope === 'HOUSE' && (
-          <fieldset style={{ marginBottom: 10 }}>
-            <legend>เลือกบ้าน</legend>
-            {houses.length === 0 && <p>ยังไม่มีข้อมูลบ้าน</p>}
-            {houses.map((h) => (
-              <label key={h.id} style={{ display: 'block' }}>
-                <input
-                  type="checkbox"
-                  checked={form.targetHouseIds.includes(h.id)}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      targetHouseIds: e.target.checked
-                        ? [...f.targetHouseIds, h.id]
-                        : f.targetHouseIds.filter((id) => id !== h.id),
-                    }))
-                  }
-                />
-                {h.houseNo} {h.zone ? `(โซน ${h.zone})` : ''}
-              </label>
-            ))}
-          </fieldset>
-        )}
+          <label style={labelStyle}>
+            เนื้อหา
+            <textarea
+              value={form.content}
+              onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+              rows={4}
+              style={inputStyle}
+            />
+          </label>
 
-        {error && <p style={{ color: 'crimson' }}>{error}</p>}
+          <label style={labelStyle}>
+            ระดับความสำคัญ
+            <select
+              value={form.level}
+              onChange={(e) => setForm((f) => ({ ...f, level: e.target.value as AnnouncementLevel }))}
+              style={inputStyle}
+            >
+              {(Object.keys(LEVEL_LABEL) as AnnouncementLevel[]).map((lvl) => (
+                <option key={lvl} value={lvl}>
+                  {LEVEL_LABEL[lvl]}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="submit" disabled={loading}>
-            {loading ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : 'สร้างประกาศ'}
-          </button>
-          {editingId && (
-            <button type="button" onClick={cancelEdit}>
-              ยกเลิก
-            </button>
+          <label style={labelStyle}>
+            กลุ่มเป้าหมาย
+            <select
+              value={form.targetScope}
+              onChange={(e) => setForm((f) => ({ ...f, targetScope: e.target.value as AnnouncementTargetScope }))}
+              style={inputStyle}
+            >
+              {(Object.keys(SCOPE_LABEL) as AnnouncementTargetScope[]).map((scope) => (
+                <option key={scope} value={scope}>
+                  {SCOPE_LABEL[scope]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {form.targetScope === 'ZONE' && (
+            <label style={labelStyle}>
+              โซน
+              <input
+                type="text"
+                value={form.targetZone}
+                onChange={(e) => setForm((f) => ({ ...f, targetZone: e.target.value }))}
+                placeholder="เช่น A"
+                style={inputStyle}
+              />
+            </label>
           )}
-        </div>
-      </form>
 
-      <h2>รายการประกาศ</h2>
-      {listError && <p style={{ color: 'crimson' }}>{listError}</p>}
-      {announcements === null && !listError && <p>กำลังโหลด...</p>}
-      {announcements !== null && announcements.length === 0 && <p>ยังไม่มีประกาศ</p>}
+          {form.targetScope === 'HOUSE' && (
+            <fieldset
+              style={{
+                marginBottom: spacing.md,
+                border: `1px solid ${colors.border}`,
+                borderRadius: radius.input,
+                padding: spacing.md,
+              }}
+            >
+              <legend style={{ fontSize: 13, color: colors.textSecondary, padding: `0 ${spacing.xs}px` }}>
+                เลือกบ้าน
+              </legend>
+              {houses.length === 0 && <p style={{ color: colors.textSecondary }}>ยังไม่มีข้อมูลบ้าน</p>}
+              {houses.map((h) => (
+                <label key={h.id} style={{ display: 'block', fontSize: 14, padding: '2px 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.targetHouseIds.includes(h.id)}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        targetHouseIds: e.target.checked
+                          ? [...f.targetHouseIds, h.id]
+                          : f.targetHouseIds.filter((id) => id !== h.id),
+                      }))
+                    }
+                  />{' '}
+                  {h.houseNo} {h.zone ? `(โซน ${h.zone})` : ''}
+                </label>
+              ))}
+            </fieldset>
+          )}
 
-      <ul style={{ listStyle: 'none', padding: 0 }}>
+          {error && <p style={{ color: colors.danger, fontSize: 13 }}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: spacing.sm }}>
+            <Button type="submit" loading={loading} loadingText="กำลังบันทึก...">
+              {editingId ? 'บันทึกการแก้ไข' : 'สร้างประกาศ'}
+            </Button>
+            {editingId && (
+              <Button type="button" variant="secondary" onClick={cancelEdit}>
+                ยกเลิก
+              </Button>
+            )}
+          </div>
+        </form>
+      </Card>
+
+      <h2 style={{ color: colors.textPrimary }}>รายการประกาศ</h2>
+      {listError && <p style={{ color: colors.danger }}>{listError}</p>}
+      {announcements === null && !listError && <p style={{ color: colors.textSecondary }}>กำลังโหลด...</p>}
+      {announcements !== null && announcements.length === 0 && (
+        <p style={{ color: colors.textSecondary }}>ยังไม่มีประกาศ</p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
         {announcements?.map((a) => (
-          <li key={a.id} style={{ border: '1px solid #eee', padding: 12, marginBottom: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <strong>{a.title}</strong>
-              <span style={{ color: LEVEL_COLOR[a.level], fontWeight: 'bold' }}>{LEVEL_LABEL[a.level]}</span>
+          <Card key={a.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm }}>
+              <strong style={{ color: colors.textPrimary }}>{a.title}</strong>
+              <Badge variant={LEVEL_BADGE_VARIANT[a.level]}>{LEVEL_LABEL[a.level]}</Badge>
             </div>
-            <p style={{ whiteSpace: 'pre-wrap' }}>{a.content}</p>
-            <p style={{ fontSize: 12, color: '#666' }}>
+            <p style={{ whiteSpace: 'pre-wrap', color: colors.textPrimary }}>{a.content}</p>
+            <p style={{ fontSize: 12, color: colors.textSecondary }}>
               กลุ่มเป้าหมาย: {SCOPE_LABEL[a.targetScope]}
               {a.targetScope === 'ZONE' && a.targetZone ? ` (${a.targetZone})` : ''}
               {' · '}
               {new Date(a.createdAt).toLocaleString('th-TH')}
             </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => startEdit(a)}>แก้ไข</button>
-              <button onClick={() => handleDelete(a.id)}>ลบ</button>
+            <div style={{ display: 'flex', gap: spacing.sm }}>
+              <Button variant="secondary" onClick={() => startEdit(a)}>
+                แก้ไข
+              </Button>
+              <Button variant="danger" onClick={() => handleDelete(a.id)}>
+                ลบ
+              </Button>
             </div>
-          </li>
+          </Card>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }

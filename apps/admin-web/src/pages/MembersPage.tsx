@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { AppUser, House, UserRole } from '../lib/types';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { colors, radius, spacing } from '../theme';
 
 const ROLE_LABEL: Record<UserRole, string> = {
   RESIDENT: 'ลูกบ้าน',
@@ -19,6 +22,21 @@ interface UserFormState {
 }
 
 const emptyUserForm: UserFormState = { name: '', phone: '', role: 'RESIDENT', houseId: '' };
+
+const labelStyle = { display: 'block', marginBottom: spacing.md, fontSize: 14, color: colors.textPrimary };
+const inputStyle = {
+  display: 'block',
+  width: '100%',
+  marginTop: spacing.xs,
+  padding: spacing.sm,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  boxSizing: 'border-box' as const,
+  fontFamily: 'inherit',
+};
+const thStyle = { padding: spacing.sm, fontSize: 13, color: colors.textSecondary };
+const tdStyle = { padding: spacing.sm, fontSize: 14, color: colors.textPrimary };
 
 export function MembersPage() {
   const [users, setUsers] = useState<AppUser[] | null>(null);
@@ -153,35 +171,37 @@ export function MembersPage() {
 
   return (
     <div>
-      <h1>จัดการสมาชิก/บ้าน</h1>
+      <h1 style={{ color: colors.textPrimary }}>จัดการสมาชิก/บ้าน</h1>
 
-      <section style={{ marginBottom: 32 }}>
-        <h2>บ้าน</h2>
-        <form onSubmit={submitHouse} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
-          <label>
-            เลขที่บ้าน
-            <input
-              type="text"
-              value={newHouseNo}
-              onChange={(e) => setNewHouseNo(e.target.value)}
-              style={{ display: 'block', padding: 6 }}
-            />
-          </label>
-          <label>
-            โซน (ถ้ามี)
-            <input
-              type="text"
-              value={newHouseZone}
-              onChange={(e) => setNewHouseZone(e.target.value)}
-              style={{ display: 'block', padding: 6 }}
-            />
-          </label>
-          <button type="submit" disabled={houseLoading}>
-            {houseLoading ? 'กำลังเพิ่ม...' : 'เพิ่มบ้าน'}
-          </button>
-        </form>
-        {houseError && <p style={{ color: 'crimson' }}>{houseError}</p>}
-        <ul>
+      <section style={{ marginBottom: spacing.xxl }}>
+        <h2 style={{ color: colors.textPrimary }}>บ้าน</h2>
+        <Card style={{ marginBottom: spacing.md, maxWidth: 480 }}>
+          <form onSubmit={submitHouse} style={{ display: 'flex', gap: spacing.md, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 14, color: colors.textPrimary }}>
+              เลขที่บ้าน
+              <input
+                type="text"
+                value={newHouseNo}
+                onChange={(e) => setNewHouseNo(e.target.value)}
+                style={{ ...inputStyle, width: 160 }}
+              />
+            </label>
+            <label style={{ fontSize: 14, color: colors.textPrimary }}>
+              โซน (ถ้ามี)
+              <input
+                type="text"
+                value={newHouseZone}
+                onChange={(e) => setNewHouseZone(e.target.value)}
+                style={{ ...inputStyle, width: 120 }}
+              />
+            </label>
+            <Button type="submit" loading={houseLoading} loadingText="กำลังเพิ่ม...">
+              เพิ่มบ้าน
+            </Button>
+          </form>
+          {houseError && <p style={{ color: colors.danger, fontSize: 13 }}>{houseError}</p>}
+        </Card>
+        <ul style={{ paddingLeft: spacing.lg, color: colors.textPrimary }}>
           {houses.map((h) => (
             <li key={h.id}>
               {h.houseNo} {h.zone ? `(โซน ${h.zone})` : ''}
@@ -191,80 +211,86 @@ export function MembersPage() {
       </section>
 
       <section>
-        <h2>สมาชิก</h2>
-        <form onSubmit={submitUser} style={{ border: '1px solid #ddd', padding: 16, marginBottom: 20, maxWidth: 480 }}>
-          <h3 style={{ marginTop: 0 }}>{editingUserId ? 'แก้ไขสมาชิก' : 'เพิ่มสมาชิกใหม่'}</h3>
+        <h2 style={{ color: colors.textPrimary }}>สมาชิก</h2>
+        <Card style={{ marginBottom: spacing.xl, maxWidth: 480 }}>
+          <form onSubmit={submitUser}>
+            <h3 style={{ marginTop: 0, color: colors.textPrimary }}>{editingUserId ? 'แก้ไขสมาชิก' : 'เพิ่มสมาชิกใหม่'}</h3>
 
-          <label style={{ display: 'block', marginBottom: 10 }}>
-            ชื่อ
-            <input
-              type="text"
-              value={userForm.name}
-              onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))}
-              style={{ display: 'block', width: '100%', padding: 6 }}
-            />
-          </label>
+            <label style={labelStyle}>
+              ชื่อ
+              <input
+                type="text"
+                value={userForm.name}
+                onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))}
+                style={inputStyle}
+              />
+            </label>
 
-          <label style={{ display: 'block', marginBottom: 10 }}>
-            เบอร์โทรศัพท์
-            <input
-              type="tel"
-              value={userForm.phone}
-              disabled={Boolean(editingUserId)}
-              onChange={(e) => setUserForm((f) => ({ ...f, phone: e.target.value }))}
-              placeholder="0811111111"
-              style={{ display: 'block', width: '100%', padding: 6 }}
-            />
-          </label>
+            <label style={labelStyle}>
+              เบอร์โทรศัพท์
+              <input
+                type="tel"
+                value={userForm.phone}
+                disabled={Boolean(editingUserId)}
+                onChange={(e) => setUserForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="0811111111"
+                style={inputStyle}
+              />
+            </label>
 
-          <label style={{ display: 'block', marginBottom: 10 }}>
-            บทบาท
-            <select
-              value={userForm.role}
-              onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value as UserRole }))}
-              style={{ display: 'block', width: '100%', padding: 6 }}
-            >
-              {(Object.keys(ROLE_LABEL) as UserRole[]).map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABEL[r]}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label style={labelStyle}>
+              บทบาท
+              <select
+                value={userForm.role}
+                onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value as UserRole }))}
+                style={inputStyle}
+              >
+                {(Object.keys(ROLE_LABEL) as UserRole[]).map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label style={{ display: 'block', marginBottom: 10 }}>
-            บ้านเลขที่
-            <select
-              value={userForm.houseId}
-              onChange={(e) => setUserForm((f) => ({ ...f, houseId: e.target.value }))}
-              style={{ display: 'block', width: '100%', padding: 6 }}
-            >
-              <option value="">— ไม่ผูกบ้าน —</option>
-              {houses.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.houseNo} {h.zone ? `(โซน ${h.zone})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label style={labelStyle}>
+              บ้านเลขที่
+              <select
+                value={userForm.houseId}
+                onChange={(e) => setUserForm((f) => ({ ...f, houseId: e.target.value }))}
+                style={inputStyle}
+              >
+                <option value="">— ไม่ผูกบ้าน —</option>
+                {houses.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.houseNo} {h.zone ? `(โซน ${h.zone})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          {userError && <p style={{ color: 'crimson' }}>{userError}</p>}
+            {userError && <p style={{ color: colors.danger, fontSize: 13 }}>{userError}</p>}
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="submit" disabled={loading}>
-              {loading ? 'กำลังบันทึก...' : editingUserId ? 'บันทึกการแก้ไข' : 'เพิ่มสมาชิก'}
-            </button>
-            {editingUserId && (
-              <button type="button" onClick={cancelEdit}>
-                ยกเลิก
-              </button>
-            )}
-          </div>
-        </form>
+            <div style={{ display: 'flex', gap: spacing.sm }}>
+              <Button type="submit" loading={loading} loadingText="กำลังบันทึก...">
+                {editingUserId ? 'บันทึกการแก้ไข' : 'เพิ่มสมาชิก'}
+              </Button>
+              {editingUserId && (
+                <Button type="button" variant="secondary" onClick={cancelEdit}>
+                  ยกเลิก
+                </Button>
+              )}
+            </div>
+          </form>
+        </Card>
 
-        <label>
+        <label style={{ fontSize: 14, color: colors.textPrimary }}>
           กรองตามบทบาท:{' '}
-          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as UserRole | 'ALL')}>
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as UserRole | 'ALL')}
+            style={{ padding: spacing.xs, borderRadius: radius.input, border: `1px solid ${colors.border}` }}
+          >
             <option value="ALL">ทั้งหมด</option>
             {(Object.keys(ROLE_LABEL) as UserRole[]).map((r) => (
               <option key={r} value={r}>
@@ -274,34 +300,40 @@ export function MembersPage() {
           </select>
         </label>
 
-        {listError && <p style={{ color: 'crimson' }}>{listError}</p>}
-        {users === null && !listError && <p>กำลังโหลด...</p>}
+        {listError && <p style={{ color: colors.danger }}>{listError}</p>}
+        {users === null && !listError && <p style={{ color: colors.textSecondary }}>กำลังโหลด...</p>}
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
-          <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '2px solid #ccc' }}>
-              <th style={{ padding: 8 }}>ชื่อ</th>
-              <th style={{ padding: 8 }}>เบอร์โทร</th>
-              <th style={{ padding: 8 }}>บทบาท</th>
-              <th style={{ padding: 8 }}>บ้าน</th>
-              <th style={{ padding: 8 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {users?.map((u) => (
-              <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: 8 }}>{u.name}</td>
-                <td style={{ padding: 8 }}>{u.phone}</td>
-                <td style={{ padding: 8 }}>{ROLE_LABEL[u.role]}</td>
-                <td style={{ padding: 8 }}>{houseLabel(u.houseId)}</td>
-                <td style={{ padding: 8, display: 'flex', gap: 8 }}>
-                  <button onClick={() => startEdit(u)}>แก้ไข</button>
-                  <button onClick={() => removeUser(u.id)}>ลบ</button>
-                </td>
+        <Card style={{ marginTop: spacing.md, padding: 0, overflowX: 'auto' as const }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+                <th style={thStyle}>ชื่อ</th>
+                <th style={thStyle}>เบอร์โทร</th>
+                <th style={thStyle}>บทบาท</th>
+                <th style={thStyle}>บ้าน</th>
+                <th style={thStyle}></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users?.map((u) => (
+                <tr key={u.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                  <td style={tdStyle}>{u.name}</td>
+                  <td style={tdStyle}>{u.phone}</td>
+                  <td style={tdStyle}>{ROLE_LABEL[u.role]}</td>
+                  <td style={tdStyle}>{houseLabel(u.houseId)}</td>
+                  <td style={{ ...tdStyle, display: 'flex', gap: spacing.sm }}>
+                    <Button variant="secondary" onClick={() => startEdit(u)}>
+                      แก้ไข
+                    </Button>
+                    <Button variant="danger" onClick={() => removeUser(u.id)}>
+                      ลบ
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
       </section>
     </div>
   );

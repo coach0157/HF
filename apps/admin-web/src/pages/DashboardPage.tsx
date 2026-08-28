@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { EntryLog, GuardShift, Paginated, SosAlert } from '../lib/types';
+import { Card } from '../components/Card';
+import { colors, spacing } from '../theme';
 
 /**
  * Dashboard — spec 1.3: "กราฟสรุปรถเข้า-ออกวันนี้, จำนวนแจ้งเหตุ, ค้างชำระค่าส่วนกลาง".
@@ -33,15 +35,17 @@ export function DashboardPage() {
 
   return (
     <div>
-      <h1>Dashboard</h1>
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+      <h1 style={{ color: colors.textPrimary }}>Dashboard</h1>
+      <div style={{ display: 'flex', gap: spacing.lg, flexWrap: 'wrap' }}>
         <StatCard title="รถ/แขกเข้า-ออกวันนี้" value={entryToday} linkTo="/entry-logs" />
         <StatCard title="แจ้งเหตุ SOS ที่รอรับแจ้ง" value={pendingSos} linkTo="/sos" highlight={Boolean(pendingSos)} />
         <StatCard title="รปภ. ที่กำลังปฏิบัติหน้าที่" value={onDutyGuards} linkTo="/guard-shifts" />
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, minWidth: 200, opacity: 0.6 }}>
-          <div style={{ fontSize: 13, color: '#666' }}>ค้างชำระค่าส่วนกลาง</div>
-          <div style={{ fontSize: 14, marginTop: 8 }}>ยังไม่พร้อมใช้งาน (โมดูลชำระเงิน — เฟส 3)</div>
-        </div>
+        <Card style={{ minWidth: 200, opacity: 0.6 }}>
+          <div style={{ fontSize: 13, color: colors.textSecondary }}>ค้างชำระค่าส่วนกลาง</div>
+          <div style={{ fontSize: 14, marginTop: spacing.sm, color: colors.textPrimary }}>
+            ยังไม่พร้อมใช้งาน (โมดูลชำระเงิน — เฟส 3)
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -59,21 +63,19 @@ function StatCard({
   highlight?: boolean;
 }) {
   return (
-    <Link
-      to={linkTo}
-      style={{
-        textDecoration: 'none',
-        color: 'inherit',
-        border: `1px solid ${highlight ? '#c0392b' : '#ddd'}`,
-        borderRadius: 8,
-        padding: 16,
-        minWidth: 200,
-      }}
-    >
-      <div style={{ fontSize: 13, color: '#666' }}>{title}</div>
-      <div style={{ fontSize: 32, fontWeight: 'bold', color: highlight ? '#c0392b' : 'inherit' }}>
-        {value === null ? '—' : value}
-      </div>
+    <Link to={linkTo} style={{ textDecoration: 'none', color: 'inherit' }}>
+      <Card
+        style={{
+          minWidth: 200,
+          border: `1px solid ${highlight ? colors.danger : colors.border}`,
+          background: highlight ? colors.dangerLight : colors.surface,
+        }}
+      >
+        <div style={{ fontSize: 13, color: highlight ? colors.danger : colors.textSecondary }}>{title}</div>
+        <div style={{ fontSize: 32, fontWeight: 'bold', color: highlight ? colors.danger : colors.textPrimary }}>
+          {value === null ? '—' : value}
+        </div>
+      </Card>
     </Link>
   );
 }

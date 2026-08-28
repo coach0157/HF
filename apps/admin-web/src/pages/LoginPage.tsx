@@ -4,6 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { setSession } from '../lib/auth';
 import type { AppUser } from '../lib/types';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { colors, font, radius, spacing } from '../theme';
 
 interface LoginResponse {
   accessToken: string;
@@ -12,6 +15,18 @@ interface LoginResponse {
 }
 
 const PHONE_PATTERN = /^0\d{9}$/;
+
+const labelStyle = { display: 'block', marginBottom: spacing.md, fontSize: 14, color: colors.textPrimary };
+const inputStyle = {
+  display: 'block',
+  width: '100%',
+  margin: `${spacing.xs}px 0 0`,
+  padding: spacing.sm + 2,
+  borderRadius: radius.input,
+  border: `1px solid ${colors.border}`,
+  fontSize: 14,
+  boxSizing: 'border-box' as const,
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -73,65 +88,78 @@ export function LoginPage() {
   }
 
   return (
-    <div style={{ maxWidth: 360, margin: '80px auto', fontFamily: 'sans-serif' }}>
-      <h1>เข้าสู่ระบบ (Admin)</h1>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: colors.background,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: font.family,
+      }}
+    >
+      <Card style={{ width: '100%', maxWidth: 360, margin: spacing.lg }} padding={spacing.xl}>
+        <h1 style={{ fontSize: 22, color: colors.textPrimary, marginTop: 0 }}>เข้าสู่ระบบ (Admin)</h1>
 
-      {step === 'phone' && (
-        <form onSubmit={requestOtp}>
-          <label>
-            เบอร์โทรศัพท์
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.trim())}
-              placeholder="0800000000"
-              maxLength={10}
-              style={{ display: 'block', width: '100%', margin: '4px 0 12px', padding: 8 }}
-              autoFocus
-            />
-          </label>
-          {error && <p style={{ color: 'crimson' }}>{error}</p>}
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: 10 }}>
-            {loading ? 'กำลังส่ง OTP...' : 'ขอรหัส OTP'}
-          </button>
-        </form>
-      )}
+        {step === 'phone' && (
+          <form onSubmit={requestOtp}>
+            <label style={labelStyle}>
+              เบอร์โทรศัพท์
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.trim())}
+                placeholder="0800000000"
+                maxLength={10}
+                style={inputStyle}
+                autoFocus
+              />
+            </label>
+            {error && <p style={{ color: colors.danger, fontSize: 13 }}>{error}</p>}
+            <Button type="submit" fullWidth loading={loading} loadingText="กำลังส่ง OTP...">
+              ขอรหัส OTP
+            </Button>
+          </form>
+        )}
 
-      {step === 'otp' && (
-        <form onSubmit={submitLogin}>
-          <p>
-            ส่งรหัส OTP ไปยัง {phone} แล้ว (ระบบ dev นี้พิมพ์รหัสไว้ใน console log ของ backend)
-          </p>
-          <label>
-            รหัส OTP (6 หลัก)
-            <input
-              type="text"
-              inputMode="numeric"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.trim())}
-              placeholder="000000"
-              maxLength={6}
-              style={{ display: 'block', width: '100%', margin: '4px 0 12px', padding: 8 }}
-              autoFocus
-            />
-          </label>
-          {error && <p style={{ color: 'crimson' }}>{error}</p>}
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: 10 }}>
-            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setStep('phone');
-              setOtp('');
-              setError(null);
-            }}
-            style={{ width: '100%', padding: 10, marginTop: 8 }}
-          >
-            เปลี่ยนเบอร์โทรศัพท์
-          </button>
-        </form>
-      )}
+        {step === 'otp' && (
+          <form onSubmit={submitLogin}>
+            <p style={{ fontSize: 13, color: colors.textSecondary }}>
+              ส่งรหัส OTP ไปยัง {phone} แล้ว (ระบบ dev นี้พิมพ์รหัสไว้ใน console log ของ backend)
+            </p>
+            <label style={labelStyle}>
+              รหัส OTP (6 หลัก)
+              <input
+                type="text"
+                inputMode="numeric"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.trim())}
+                placeholder="000000"
+                maxLength={6}
+                style={inputStyle}
+                autoFocus
+              />
+            </label>
+            {error && <p style={{ color: colors.danger, fontSize: 13 }}>{error}</p>}
+            <Button type="submit" fullWidth loading={loading} loadingText="กำลังเข้าสู่ระบบ...">
+              เข้าสู่ระบบ
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              style={{ marginTop: spacing.sm }}
+              onClick={() => {
+                setStep('phone');
+                setOtp('');
+                setError(null);
+              }}
+            >
+              เปลี่ยนเบอร์โทรศัพท์
+            </Button>
+          </form>
+        )}
+      </Card>
     </div>
   );
 }
