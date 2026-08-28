@@ -48,6 +48,13 @@ export class EntryLogController {
     @Query("date") date: string | undefined,
     @Query("page") page: string | undefined,
     @Query("pageSize") pageSize: string | undefined,
+    // QA-flagged gap: mobile's ExitConfirmScreen was filtering "not yet
+    // exited" client-side over a single pageSize=100 page, silently
+    // dropping open visitors past the 100th when the gate's true open
+    // count exceeds that. `exited=true`/`exited=false` pushes the
+    // `exit_time IS NULL` filter into the DB query (see service's `list()`)
+    // so it's correct against the real total, not just one page's worth.
+    @Query("exited") exited: string | undefined,
     @CurrentUser() user: TenantClaims,
   ) {
     return this.entryLogService.list(
@@ -56,6 +63,7 @@ export class EntryLogController {
         date,
         page: Math.max(1, Number(page) || 1),
         pageSize: Math.min(100, Math.max(1, Number(pageSize) || 20)),
+        exited: exited === undefined ? undefined : exited === "true",
       },
       user,
     );

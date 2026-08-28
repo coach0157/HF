@@ -70,6 +70,27 @@ export class GuardShiftService {
     });
   }
 
+  /**
+   * QA-flagged gap: lets a guard read their own current shift so the mobile
+   * app can sync on/off-duty UI state on launch instead of trusting
+   * locally-remembered state (which is wrong after a kill-and-reopen mid-
+   * shift). Always scoped to `claims.userId` — never accepts a target guard
+   * id — so this can never be used to read another guard's shift status.
+   * Returns `null` (not 404) when the guard has no open shift; "not on
+   * duty" is a normal, expected state, not an error.
+   */
+  async getCurrentForGuard(claims: TenantClaims) {
+    const tx = getTenantPrismaClient<PrismaClient>();
+    return tx.guardShift.findFirst({
+      where: {
+        guardUserId: claims.userId,
+        status: GuardShiftStatus.ON_DUTY,
+        shiftEnd: null,
+      },
+      orderBy: { shiftStart: "desc" },
+    });
+  }
+
   async list(filters: { status?: GuardShiftStatus; guardUserId?: string }) {
     const tx = getTenantPrismaClient<PrismaClient>();
     return tx.guardShift.findMany({

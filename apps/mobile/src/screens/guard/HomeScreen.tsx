@@ -2,27 +2,32 @@
  * Guard home (spec 1.2 "หน้าแรก") — MVP_BACKLOG.md Epic 7.
  *
  * Today's entry/exit summary: no dedicated summary endpoint exists, so this
- * computes client-side from `GET /entry-logs?date=<today>&pageSize=100`
- * (entry count = the accurate server-side `total`; exit count = an
- * approximation over the returned page, since there's no exit-time filter
- * — acceptable for a small village's daily volume per the MVP_BACKLOG note).
+ * computes from two cheap `GET /entry-logs?date=<today>` calls — entry count
+ * uses the accurate server-side `total` (no filter), exit count uses the
+ * new `exited=true` server-side filter's `total` (QA fix — previously an
+ * approximation over one pageSize=100 page's client-side filter, which
+ * undercounted once a day's traffic passed 100 rows). `pageSize=1` on both
+ * calls keeps the payload tiny since only `total` is used, never `items`.
  *
- * Guard shift status: `GET /guard-shifts` (list, to know current on/off-duty
- * status) is ADMIN-only in guard-shift.controller.ts — a GUARD caller can
- * only `POST /guard-shifts` (start) / `PATCH /guard-shifts/:id` (end), not
- * read their own current shift. Product call made here (per the original
- * doc comment's "pick one and note the decision"): surface a simple
- * Start/End shift toggle backed by locally-remembered shift id+state rather
- * than a true read-only status display, since there is nothing to read.
- * This is a mobile-side UX nicety, not required for SOS routing correctness
- * (that's enforced server-side against `guard_shifts.status`).
+ * Guard shift status: previously local-state-only (no way for a GUARD
+ * caller to read their own shift — `GET /guard-shifts` list is ADMIN-only),
+ * so relaunching the app mid-shift showed "ยังไม่เริ่มเวร" even while truly
+ * on duty, and tapping the toggle could then race a duplicate
+ * `POST /guard-shifts` against the still-open server-side shift (400 "This
+ * guard already has an open shift"). QA fix: `GET /guard-shifts/me/current`
+ * (guard-shift.controller.ts, GUARD-only, self-scoped) is now called on
+ * every focus to sync `onDuty`/`shiftId` with the real server state before
+ * the guard can toggle it. Response is `{ shift: GuardShift | null }` (not
+ * a bare value — a raw `null`/`undefined` controller return doesn't
+ * round-trip as JSON `null` over Nest/Express, see the controller's doc
+ * comment).
  */
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { api, ApiError } from "../../lib/api";
-import type { EntryLog, Paginated } from "../../lib/types";
+import type { EntryLog, GuardShift, Paginated } from "../../lib/types";
 import type { GuardTabParamList } from "../../navigation/types";
 
 function todayIso(): string {
@@ -37,15 +42,26 @@ export function GuardHomeScreen() {
   const [onDuty, setOnDuty] = useState(false);
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [shiftBusy, setShiftBusy] = useState(false);
+  const [shiftSynced, setShiftSynced] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<Paginated<EntryLog>>(`/entry-logs?date=${todayIso()}&pageSize=100`);
-      setEntryCount(res.total);
-      setExitCount(res.items.filter((l) => l.exitTime).length);
+      const [entryRes, exitRes, currentShiftRes] = await Promise.all([
+        api.get<Paginated<EntryLog>>(`/entry-logs?date=${todayIso()}&pageSize=1`),
+        api.get<Paginated<EntryLog>>(`/entry-logs?date=${todayIso()}&exited=true&pageSize=1`),
+        api.get<{ shift: GuardShift | null }>("/guard-shifts/me/current"),
+      ]);
+      setEntryCount(entryRes.total);
+      setExitCount(exitRes.total);
+      setOnDuty(!!currentShiftRes.shift);
+      setShiftId(currentShiftRes.shift?.id ?? null);
+      setShiftSynced(true);
     } catch {
-      // Non-blocking — the scan button still works without a summary.
+      // Non-blocking — the scan button still works without a summary. Shift
+      // toggle stays disabled below until a sync succeeds, so a stale/wrong
+      // on/off-duty state is never shown or actionable.
+      setShiftSynced(false);
     } finally {
       setLoading(false);
     }
@@ -71,6 +87,10 @@ export function GuardHomeScreen() {
       }
     } catch (e) {
       Alert.alert("ทำรายการไม่สำเร็จ", e instanceof ApiError ? e.message : "ลองใหม่อีกครั้ง");
+      // The toggle attempt may have raced actual server state (e.g. another
+      // device already started/ended this guard's shift) — re-sync rather
+      // than trust the optimistic local value after a failure.
+      load();
     } finally {
       setShiftBusy(false);
     }
@@ -84,8 +104,14 @@ export function GuardHomeScreen() {
     >
       <View style={styles.shiftRow}>
         <View style={[styles.dot, { backgroundColor: onDuty ? "#27ae60" : "#999" }]} />
-        <Text style={styles.shiftLabel}>{onDuty ? "กำลังปฏิบัติหน้าที่" : "ยังไม่เริ่มเวร"}</Text>
-        <TouchableOpacity style={styles.shiftButton} onPress={handleToggleShift} disabled={shiftBusy}>
+        <Text style={styles.shiftLabel}>
+          {!shiftSynced && loading ? "กำลังซิงค์สถานะเวร..." : onDuty ? "กำลังปฏิบัติหน้าที่" : "ยังไม่เริ่มเวร"}
+        </Text>
+        <TouchableOpacity
+          style={styles.shiftButton}
+          onPress={handleToggleShift}
+          disabled={shiftBusy || !shiftSynced}
+        >
           {shiftBusy ? (
             <ActivityIndicator size="small" color="#1d6f42" />
           ) : (

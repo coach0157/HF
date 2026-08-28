@@ -372,3 +372,208 @@ Nothing new to add to QA pass 1's production-readiness punch list
 `photo_url` nulling) — this pass's scope (Admin Dashboard UI + its two new
 backend surfaces) did not touch any of those areas and found no additional
 items of that severity.
+
+---
+
+## QA pass 3 — Mobile app (`apps/mobile`, Epic 6/7 UI implementation)
+
+**Scope:** the just-implemented Resident (6 screens) + Guard (4 screens)
+mobile UI in `apps/mobile/src`, plus the two backend gaps Dev flagged for
+this pass. **Method constraint, stated up front: this machine has no
+Android/iOS emulator and never has — no screen in this app has ever been
+rendered.** Everything below is static analysis (read every screen's
+source in full against the backend it calls), backend integration
+correctness (does the request shape/response shape/RBAC actually match
+what the screen assumes), and automated backend tests. No UI rendering,
+no manual tap-through, no visual verification of any kind was performed or
+attempted — that risk is not covered by this pass and is called out
+explicitly in the go/no-go below.
+
+### 1. Build / typecheck / test results
+
+| Check | Result |
+|---|---|
+| `npm run typecheck --workspace apps/mobile` | **Pass** — no TS errors, including after all mobile-side fixes below |
+| `npm run build` (root — backend + admin-web; mobile has no bundler build step to run headless) | **Pass** |
+| `apps/backend` unit tests (`jest`, excl. e2e) | **Pass** — 62/62 (added 7 new: 3 for `guard-shift.service.ts`'s new method, 4 for `entry-log.service.ts`'s new filter) |
+| `apps/backend` e2e tests (`jest --config test/jest-e2e.json`) | **Pass** — 72/72 (added 5 new: 3 RBAC/self-scoping tests for the new endpoint, 2 correctness/isolation tests for the new query param) |
+| `apps/mobile` unit/component tests | **None exist** — no test runner is configured for `apps/mobile` (no jest config, no `*.test.*`/`*.spec.*` files, no `test` script in `package.json`). This matches MVP_BACKLOG.md Epic 6/7's own task list, which still has "Unit/component test เมื่อเริ่ม implement" unchecked — Dev's UI round did not add a test harness. Flagged back, not something I set up myself (out of this pass's assigned scope, and a real emulator/simulator or a DOM-less RN test renderer would be needed to make component tests meaningful, which circles back to the same "no emulator" constraint). |
+
+### 2. Gap 1 (Dev-flagged) — guard shift state didn't persist across app restarts — **fixed**
+
+Confirmed the gap was real: `GuardHomeScreen.tsx` tracked `onDuty`/`shiftId`
+in local component state only. `GET /guard-shifts` (list) was `@Roles("ADMIN")`-only
+in `guard-shift.controller.ts`, and there was no other way for a `GUARD`
+caller to read their own shift. A guard who force-closed the app mid-shift
+and reopened it would see "ยังไม่เริ่มเวร" while a real `ON_DUTY` row still
+existed server-side; tapping "เริ่มเวร" would then hit `guard-shift.service.ts`'s
+`start()` guard against a duplicate open shift and 400.
+
+**Fix — new endpoint `GET /guard-shifts/me/current`:**
+- `apps/backend/src/modules/guard-shift/guard-shift.controller.ts` — `@Roles("GUARD")`
+  only (not ADMIN — matches the brief's "guard เท่านั้น"). Never accepts a
+  target-guard parameter; always resolves from `@CurrentUser()`.
+- `apps/backend/src/modules/guard-shift/guard-shift.service.ts`'s new
+  `getCurrentForGuard()` queries `guardShift.findFirst` scoped to
+  `guardUserId: claims.userId, status: ON_DUTY, shiftEnd: null` — structurally
+  incapable of returning another guard's shift, verified by an e2e test with
+  two guards in the same village.
+- Response is wrapped `{ shift: GuardShift | null }`, not a bare value.
+  Found and worked around a real Nest/Express quirk during testing: a
+  controller returning raw `null` doesn't serialize to JSON `null` — Nest's
+  `RouterResponseController` → Express adapter's `reply()` treats
+  `isNil(body)` as "send nothing", so the HTTP response body is empty, not
+  the string `"null"`. A test asserting `body).toBeNull()` against that got
+  `undefined` instead. Wrapping in an object sidesteps it entirely.
+- `apps/mobile/src/screens/guard/HomeScreen.tsx` now calls this endpoint
+  (alongside the existing entry/exit-count calls, via `Promise.all` on
+  every screen focus) and sets `onDuty`/`shiftId` from the real server
+  state. The shift toggle button is disabled until a sync succeeds
+  (`shiftSynced` state) — a failed sync leaves the UI showing "กำลังซิงค์..."
+  and non-actionable rather than falling back to a guessed state. A failed
+  toggle attempt (e.g. lost the start/end race against another device) now
+  re-syncs from the server instead of trusting the optimistic local update.
+- Test coverage: 3 unit tests (`guard-shift.service.spec.ts`) + 3 e2e tests
+  (`security-flows.e2e-spec.ts`) — RBAC (resident and admin both 403),
+  null-then-shift-then-null-again correctness, and self-scoping (guard Y
+  never sees guard X's open shift).
+
+### 3. Gap 2 (Dev-flagged) — pagination cap 100 on "not yet exited" — **fixed for `ExitConfirmScreen`, residual gap noted for `EntryHistoryScreen`**
+
+Confirmed `entry-log.service.ts`'s `list()` had no server-side "still open"
+filter — `ExitConfirmScreen.tsx` was fetching a single `pageSize=100` page
+of *all* recent entries (open + closed, village-wide, not date-scoped) and
+filtering `!exitTime` client-side. If a gate had more than 100 truly-open
+visitors at once, the ones pushed past page 1 by more-recent *closed*
+entries would silently never appear in the confirm-exit list — a real,
+if edge-case, data-integrity risk (a guest who should be confirmable as
+exited becomes unreachable through the UI).
+
+**Fix — new query param `exited=true|false` on the existing `GET /entry-logs`:**
+- `entry-log.controller.ts` parses `?exited=` into `boolean | undefined`;
+  `entry-log.service.ts`'s `list()` adds `exitTime: null` (false) or
+  `exitTime: { not: null }` (true) to the Prisma `where` clause — pushed
+  into the DB query, evaluated against the true total via the existing
+  `count()` call, not a single page's contents.
+- `ExitConfirmScreen.tsx` now calls `GET /entry-logs?exited=false` through
+  a new `loadAllOpen()` helper that pages through *all* matching results
+  (up to a 20-page / 2000-row sanity cap, not a real limit) instead of
+  trusting one page — this is the part of the fix that actually closes the
+  ">100 open guests" gap, not just moving the filter server-side.
+- `GuardHomeScreen.tsx`'s "ออกวันนี้" (exited today) summary count, which
+  had the same class of bug (approximated from one `pageSize=100` page's
+  client-side filter), now uses `exited=true&date=<today>&pageSize=1` and
+  reads the accurate `total` — free correctness improvement from the same
+  new param, minimal extra complexity since `count()` is pageSize-independent.
+- Test coverage: 4 unit tests (`entry-log.service.spec.ts` — `exited=true`,
+  `exited=false`, `exited` omitted, and that a resident's `house_id` scoping
+  still overrides any `house_id` they pass alongside the new filter) + 2 e2e
+  tests (open-vs-closed correctness with real created/confirmed entries;
+  the filter doesn't weaken cross-village isolation).
+- **Residual, unfixed, explicitly reported per the task's own escape
+  valve ("ถ้าซับซ้อนเกินให้ report แทน"):** `EntryHistoryScreen.tsx` (resident's
+  own history) still fetches a single `pageSize=100` page with no "load
+  more" control, for *both* filtered and unfiltered date queries. This is
+  a different shape of gap than the one Dev flagged — it doesn't
+  client-side-filter "not yet exited" (it lists everything, open and
+  closed, and the confirm-exit button is a plain conditional on each
+  row's own `exitTime`), so the ">100 open guests dropped" failure mode
+  doesn't apply here the way it does to `ExitConfirmScreen`. The real
+  residual risk is narrower: a single house with more than 100 total
+  entry-log rows in the queried period (unfiltered = potentially 6 months
+  of history) only ever sees the newest 100; older rows are unreachable
+  through this screen. Judged low-severity for MVP (a single household
+  passing 100 visitor entries in one query window is a lot) and out of
+  scope to force a fix into this pass — recommend a follow-up adding real
+  page-through/"load more" UI, using the `page`/`pageSize` params that
+  already exist server-side.
+
+### 4. Targeted code review — security/data-integrity-sensitive screens
+
+- **`ExitConfirmScreen.tsx` / `EntryHistoryScreen.tsx` — no auto-close.**
+  Read both screens end to end. Neither has any code path that sets
+  `exitTime` except the explicit "ยืนยันแขกออก" button's
+  `PATCH /entry-logs/:id/confirm-exit` call, gated behind a per-row
+  `confirmingId` busy-state to prevent a double-tap firing two requests.
+  `ScanQrScreen.tsx`'s "ยืนยันเข้า" button only ever calls
+  `POST /entry-logs` (entry, not exit) — confirmed it never touches the
+  confirm-exit endpoint, so a guard re-scanning an already-`ENTERED` QR at
+  the exit gate cannot auto-close through this screen either; the backend
+  independently enforces the same invariant (`entry-log.service.ts`'s
+  `createFromQr()`, and re-verified by the pre-existing "re-scanning ...
+  does NOT set exit_time" e2e test, still passing). No auto-close path
+  found anywhere in the mobile code.
+- **`SosHoldButton.tsx` — genuine 2-second hold, not a disguised tap.**
+  `onPressIn` starts an `Animated.timing` over `HOLD_MS = 2000` and fires
+  `onTrigger()` only from the animation's completion callback, gated by
+  `finished && !firedRef.current`. `onPressOut` (fires on release
+  regardless of finger position, per React Native's `Pressable`
+  semantics — not gated to "released while still over the button") calls
+  `animRef.current.stop()` and resets the progress value; RN's `Animated`
+  invokes a stopped animation's completion callback with `finished: false`,
+  so an early release cannot fire `onTrigger()`. A fast tap-and-release
+  genuinely cannot trigger SOS; only a held-down 2-second press can. No
+  `setTimeout`-based race condition (the doc comment's stated design
+  intent) — verified by reading the actual implementation, not just
+  trusting the comment.
+- **Revoke QR flow.** Both call sites (`InviteGuestScreen.tsx`'s list-row
+  revoke, `QrDisplayScreen.tsx`'s full-screen revoke) require an explicit
+  two-step confirmation (`Alert.alert` with a destructive-styled "ยืนยันยกเลิก"
+  button) before calling `PATCH /visitor-passes/:id/revoke` — no
+  accidental single-tap revoke path. Backend ownership check
+  (`visitor-pass.service.ts`'s `revoke()`) independently verified: only
+  the pass's own creator or an ADMIN may revoke, enforced server-side
+  regardless of what the client sends, and revoke is idempotent (calling
+  it twice returns 200 both times, no error) — safe against the UI's lack
+  of a busy-state guard on the list-row revoke button (unlike
+  `QrDisplayScreen`'s, which does disable while `revoking`).
+- No code change was needed for any of the three — Dev's implementation is
+  correct on all three as flagged.
+
+### 5. Other observations (not fixed, informational)
+
+- `apps/mobile/src/lib/api.ts`'s doc comment says the `onSessionExpired`
+  registration is a "Dev agent TODO... stubbed there with a matching TODO"
+  in `AuthContext.tsx` — checked, and it's already correctly wired
+  (`AuthContext.tsx`'s mount effect calls `setOnSessionExpired(() =>
+  setSessionState(null))`). Stale comment only, not a functional bug — a
+  401 that survives refresh-token rotation does correctly clear the
+  session and flip `RootNavigator` back to the Auth stack.
+- The new `exited=` query param treats anything other than the literal
+  string `"true"` as `false` (including a typo like `exited=1` or
+  `exited=flase`), same permissive-parsing style already used for
+  `page`/`pageSize` elsewhere in this controller. Not a security issue
+  (only narrows results further, RBAC/tenant scoping unaffected) — noted
+  for awareness, not treated as a bug.
+
+### 6. Go/No-Go — Mobile app (Epic 6/7) addition to the MVP
+
+**Conditional GO** — ship as a controlled/limited rollout (e.g. a small
+beta group of residents + guards), not a full unconditional release,
+specifically because of the one thing this pass structurally cannot
+verify:
+
+- **Outstanding, carried forward from before this pass and still true
+  after it: no screen in this app has ever been rendered on a real device
+  or emulator.** Everything reported above — including the "no auto-close"
+  and "genuine 2-second hold" findings — is proven true of the *source
+  code's logic*, not of what a user actually sees or can do on a phone.
+  Layout bugs, gesture-handling edge cases specific to a real touchscreen
+  (e.g. does `SosHoldButton`'s hold-then-release actually feel reliable on
+  real hardware, not just in the animation math), camera/permission-prompt
+  behavior on real iOS/Android, and anything dependent on native module
+  behavior are entirely unverified. **This item does not go away and
+  should stay on the punch list until a physical device or emulator pass
+  happens** — it is out of scope for any future backend-only or
+  static-analysis-only QA pass to close.
+- Both Dev-flagged backend gaps are now fixed, server-side-verified, and
+  covered by new automated tests (12 new: 7 unit + 5 e2e, all passing
+  alongside the full existing 62 unit + 72 e2e suite — no regressions).
+- The three specifically-flagged security/data-integrity screens
+  (exit-confirm, SOS hold, QR revoke) hold up under adversarial code
+  review; no code changes were needed for any of them.
+- `apps/mobile` has no automated test harness of its own — acceptable for
+  this MVP round per the backlog's own scope note, but a real gap that
+  should be closed alongside the device/emulator pass above, since a test
+  renderer only becomes meaningful once there's a device/emulator target
+  to validate it against.

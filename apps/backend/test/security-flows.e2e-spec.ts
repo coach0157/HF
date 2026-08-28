@@ -160,12 +160,9 @@ describe("Security & acceptance-criteria flows (API-driven e2e)", () => {
         villageA.guardOnDuty.phone,
         villageA.villageId,
       );
-      const res = await api(
-        baseUrl,
-        "GET",
-        `/users/${villageA.resident.id}`,
-        { token: guardToken },
-      );
+      const res = await api(baseUrl, "GET", `/users/${villageA.resident.id}`, {
+        token: guardToken,
+      });
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(villageA.resident.id);
       expect(res.body.phone).toBe(villageA.resident.phone);
@@ -177,12 +174,9 @@ describe("Security & acceptance-criteria flows (API-driven e2e)", () => {
         villageA.resident.phone,
         villageA.villageId,
       );
-      const res = await api(
-        baseUrl,
-        "GET",
-        `/users/${villageA.resident.id}`,
-        { token: residentToken },
-      );
+      const res = await api(baseUrl, "GET", `/users/${villageA.resident.id}`, {
+        token: residentToken,
+      });
       expect(res.status).toBe(200);
       expect(res.body.id).toBe(villageA.resident.id);
     });
@@ -576,18 +570,16 @@ describe("Security & acceptance-criteria flows (API-driven e2e)", () => {
 
       // A second resident in village A, so there is another villager's pass
       // in the same tenant that must NOT show up in residentA's list.
-      const otherResident = await withVillageContext(
-        villageA.villageId,
-        (tx) =>
-          tx.user.create({
-            data: {
-              villageId: villageA.villageId,
-              name: "Other Resident A",
-              phone: nextPhone("93"),
-              role: "RESIDENT",
-              houseId: villageA.houseId,
-            },
-          }),
+      const otherResident = await withVillageContext(villageA.villageId, (tx) =>
+        tx.user.create({
+          data: {
+            villageId: villageA.villageId,
+            name: "Other Resident A",
+            phone: nextPhone("93"),
+            role: "RESIDENT",
+            houseId: villageA.houseId,
+          },
+        }),
       );
       const otherResidentToken = await loginToken(
         baseUrl,
@@ -611,9 +603,9 @@ describe("Security & acceptance-criteria flows (API-driven e2e)", () => {
       expect(
         res.body.items.some((p: any) => p.visitorName === "OtherGuest"),
       ).toBe(false);
-      expect(
-        res.body.items.some((p: any) => p.visitorName === "MyGuest"),
-      ).toBe(true);
+      expect(res.body.items.some((p: any) => p.visitorName === "MyGuest")).toBe(
+        true,
+      );
     });
 
     it("guard/admin cannot call the resident-only list endpoint (403)", async () => {
@@ -698,6 +690,255 @@ describe("Security & acceptance-criteria flows (API-driven e2e)", () => {
       await api(baseUrl, "PATCH", `/guard-shifts/${startOnDuty.body.id}`, {
         token: onDutyToken,
       });
+    });
+  });
+
+  // Mobile Dev-agent round QA fix: GuardHomeScreen had no way to read a
+  // guard's own current shift, so relaunching the app mid-shift showed
+  // "ยังไม่เริ่มเวร" even while genuinely on duty. New endpoint:
+  // GET /guard-shifts/me/current — GUARD-only, always scoped to the
+  // caller's own guardUserId.
+  describe("GET /guard-shifts/me/current (QA fix — guard shift state sync)", () => {
+    it("a resident and an admin cannot call this guard-only endpoint (403)", async () => {
+      const residentAToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const residentRes = await api(
+        baseUrl,
+        "GET",
+        "/guard-shifts/me/current",
+        {
+          token: residentAToken,
+        },
+      );
+      expect(residentRes.status).toBe(403);
+
+      const adminAToken = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
+      const adminRes = await api(baseUrl, "GET", "/guard-shifts/me/current", {
+        token: adminAToken,
+      });
+      expect(adminRes.status).toBe(403);
+    });
+
+    it("returns null with no open shift, the guard's own shift once started, then null again after ending it", async () => {
+      const freshGuard = await withVillageContext(villageA.villageId, (tx) =>
+        tx.user.create({
+          data: {
+            villageId: villageA.villageId,
+            name: "Fresh Guard A",
+            phone: nextPhone("94"),
+            role: "GUARD",
+          },
+        }),
+      );
+      const guardToken = await loginToken(
+        baseUrl,
+        freshGuard.phone,
+        villageA.villageId,
+      );
+
+      const before = await api(baseUrl, "GET", "/guard-shifts/me/current", {
+        token: guardToken,
+      });
+      expect(before.status).toBe(200);
+      expect(before.body.shift).toBeNull();
+
+      const startRes = await api(baseUrl, "POST", "/guard-shifts", {
+        token: guardToken,
+        body: {},
+      });
+      expect(startRes.status).toBe(201);
+
+      const during = await api(baseUrl, "GET", "/guard-shifts/me/current", {
+        token: guardToken,
+      });
+      expect(during.status).toBe(200);
+      expect(during.body.shift.id).toBe(startRes.body.id);
+      expect(during.body.shift.status).toBe("ON_DUTY");
+
+      const endRes = await api(
+        baseUrl,
+        "PATCH",
+        `/guard-shifts/${startRes.body.id}`,
+        { token: guardToken },
+      );
+      expect(endRes.status).toBe(200);
+
+      const after = await api(baseUrl, "GET", "/guard-shifts/me/current", {
+        token: guardToken,
+      });
+      expect(after.status).toBe(200);
+      expect(after.body.shift).toBeNull();
+    });
+
+    it("a guard never sees another guard's open shift — self-scoped, not merely village-scoped", async () => {
+      const guardX = await withVillageContext(villageA.villageId, (tx) =>
+        tx.user.create({
+          data: {
+            villageId: villageA.villageId,
+            name: "Guard X",
+            phone: nextPhone("94"),
+            role: "GUARD",
+          },
+        }),
+      );
+      const guardY = await withVillageContext(villageA.villageId, (tx) =>
+        tx.user.create({
+          data: {
+            villageId: villageA.villageId,
+            name: "Guard Y",
+            phone: nextPhone("94"),
+            role: "GUARD",
+          },
+        }),
+      );
+      const tokenX = await loginToken(
+        baseUrl,
+        guardX.phone,
+        villageA.villageId,
+      );
+      const tokenY = await loginToken(
+        baseUrl,
+        guardY.phone,
+        villageA.villageId,
+      );
+
+      const startX = await api(baseUrl, "POST", "/guard-shifts", {
+        token: tokenX,
+        body: {},
+      });
+      expect(startX.status).toBe(201);
+
+      const currentY = await api(baseUrl, "GET", "/guard-shifts/me/current", {
+        token: tokenY,
+      });
+      expect(currentY.status).toBe(200);
+      expect(currentY.body.shift).toBeNull();
+
+      // Cleanup so this open shift doesn't affect any other test in this file.
+      await api(baseUrl, "PATCH", `/guard-shifts/${startX.body.id}`, {
+        token: tokenX,
+      });
+    });
+  });
+
+  // Mobile Dev-agent round QA fix: ExitConfirmScreen was filtering "not yet
+  // exited" client-side over a single pageSize=100 page, which would
+  // silently drop open visitors past the 100th. New `exited=`
+  // query param on the existing GET /entry-logs pushes the
+  // `exit_time IS NULL` / `IS NOT NULL` filter into the DB query.
+  describe("GET /entry-logs?exited= filter (QA fix — server-side open/closed filter)", () => {
+    it("exited=false returns only still-open entries; exited=true returns only closed ones", async () => {
+      const residentAToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const guardAToken = await loginToken(
+        baseUrl,
+        villageA.guardOnDuty.phone,
+        villageA.villageId,
+      );
+
+      const openPass = await api(baseUrl, "POST", "/visitor-passes", {
+        token: residentAToken,
+        body: passBody("ExitedFilterOpenGuest"),
+      });
+      const openEntry = await api(baseUrl, "POST", "/entry-logs", {
+        token: guardAToken,
+        body: { qrToken: openPass.body.qrToken },
+      });
+      const openId = openEntry.body.entryLog.id;
+
+      const closedPass = await api(baseUrl, "POST", "/visitor-passes", {
+        token: residentAToken,
+        body: passBody("ExitedFilterClosedGuest"),
+      });
+      const closedEntry = await api(baseUrl, "POST", "/entry-logs", {
+        token: guardAToken,
+        body: { qrToken: closedPass.body.qrToken },
+      });
+      const closedId = closedEntry.body.entryLog.id;
+      const confirmRes = await api(
+        baseUrl,
+        "PATCH",
+        `/entry-logs/${closedId}/confirm-exit`,
+        { token: guardAToken },
+      );
+      expect(confirmRes.status).toBe(200);
+
+      const openList = await api(
+        baseUrl,
+        "GET",
+        "/entry-logs?exited=false&pageSize=100",
+        { token: guardAToken },
+      );
+      expect(openList.status).toBe(200);
+      expect(openList.body.items.some((i: any) => i.id === openId)).toBe(true);
+      expect(openList.body.items.some((i: any) => i.id === closedId)).toBe(
+        false,
+      );
+      expect(openList.body.items.every((i: any) => i.exitTime === null)).toBe(
+        true,
+      );
+
+      const closedList = await api(
+        baseUrl,
+        "GET",
+        "/entry-logs?exited=true&pageSize=100",
+        { token: guardAToken },
+      );
+      expect(closedList.status).toBe(200);
+      expect(closedList.body.items.some((i: any) => i.id === closedId)).toBe(
+        true,
+      );
+      expect(closedList.body.items.some((i: any) => i.id === openId)).toBe(
+        false,
+      );
+      expect(closedList.body.items.every((i: any) => i.exitTime !== null)).toBe(
+        true,
+      );
+    });
+
+    it("the exited filter does not weaken cross-village isolation", async () => {
+      const residentAToken = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const guardAToken = await loginToken(
+        baseUrl,
+        villageA.guardOnDuty.phone,
+        villageA.villageId,
+      );
+      const pass = await api(baseUrl, "POST", "/visitor-passes", {
+        token: residentAToken,
+        body: passBody("ExitedFilterCrossVillageGuest"),
+      });
+      const entry = await api(baseUrl, "POST", "/entry-logs", {
+        token: guardAToken,
+        body: { qrToken: pass.body.qrToken },
+      });
+      expect(entry.status).toBe(201);
+
+      const adminBToken = await loginToken(
+        baseUrl,
+        villageB.admin.phone,
+        villageB.villageId,
+      );
+      const listRes = await api(baseUrl, "GET", "/entry-logs?exited=false", {
+        token: adminBToken,
+      });
+      expect(listRes.status).toBe(200);
+      expect(
+        listRes.body.items.some((i: any) => i.id === entry.body.entryLog.id),
+      ).toBe(false);
     });
   });
 

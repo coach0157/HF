@@ -22,6 +22,8 @@ export interface ListEntryLogsFilters {
   date?: string;
   page: number;
   pageSize: number;
+  /** `true` = only exited (`exit_time IS NOT NULL`), `false` = only still-open (`exit_time IS NULL`), undefined = no filter. */
+  exited?: boolean;
 }
 
 /**
@@ -229,6 +231,17 @@ export class EntryLogService {
         end.setDate(end.getDate() + 1);
         where.entryTime = { gte: start, lt: end };
       }
+    }
+
+    // QA-flagged gap (spec 2.1's dual-confirm flow): server-side "still
+    // open" filter so callers like the Guard app's exit-confirm screen get
+    // a correct result against the real total instead of paging through
+    // pageSize-capped, client-side-filtered results that silently drop
+    // open visitors past the page boundary.
+    if (filters.exited === true) {
+      where.exitTime = { not: null };
+    } else if (filters.exited === false) {
+      where.exitTime = null;
     }
 
     const [items, total] = await Promise.all([

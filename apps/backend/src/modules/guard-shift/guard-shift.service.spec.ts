@@ -169,4 +169,48 @@ describe("GuardShiftService", () => {
       expect(tx.guardShift.update).not.toHaveBeenCalled();
     });
   });
+
+  describe("getCurrentForGuard — QA fix for mobile shift-state sync", () => {
+    it("happy path: returns the caller's own open shift", async () => {
+      const claims = mockClaims({ userId: "guard-1" });
+      const openShift = {
+        id: "shift-1",
+        guardUserId: "guard-1",
+        status: GuardShiftStatus.ON_DUTY,
+        shiftEnd: null,
+      };
+      tx.guardShift.findFirst.mockResolvedValue(openShift);
+
+      const result = await service.getCurrentForGuard(claims);
+
+      expect(result).toBe(openShift);
+      expect(tx.guardShift.findFirst).toHaveBeenCalledWith({
+        where: {
+          guardUserId: "guard-1",
+          status: GuardShiftStatus.ON_DUTY,
+          shiftEnd: null,
+        },
+        orderBy: { shiftStart: "desc" },
+      });
+    });
+
+    it("edge case: returns null (not an error) when the guard has no open shift", async () => {
+      const claims = mockClaims({ userId: "guard-1" });
+      tx.guardShift.findFirst.mockResolvedValue(null);
+
+      const result = await service.getCurrentForGuard(claims);
+
+      expect(result).toBeNull();
+    });
+
+    it("edge case: always queries by the caller's own userId, never a passed-in one", async () => {
+      const claims = mockClaims({ userId: "guard-1" });
+      tx.guardShift.findFirst.mockResolvedValue(null);
+
+      await service.getCurrentForGuard(claims);
+
+      const calledWith = tx.guardShift.findFirst.mock.calls[0][0];
+      expect(calledWith.where.guardUserId).toBe("guard-1");
+    });
+  });
 });

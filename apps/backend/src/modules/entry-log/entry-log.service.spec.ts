@@ -32,6 +32,8 @@ describe("EntryLogService", () => {
       create: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
     };
     user: { findUnique: jest.Mock };
     house: { findUnique: jest.Mock };
@@ -56,6 +58,8 @@ describe("EntryLogService", () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
       },
       user: { findUnique: jest.fn() },
       house: { findUnique: jest.fn() },
@@ -171,6 +175,63 @@ describe("EntryLogService", () => {
         BadRequestException,
       );
       expect(tx.entryLog.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("list — exited filter (QA fix for mobile's ExitConfirmScreen/GuardHomeScreen)", () => {
+    it("exited=false pushes exit_time IS NULL into the where clause", async () => {
+      const claims = mockClaims({ role: "GUARD" });
+
+      await service.list({ page: 1, pageSize: 20, exited: false }, claims);
+
+      expect(tx.entryLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ exitTime: null }),
+        }),
+      );
+      expect(tx.entryLog.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ exitTime: null }),
+        }),
+      );
+    });
+
+    it("exited=true pushes exit_time IS NOT NULL into the where clause", async () => {
+      const claims = mockClaims({ role: "GUARD" });
+
+      await service.list({ page: 1, pageSize: 20, exited: true }, claims);
+
+      expect(tx.entryLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ exitTime: { not: null } }),
+        }),
+      );
+    });
+
+    it("exited undefined applies no exit_time filter at all", async () => {
+      const claims = mockClaims({ role: "GUARD" });
+
+      await service.list({ page: 1, pageSize: 20 }, claims);
+
+      const calledWith = tx.entryLog.findMany.mock.calls[0][0];
+      expect(calledWith.where.exitTime).toBeUndefined();
+    });
+
+    it("a resident's exited filter stays scoped to their own house_id, ignoring any house_id they pass", async () => {
+      const claims = mockClaims({
+        role: "RESIDENT",
+        houseId: "house-A",
+        userId: "res-1",
+      });
+
+      await service.list(
+        { page: 1, pageSize: 20, exited: false, houseId: "house-OTHER" },
+        claims,
+      );
+
+      const calledWith = tx.entryLog.findMany.mock.calls[0][0];
+      expect(calledWith.where.houseId).toBe("house-A");
+      expect(calledWith.where.exitTime).toBeNull();
     });
   });
 });

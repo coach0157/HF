@@ -3,16 +3,25 @@
  * MVP_BACKLOG.md Epic 7.
  *
  * Design decision (per the original doc comment's "pick one and note the
- * decision here"): this is a standalone list of open entries
- * (`exitTime === null`, filtered client-side from `GET /entry-logs`), not a
- * re-use of ScanQrScreen with an exit-mode flag. Rationale: the exit point
- * often isn't the same physical gate/kiosk as the entry scan, guards may
- * need to confirm an exit for a visitor whose QR the visitor no longer has
- * (already handed back / thrown away), and a plain searchable list keeps
- * the "no auto-close from a scan" invariant obviously true by construction
- * — there is no scan step in this screen at all, only an explicit
- * "ยืนยันแขกออก" button per row, which is the **only** path that ever sets
- * `exitTime` (spec 2.1).
+ * decision here"): this is a standalone list of open entries, not a re-use
+ * of ScanQrScreen with an exit-mode flag. Rationale: the exit point often
+ * isn't the same physical gate/kiosk as the entry scan, guards may need to
+ * confirm an exit for a visitor whose QR the visitor no longer has (already
+ * handed back / thrown away), and a plain searchable list keeps the "no
+ * auto-close from a scan" invariant obviously true by construction — there
+ * is no scan step in this screen at all, only an explicit "ยืนยันแขกออก"
+ * button per row, which is the **only** path that ever sets `exitTime`
+ * (spec 2.1).
+ *
+ * QA fix: "open" entries now come from the server-side `exited=false` filter
+ * (`GET /entry-logs?exited=false`, entry-log.service.ts) instead of a
+ * client-side `!exitTime` filter over a single pageSize=100 page — the old
+ * approach silently dropped open visitors past the 100th if a gate had more
+ * than 100 not-yet-exited guests at once. `loadAllOpen()` below pages
+ * through the server-filtered result until every open entry is fetched (capped
+ * at MAX_PAGES as a sanity bound against a runaway loop, not a real limit —
+ * even a very busy gate should never legitimately have thousands of
+ * simultaneously-open visitors).
  */
 import { useCallback, useState } from "react";
 import {
@@ -30,6 +39,22 @@ import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { EntryLog, Paginated } from "../../lib/types";
 
+const PAGE_SIZE = 100;
+const MAX_PAGES = 20; // sanity bound (2000 open entries) — see file doc comment.
+
+async function loadAllOpen(): Promise<EntryLog[]> {
+  const all: EntryLog[] = [];
+  let page = 1;
+  for (; page <= MAX_PAGES; page++) {
+    const res = await api.get<Paginated<EntryLog>>(
+      `/entry-logs?exited=false&page=${page}&pageSize=${PAGE_SIZE}`,
+    );
+    all.push(...res.items);
+    if (all.length >= res.total || res.items.length === 0) break;
+  }
+  return all;
+}
+
 export function ExitConfirmScreen() {
   const [logs, setLogs] = useState<EntryLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,11 +64,7 @@ export function ExitConfirmScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // No server-side "open only" filter exists — page through recent
-      // entries and filter client-side. pageSize=100 comfortably covers a
-      // gate's open (not-yet-exited) visitors at any one time for MVP.
-      const res = await api.get<Paginated<EntryLog>>("/entry-logs?pageSize=100");
-      setLogs(res.items.filter((l) => !l.exitTime));
+      setLogs(await loadAllOpen());
     } catch (e) {
       Alert.alert("โหลดรายการไม่สำเร็จ", e instanceof ApiError ? e.message : "ลองใหม่อีกครั้ง");
     } finally {
