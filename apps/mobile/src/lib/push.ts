@@ -34,9 +34,23 @@
  * environment and no-ops — there is no reliable static "is this Expo Go on
  * Android" check worth hard-coding here, and ADR-006 already treats push as
  * best-effort, never something the rest of the app depends on.
+ *
+ * IMPORTANT correction found by QA against a real device: the above
+ * "catches whatever throws" claim only holds for errors thrown from inside
+ * a function call. On Expo Go/Android/SDK57, `expo-notifications` itself
+ * throws as a SIDE EFFECT of merely being imported/required (its own
+ * module-init code calls `addPushTokenListener` internally and that's what
+ * warns/throws — see the `warnOfExpoGoPushUsage` frame in the crash's
+ * stack). A static `import * as Notifications from "expo-notifications"`
+ * at the top of this file runs that code the moment ANY file imports this
+ * module (i.e. at app boot, via AuthContext), which crashes the whole app
+ * before any of our try/catch blocks below ever get a chance to run.
+ * Fixed by lazy-`require`-ing the module through `getNotifications()`
+ * instead of a static import, so the failure happens inside a try/catch we
+ * actually control, no earlier than the first time push is attempted (after
+ * login) rather than at import time.
  */
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { api } from "./api";
@@ -49,19 +63,47 @@ export interface PushDeepLinkData {
   id: string;
 }
 
-// Foreground notification handler — set once at module load, before any
-// notification could plausibly arrive (Expo's own recommended pattern).
-// `shouldShowBanner`/`shouldShowList` show the OS banner/notification-center
-// entry even while the app is in the foreground (background/killed-app
-// delivery is handled by the OS regardless of this handler).
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type NotificationsModule = typeof import("expo-notifications");
+
+// `undefined` = never attempted yet, `null` = attempted and unavailable in
+// this environment. Memoized so we only pay the (possibly-throwing) require
+// once per app session, not on every push-related call.
+let cached: NotificationsModule | null | undefined;
+
+/**
+ * Lazily (and safely) loads `expo-notifications`. Exported so
+ * `RootNavigator.tsx` can share the exact same guarded load instead of
+ * risking its own static import re-introducing the crash this fixes.
+ * Returns `null` — never throws — when the module is unavailable (Expo Go
+ * on Android/SDK53+, or any other future environment mismatch).
+ */
+export function getNotifications(): NotificationsModule | null {
+  if (cached !== undefined) return cached;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require("expo-notifications") as NotificationsModule;
+    // Foreground notification handler — set once, right after the first
+    // successful load (equivalent to the old "at module load" timing, but
+    // now only reachable once we know the module didn't throw).
+    // `shouldShowBanner`/`shouldShowList` show the OS banner/notification-
+    // center entry even while the app is in the foreground (background/
+    // killed-app delivery is handled by the OS regardless of this handler).
+    mod.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+    cached = mod;
+  } catch (err) {
+    console.warn("[push] expo-notifications unavailable in this environment:", err);
+    cached = null;
+  }
+  return cached;
+}
 
 function getProjectId(): string | undefined {
   return (
@@ -70,15 +112,18 @@ function getProjectId(): string | undefined {
   );
 }
 
-async function ensureAndroidChannel(): Promise<void> {
+async function ensureAndroidChannel(notifications: NotificationsModule): Promise<void> {
   if (Platform.OS !== "android") return;
-  await Notifications.setNotificationChannelAsync("default", {
+  await notifications.setNotificationChannelAsync("default", {
     name: "การแจ้งเตือนทั่วไป",
-    importance: Notifications.AndroidImportance.MAX,
+    importance: notifications.AndroidImportance.MAX,
   });
 }
 
 async function getExpoPushTokenSafe(): Promise<string | null> {
+  const notifications = getNotifications();
+  if (!notifications) return null;
+
   if (!Device.isDevice) {
     // Simulators/emulators cannot obtain a real push token.
     console.log("[push] skipped — push tokens require a physical device");
@@ -93,12 +138,12 @@ async function getExpoPushTokenSafe(): Promise<string | null> {
     return null;
   }
 
-  await ensureAndroidChannel();
+  await ensureAndroidChannel(notifications);
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  const { status: existingStatus } = await notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   if (existingStatus !== "granted") {
-    const requested = await Notifications.requestPermissionsAsync();
+    const requested = await notifications.requestPermissionsAsync();
     finalStatus = requested.status;
   }
   if (finalStatus !== "granted") {
@@ -106,7 +151,7 @@ async function getExpoPushTokenSafe(): Promise<string | null> {
     return null;
   }
 
-  const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync({
+  const { data: expoPushToken } = await notifications.getExpoPushTokenAsync({
     projectId,
   });
   return expoPushToken;

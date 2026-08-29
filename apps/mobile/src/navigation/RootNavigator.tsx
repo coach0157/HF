@@ -20,14 +20,17 @@ import {
   createNavigationContainerRef,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import * as Notifications from "expo-notifications";
+// Type-only import — erased at compile time, so unlike a value import it
+// cannot re-trigger expo-notifications' module-init crash under Expo Go on
+// Android (see lib/push.ts's `getNotifications()` doc comment for why a
+// static value import of this package is unsafe here).
 import type { NotificationResponse } from "expo-notifications";
 import { useAuth } from "../context/AuthContext";
 import { AuthNavigator } from "./AuthNavigator";
 import { ResidentTabNavigator } from "./ResidentTabNavigator";
 import { GuardTabNavigator } from "./GuardTabNavigator";
 import type { RootStackParamList } from "./types";
-import type { PushDeepLinkData } from "../lib/push";
+import { getNotifications, type PushDeepLinkData } from "../lib/push";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -153,12 +156,15 @@ export function RootNavigator() {
   }
 
   useEffect(() => {
+    const notifications = getNotifications();
+    if (!notifications) return; // unavailable in this environment — see lib/push.ts
+
     // Cold start — app was launched (from killed) by tapping a notification.
-    Notifications.getLastNotificationResponseAsync().then(handleResponse);
+    notifications.getLastNotificationResponseAsync().then(handleResponse);
 
     // Warm/background — app already running, notification tapped.
     const subscription =
-      Notifications.addNotificationResponseReceivedListener(handleResponse);
+      notifications.addNotificationResponseReceivedListener(handleResponse);
     return () => subscription.remove();
   }, []);
 
