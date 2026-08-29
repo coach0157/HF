@@ -28,6 +28,7 @@ import { colors, radius, spacing } from "../../theme";
 interface ChatTarget {
   key: string;
   icon: string;
+  tint: string;
   label: string;
   subLabel: string;
   find: (rooms: ChatRoomSummary[]) => ChatRoomSummary | undefined;
@@ -71,6 +72,7 @@ export function ChatListScreen() {
     {
       key: "admin",
       icon: "🏢",
+      tint: colors.secondaryLight,
       label: "นิติบุคคล",
       subLabel: "ติดต่อสอบถาม/แจ้งเรื่องกับนิติบุคคล",
       find: (rs) => rs.find((r) => r.type === "DIRECT" && r.otherUser?.role === "ADMIN"),
@@ -85,6 +87,7 @@ export function ChatListScreen() {
     {
       key: "guard",
       icon: "🛡️",
+      tint: colors.primaryLight,
       label: "รปภ.",
       subLabel: "ติดต่อเจ้าหน้าที่รักษาความปลอดภัย",
       find: (rs) => rs.find((r) => r.type === "DIRECT" && r.otherUser?.role === "GUARD"),
@@ -99,6 +102,7 @@ export function ChatListScreen() {
     {
       key: "group",
       icon: "👥",
+      tint: colors.secondaryLight,
       label: "กลุ่มหมู่บ้าน",
       subLabel: "ข่าวสาร/พูดคุยร่วมกับเพื่อนบ้าน",
       find: (rs) => rs.find((r) => r.type === "GROUP" && r.name === "กลุ่มหมู่บ้าน"),
@@ -147,7 +151,9 @@ export function ChatListScreen() {
             onPress={() => openTarget(target)}
             disabled={opening === target.key}
           >
-            <Text style={styles.icon}>{target.icon}</Text>
+            <View style={[styles.iconWrap, { backgroundColor: target.tint }]}>
+              <Text style={styles.icon}>{target.icon}</Text>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>{target.label}</Text>
               <Text style={styles.preview} numberOfLines={1}>
@@ -180,7 +186,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-  icon: { fontSize: 28 },
+  iconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icon: { fontSize: 22 },
   label: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
   preview: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
   badge: {

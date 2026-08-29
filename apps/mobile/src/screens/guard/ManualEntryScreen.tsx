@@ -171,6 +171,9 @@ export function ManualEntryScreen() {
                 setHousePickerOpen(false);
               }}
             >
+              <View style={styles.houseIconWrap}>
+                <Text style={styles.houseIcon}>🏠</Text>
+              </View>
               <Text style={styles.houseRowText}>
                 {h.houseNo}
                 {h.zone ? ` (โซน ${h.zone})` : ""}
@@ -241,7 +244,23 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   modalTitle: { fontSize: 18, fontWeight: "700", color: colors.textPrimary, marginBottom: spacing.md },
-  houseRow: { paddingVertical: spacing.md + 2, borderBottomWidth: 1, borderBottomColor: colors.border },
+  houseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  houseIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  houseIcon: { fontSize: 16 },
   houseRowText: { fontSize: 15, color: colors.textPrimary },
   closeModal: { marginTop: spacing.xl, alignItems: "center", padding: spacing.md },
   closeModalText: { color: colors.textMuted },

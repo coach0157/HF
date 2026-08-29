@@ -138,15 +138,25 @@ export function GuardHomeScreen() {
       </View>
 
       <View style={styles.quickLinks}>
-        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate("ManualEntry")}>
-          <Text style={styles.linkText}>บันทึกด้วยมือ</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate("ExitConfirm")}>
-          <Text style={styles.linkText}>ยืนยันแขกออก</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate("SosList")}>
-          <Text style={styles.linkText}>แจ้งเหตุ SOS</Text>
-        </TouchableOpacity>
+        {(
+          [
+            { icon: "📝", label: "บันทึกด้วยมือ", tint: "primary", onPress: () => navigation.navigate("ManualEntry") },
+            { icon: "🚪", label: "ยืนยันแขกออก", tint: "secondary", onPress: () => navigation.navigate("ExitConfirm") },
+            { icon: "🚨", label: "แจ้งเหตุ SOS", tint: "secondary", onPress: () => navigation.navigate("SosList") },
+          ] as const
+        ).map((item) => (
+          <TouchableOpacity key={item.label} style={styles.linkCard} onPress={item.onPress}>
+            <View
+              style={[
+                styles.linkIconWrap,
+                { backgroundColor: item.tint === "primary" ? colors.primaryLight : colors.secondaryLight },
+              ]}
+            >
+              <Text style={styles.linkIcon}>{item.icon}</Text>
+            </View>
+            <Text style={styles.linkText}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </ScrollView>
   );
@@ -189,14 +199,39 @@ const styles = StyleSheet.create({
   },
   summaryValue: { fontSize: 28, fontWeight: "800", color: colors.primaryDark },
   summaryLabel: { fontSize: 12, color: colors.textSecondary, marginTop: spacing.xs },
-  quickLinks: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm + 2, marginTop: spacing.xxl, justifyContent: "center" },
-  linkButton: {
+  quickLinks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    marginTop: spacing.xxl,
+    alignSelf: "stretch",
+    justifyContent: "center",
+  },
+  linkCard: {
+    // 3-up on a normal phone width, wraps to fewer columns on narrower
+    // screens instead of squeezing labels onto one cramped row.
+    width: 104,
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: "center",
+    gap: spacing.sm,
+    shadowColor: colors.black,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  linkText: { fontSize: 13, color: colors.textPrimary },
+  linkIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  linkIcon: { fontSize: 20 },
+  linkText: { fontSize: 12, fontWeight: "600", textAlign: "center", color: colors.textPrimary },
 });

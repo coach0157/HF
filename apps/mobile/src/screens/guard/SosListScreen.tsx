@@ -23,6 +23,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { AppUser, House, SosAlert } from "../../lib/types";
 import { Button } from "../../components/Button";
+import { Badge } from "../../components/Badge";
 import { colors, radius, spacing } from "../../theme";
 
 const POLL_MS = 5000;
@@ -142,6 +143,7 @@ export function SosListScreen() {
             <Text style={styles.houseNo}>บ้านเลขที่ {item.houseNo ?? "-"}</Text>
             <Text style={styles.time}>{new Date(item.createdAt).toLocaleTimeString("th-TH")}</Text>
           </View>
+          <Badge label="รอรับเรื่อง" variant="danger" style={styles.pendingBadge} />
           {item.callerName ? <Text style={styles.caller}>ผู้แจ้ง: {item.callerName}</Text> : null}
 
           <TouchableOpacity onPress={() => handleMap(item)}>
@@ -185,6 +187,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   houseNo: { fontSize: 17, fontWeight: "800", color: colors.danger },
   time: { fontSize: 12, color: colors.textMuted },
+  pendingBadge: { marginTop: spacing.sm - 2, backgroundColor: colors.white },
   caller: { fontSize: 13, color: colors.textPrimary, marginTop: spacing.xs },
   coords: { fontSize: 12, color: colors.secondaryDark, marginTop: spacing.sm },
   actionRow: { flexDirection: "row", gap: spacing.sm + 2, marginTop: spacing.md + 2 },

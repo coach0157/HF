@@ -19,6 +19,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
 import type { EntryLog, Paginated } from "../../lib/types";
 import { Button } from "../../components/Button";
+import { Badge } from "../../components/Badge";
 import { colors, radius, spacing } from "../../theme";
 
 function fmt(iso: string | null): string {
@@ -104,7 +105,13 @@ export function EntryHistoryScreen() {
               </View>
             )}
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{item.visitorName ?? "(ไม่ระบุชื่อ)"}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{item.visitorName ?? "(ไม่ระบุชื่อ)"}</Text>
+                <Badge
+                  label={item.exitTime ? "ออกแล้ว" : "อยู่ในหมู่บ้าน"}
+                  variant={item.exitTime ? "neutral" : "warning"}
+                />
+              </View>
               {item.vehiclePlate ? <Text style={styles.meta}>ทะเบียน: {item.vehiclePlate}</Text> : null}
               <Text style={styles.meta}>เข้า: {fmt(item.entryTime)}</Text>
               <Text style={styles.meta}>ออก: {fmt(item.exitTime)}</Text>
@@ -150,7 +157,8 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   photo: { width: 56, height: 56, borderRadius: spacing.sm },
-  photoPlaceholder: { backgroundColor: colors.border, alignItems: "center", justifyContent: "center" },
+  photoPlaceholder: { backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   name: { fontSize: 14, fontWeight: "700", color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   metaSmall: { fontSize: 11, color: colors.textMuted, marginTop: 2 },

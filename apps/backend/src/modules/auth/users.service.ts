@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -9,8 +10,22 @@ import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { UpdateAvatarDto } from "./dto/update-avatar.dto";
+import { FileStorageService } from "../../common/storage/file-storage.service";
 
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+
+// Dev-agent addition (avatar upload feature). Generous enough for a
+// resized profile photo (the mobile client crops to a square and
+// compresses before base64-encoding — see ProfileScreen.tsx's
+// pickAndUploadAvatar()), small enough to keep this MVP's local-disk
+// "uploads/" folder sane with no real object storage behind it.
+const MAX_AVATAR_BYTES = 3 * 1024 * 1024; // 3 MB
+const ALLOWED_AVATAR_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 /**
  * Epic 1 backlog item: "Users CRUD ระดับพื้นฐาน (backend service ให้ Admin
@@ -20,6 +35,8 @@ const NIL_UUID = "00000000-0000-0000-0000-000000000000";
  */
 @Injectable()
 export class UsersService {
+  constructor(private readonly fileStorage: FileStorageService) {}
+
   /**
    * `claims` is required as of Epic 8 (Chat) — RESIDENT/GUARD callers get a
    * restricted "staff directory" view (see below), not the full unfiltered
@@ -138,5 +155,72 @@ export class UsersService {
       }
       throw err;
     }
+  }
+
+  /**
+   * Avatar upload feature (Dev-agent addition, requested outside the
+   * original spec — see MVP_BACKLOG.md; nothing in spec 1.1/2.x asked for a
+   * profile picture). Every role may call this, but ONLY for their own
+   * record (`claims.userId`, never a `:id` param) — there is deliberately
+   * no admin-sets-someone-else's-avatar path.
+   *
+   * Format/size validation happens here rather than in the DTO
+   * (class-validator can't inspect decoded base64 length) and rather than
+   * in FileStorageService.savePhoto() (which stays a generic "any bucket,
+   * any image/* mime" writer used by entry-log/chat/maintenance too —
+   * narrowing its accepted mime set or adding a size cap there would change
+   * behavior for those unrelated features, which is out of scope here).
+   */
+  async updateAvatar(dto: UpdateAvatarDto, claims: TenantClaims) {
+    const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(
+      dto.photoDataUrl,
+    );
+    if (!match) {
+      throw new BadRequestException(
+        'photoDataUrl must be a base64 image data URL, e.g. "data:image/jpeg;base64,<...>"',
+      );
+    }
+    const [, mime, base64Data] = match;
+    if (!ALLOWED_AVATAR_MIME_TYPES.has(mime.toLowerCase())) {
+      throw new BadRequestException(
+        `Unsupported avatar image type "${mime}" — allowed: ${[...ALLOWED_AVATAR_MIME_TYPES].join(", ")}`,
+      );
+    }
+    // Fast pre-check on the base64 string length (~4/3 of decoded byte
+    // size) so an oversized upload is rejected before ever hitting disk.
+    const approxDecodedBytes = Math.floor((base64Data.length * 3) / 4);
+    if (approxDecodedBytes > MAX_AVATAR_BYTES) {
+      throw new BadRequestException(
+        `Avatar image is too large (max ${MAX_AVATAR_BYTES / (1024 * 1024)}MB)`,
+      );
+    }
+
+    const tx = getTenantPrismaClient<PrismaClient>();
+    const previous = await tx.user.findUnique({
+      where: { id: claims.userId },
+    });
+    if (!previous) {
+      throw new NotFoundException("User not found");
+    }
+
+    const avatarUrl = await this.fileStorage.savePhoto(
+      "avatars",
+      claims.villageId,
+      dto.photoDataUrl,
+    );
+    const updated = await tx.user.update({
+      where: { id: claims.userId },
+      data: { avatarUrl },
+    });
+
+    // Best-effort cleanup of the old avatar file — not the entry_logs-style
+    // "clear the dangling reference" case (this bucket isn't swept by
+    // SensitivePhotoCleanupService), just avoiding leaking a superseded
+    // file on local disk forever. Never blocks/fails the response.
+    if (previous.avatarUrl && previous.avatarUrl !== avatarUrl) {
+      await this.fileStorage.delete(previous.avatarUrl);
+    }
+
+    return updated;
   }
 }

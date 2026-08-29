@@ -8,7 +8,7 @@
  * `RootNavigator` swaps to ResidentApp/GuardApp.
  */
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import type { RouteProp } from "@react-navigation/native";
 import type { AuthStackParamList } from "../../navigation/types";
 import { api, ApiError } from "../../lib/api";
@@ -110,6 +110,9 @@ export function OtpVerifyScreen({
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <View style={styles.heroIconWrap}>
+        <Text style={styles.heroIcon}>🔐</Text>
+      </View>
       <Text style={styles.title}>ยืนยัน OTP</Text>
       <Text style={styles.subtitle}>กรอกรหัส 6 หลักที่ส่งไปยังเบอร์ {phone}</Text>
 
@@ -146,6 +149,17 @@ export function OtpVerifyScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", padding: spacing.xl, backgroundColor: colors.background },
+  heroIconWrap: {
+    alignSelf: "center",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.secondaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.lg,
+  },
+  heroIcon: { fontSize: 32 },
   title: { fontSize: 24, fontWeight: "800", textAlign: "center", color: colors.textPrimary },
   subtitle: { textAlign: "center", color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.xxl },
   input: {

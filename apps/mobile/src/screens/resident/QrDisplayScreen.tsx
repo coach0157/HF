@@ -19,7 +19,7 @@ import type { VisitorPass } from "../../lib/types";
 import type { ResidentTabParamList } from "../../navigation/types";
 import { Button } from "../../components/Button";
 import { Badge, type BadgeVariant } from "../../components/Badge";
-import { colors, spacing } from "../../theme";
+import { colors, radius, spacing } from "../../theme";
 
 const STATUS_LABEL: Record<VisitorPass["status"], string> = {
   UNUSED: "ยังไม่ใช้",
@@ -127,6 +127,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     padding: spacing.lg,
     backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.black,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   visitorName: { fontSize: 20, fontWeight: "700", color: colors.textPrimary },
   meta: { fontSize: 13, color: colors.textSecondary, marginTop: spacing.xs, textAlign: "center" },

@@ -6,7 +6,7 @@
  * the JWT the backend returns after OTP verify, not chosen here.
  */
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
@@ -44,6 +44,9 @@ export function PhoneLoginScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <View style={styles.heroIconWrap}>
+        <Text style={styles.heroIcon}>🏘️</Text>
+      </View>
       <Text style={styles.title}>เข้าสู่ระบบ</Text>
       <Text style={styles.subtitle}>ระบบความปลอดภัยและอำนวยความสะดวกหมู่บ้าน</Text>
 
@@ -75,6 +78,17 @@ export function PhoneLoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", padding: spacing.xl, backgroundColor: colors.background },
+  heroIconWrap: {
+    alignSelf: "center",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.lg,
+  },
+  heroIcon: { fontSize: 32 },
   title: { fontSize: 24, fontWeight: "800", textAlign: "center", color: colors.textPrimary },
   subtitle: { textAlign: "center", color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.xxl },
   fieldLabel: { fontSize: 13, color: colors.textSecondary, marginBottom: spacing.sm - 2 },

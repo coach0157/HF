@@ -27,12 +27,23 @@ function TabIcon({ emoji, color }: { emoji: string; color: string }) {
   return <Text style={{ fontSize: 20, color }}>{emoji}</Text>;
 }
 
+// Shared native-stack/tab header theme — see ResidentTabNavigator.tsx's
+// identical `themedHeaderOptions` doc comment for why (consistent branded
+// green header instead of the default white one, applied via
+// screenOptions so it's chrome-only and never touches a screen's own
+// component/business logic).
+const themedHeaderOptions = {
+  headerStyle: { backgroundColor: colors.primary },
+  headerTintColor: colors.white,
+  headerTitleStyle: { fontWeight: "700" as const },
+};
+
 // Nested stack so ChatListScreen can drill into the shared ChatRoomScreen —
 // same pattern as ResidentTabNavigator's ChatStackNavigator.
 const ChatStack = createNativeStackNavigator<ChatStackParamList>();
 function ChatStackNavigator() {
   return (
-    <ChatStack.Navigator>
+    <ChatStack.Navigator screenOptions={themedHeaderOptions}>
       <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: "แชท" }} />
       <ChatStack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ title: "" }} />
     </ChatStack.Navigator>
@@ -45,6 +56,7 @@ export function GuardTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
+        ...themedHeaderOptions,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },

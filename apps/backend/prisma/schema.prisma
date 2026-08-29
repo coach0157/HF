@@ -203,6 +203,13 @@ model User {
   houseId      String?  @map("house_id") @db.Uuid
   lineUserId   String?  @map("line_user_id")
   passwordHash String?  @map("password_hash")
+  // Dev-agent addition (avatar upload feature, requested outside the
+  // original spec): local://avatars/... ref from FileStorageService, same
+  // shape as EntryLog.photoUrl / Announcement.imageUrl. Unlike
+  // "sensitive-id", the "avatars" bucket is NOT auto-deleted by the 90-day
+  // cleanup cron (see file-storage.service.ts) — a profile picture is a
+  // long-lived, user-controlled asset, not a transient ID-card snapshot.
+  avatarUrl    String?  @map("avatar_url")
   createdAt    DateTime @default(now()) @map("created_at")
 
   village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)

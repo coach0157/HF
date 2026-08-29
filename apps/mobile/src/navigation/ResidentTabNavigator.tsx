@@ -39,10 +39,22 @@ function TabIcon({ emoji, color }: { emoji: string; color: string }) {
   return <Text style={{ fontSize: 20, color }}>{emoji}</Text>;
 }
 
+// Shared native-stack header theme (spec's "แถบหัวข้อสีพื้นเขียว" direction,
+// per docs/DESIGN_SYSTEM.md) — applied via screenOptions rather than
+// per-screen `options` so every drill-in screen in a stack (InviteGuest,
+// EntryHistory, ChatRoom, ...) picks it up automatically instead of looking
+// like a different (default white) app. Purely chrome/styling — doesn't
+// touch any screen's own component/business logic.
+const themedHeaderOptions = {
+  headerStyle: { backgroundColor: colors.primary },
+  headerTintColor: colors.white,
+  headerTitleStyle: { fontWeight: "700" as const },
+};
+
 const HomeStack = createNativeStackNavigator<ResidentTabParamList>();
 function HomeStackNavigator() {
   return (
-    <HomeStack.Navigator>
+    <HomeStack.Navigator screenOptions={themedHeaderOptions}>
       <HomeStack.Screen
         name="Home"
         component={ResidentHomeScreen}
@@ -96,7 +108,7 @@ function HomeStackNavigator() {
 const ChatStack = createNativeStackNavigator<ChatStackParamList>();
 function ChatStackNavigator() {
   return (
-    <ChatStack.Navigator>
+    <ChatStack.Navigator screenOptions={themedHeaderOptions}>
       <ChatStack.Screen name="ChatList" component={ChatListScreen} options={{ title: "แชท" }} />
       <ChatStack.Screen name="ChatRoom" component={ChatRoomScreen} options={{ title: "" }} />
     </ChatStack.Navigator>
@@ -109,6 +121,7 @@ export function ResidentTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
+        ...themedHeaderOptions,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },

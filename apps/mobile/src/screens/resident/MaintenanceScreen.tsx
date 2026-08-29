@@ -28,6 +28,21 @@ const CATEGORY_LABEL: Record<MaintenanceCategory, string> = {
   OTHER: "อื่นๆ",
 };
 
+// Matches CreateMaintenanceScreen's category icons/chips — repeated here so
+// each ticket row is scannable at a glance instead of plain text.
+const CATEGORY_ICON: Record<MaintenanceCategory, string> = {
+  ELECTRICAL: "💡",
+  PLUMBING: "🚰",
+  ROAD: "🛣️",
+  OTHER: "🔧",
+};
+const CATEGORY_TINT: Record<MaintenanceCategory, string> = {
+  ELECTRICAL: colors.primaryLight,
+  PLUMBING: colors.secondaryLight,
+  ROAD: colors.primaryLight,
+  OTHER: colors.secondaryLight,
+};
+
 const STATUS_LABEL: Record<MaintenanceStatus, string> = {
   OPEN: "รับเรื่อง",
   IN_PROGRESS: "กำลังดำเนินการ",
@@ -87,6 +102,9 @@ export function MaintenanceScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.row}>
+            <View style={[styles.iconWrap, { backgroundColor: CATEGORY_TINT[item.category] }]}>
+              <Text style={styles.icon}>{CATEGORY_ICON[item.category]}</Text>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.ticketNumber}>{item.ticketNumber}</Text>
               <Text style={styles.category}>{CATEGORY_LABEL[item.category]}</Text>
@@ -122,6 +140,14 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icon: { fontSize: 20 },
   ticketNumber: { fontSize: 14, fontWeight: "700", color: colors.textPrimary },
   category: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   description: { fontSize: 13, color: colors.textPrimary, marginTop: spacing.xs },

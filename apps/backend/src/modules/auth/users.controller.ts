@@ -14,6 +14,7 @@ import { UserRole } from "@prisma/client";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { UpdateAvatarDto } from "./dto/update-avatar.dto";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import type { TenantClaims } from "../../common/rls/tenant-context";
@@ -29,9 +30,29 @@ import type { TenantClaims } from "../../common/rls/tenant-context";
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // Dev-agent change (avatar upload feature): used to just `return user`
+  // (the raw JWT claims — villageId/userId/role/houseId, see TenantClaims),
+  // which can never carry avatarUrl since it's not part of the access-token
+  // payload. Now fetches the live DB row instead, so ProfileScreen-style
+  // callers get name/phone/houseId/avatarUrl in one call. Nothing in this
+  // codebase depended on the old claims-shaped response (verified: no
+  // caller hit this route before this change).
   @Get("me")
   me(@CurrentUser() user: TenantClaims) {
-    return user;
+    return this.usersService.findOne(user.userId, user);
+  }
+
+  // Avatar upload feature (Dev-agent addition, outside the original spec).
+  // Every role may call this for their OWN record only — ownership is
+  // enforced in the service via claims.userId, never a route param, so
+  // there's no way to target another user's avatar through this endpoint.
+  @Roles("ADMIN", "GUARD", "RESIDENT")
+  @Patch("me/avatar")
+  updateAvatar(
+    @Body() dto: UpdateAvatarDto,
+    @CurrentUser() user: TenantClaims,
+  ) {
+    return this.usersService.updateAvatar(dto, user);
   }
 
   // Epic 8 (Chat): opened to RESIDENT/GUARD so the mobile chat screen can

@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
-export type PhotoBucket = "entry-logs" | "sensitive-id";
+export type PhotoBucket = "entry-logs" | "sensitive-id" | "avatars";
 
 /**
  * Spec 3.4: "แยกนโยบายเก็บข้อมูลภาพบัตรประชาชน/ทะเบียนรถออกจากประวัติเข้า-ออกทั่วไป" —
@@ -42,6 +42,14 @@ export class FileStorageService {
       "sensitive-id": this.config.get<string>(
         "S3_BUCKET_SENSITIVE_ID",
         "village-sensitive-id-photos",
+      ),
+      // Dev-agent addition (avatar upload feature). Deliberately NOT covered
+      // by listStaleSensitivePhotos()/SensitivePhotoCleanupService below —
+      // those only ever enumerate the "sensitive-id" bucket by name, so a
+      // profile picture is never swept by the 90-day ID-photo retention job.
+      avatars: this.config.get<string>(
+        "S3_BUCKET_AVATARS",
+        "village-avatars",
       ),
     };
   }

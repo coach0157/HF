@@ -37,6 +37,16 @@ const TYPE_ICON: Record<TransportProviderType, string> = {
   OTHER: "🚗",
 };
 
+// Alternating light tint per provider type (docs/DESIGN_SYSTEM.md's
+// primary/secondary rhythm) — purely presentational, doesn't affect the
+// `type` value used for filtering/API calls.
+const TYPE_TINT: Record<TransportProviderType, string> = {
+  MOTORCYCLE: colors.primaryLight,
+  TAXI: colors.secondaryLight,
+  VAN: colors.primaryLight,
+  OTHER: colors.secondaryLight,
+};
+
 const FILTERS: Array<TransportProviderType | "ALL"> = ["ALL", "MOTORCYCLE", "TAXI", "VAN", "OTHER"];
 
 export function TransportScreen() {
@@ -97,7 +107,9 @@ export function TransportScreen() {
         }
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Text style={styles.icon}>{TYPE_ICON[item.type]}</Text>
+            <View style={[styles.iconWrap, { backgroundColor: TYPE_TINT[item.type] }]}>
+              <Text style={styles.icon}>{TYPE_ICON[item.type]}</Text>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.meta}>{TYPE_LABEL[item.type]}</Text>
@@ -142,7 +154,14 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  icon: { fontSize: 28 },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icon: { fontSize: 22 },
   name: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   phone: { fontSize: 13, color: colors.primaryDark, marginTop: spacing.xs, fontWeight: "600" },

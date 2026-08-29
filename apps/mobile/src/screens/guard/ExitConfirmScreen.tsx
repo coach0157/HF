@@ -114,6 +114,9 @@ export function ExitConfirmScreen() {
         ListEmptyComponent={!loading ? <Text style={styles.empty}>ไม่มีแขกที่ยังไม่ออก</Text> : null}
         renderItem={({ item }) => (
           <View style={styles.row}>
+            <View style={styles.iconWrap}>
+              <Text style={styles.icon}>🚶</Text>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{item.visitorName ?? "(ไม่ระบุชื่อ)"}</Text>
               {item.vehiclePlate ? <Text style={styles.meta}>ทะเบียน: {item.vehiclePlate}</Text> : null}
@@ -155,6 +158,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm + 2,
     backgroundColor: colors.surface,
   },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.warningLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icon: { fontSize: 18 },
   name: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   confirmButton: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md },

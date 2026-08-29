@@ -66,7 +66,14 @@ export function ChatListScreen() {
             style={styles.row}
             onPress={() => navigation.navigate("ChatRoom", { chatRoomId: item.id, title: roomLabel(item) })}
           >
-            <Text style={styles.icon}>{item.type === "GROUP" ? "👥" : "🏠"}</Text>
+            <View
+              style={[
+                styles.iconWrap,
+                { backgroundColor: item.type === "GROUP" ? colors.secondaryLight : colors.primaryLight },
+              ]}
+            >
+              <Text style={styles.icon}>{item.type === "GROUP" ? "👥" : "🏠"}</Text>
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.label}>{roomLabel(item)}</Text>
               <Text style={styles.preview} numberOfLines={1}>
@@ -98,7 +105,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-  icon: { fontSize: 26 },
+  iconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icon: { fontSize: 20 },
   label: { fontSize: 15, fontWeight: "700", color: colors.textPrimary },
   preview: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
   badge: {
