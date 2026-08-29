@@ -123,23 +123,30 @@ export function ResidentHomeScreen() {
         {sosSending && <ActivityIndicator style={{ marginTop: spacing.sm }} />}
       </View>
 
-      <View style={styles.cardsRow}>
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate("InviteGuest")}>
-          <Text style={styles.cardIcon}>📷</Text>
-          <Text style={styles.cardLabel}>เชิญแขก (QR)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate("EntryHistory")}>
-          <Text style={styles.cardIcon}>🕒</Text>
-          <Text style={styles.cardLabel}>ประวัติเข้า-ออก</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate("Transport")}>
-          <Text style={styles.cardIcon}>🚕</Text>
-          <Text style={styles.cardLabel}>เรียกรถโดยสาร</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate("Maintenance")}>
-          <Text style={styles.cardIcon}>🔧</Text>
-          <Text style={styles.cardLabel}>แจ้งซ่อม</Text>
-        </TouchableOpacity>
+      <View style={styles.cardsGrid}>
+        {(
+          [
+            { icon: "📷", label: "เชิญแขก (QR)", tint: "primary", onPress: () => navigation.navigate("InviteGuest") },
+            { icon: "🕒", label: "ประวัติเข้า-ออก", tint: "secondary", onPress: () => navigation.navigate("EntryHistory") },
+            { icon: "🚕", label: "เรียกรถโดยสาร", tint: "secondary", onPress: () => navigation.navigate("Transport") },
+            { icon: "🔧", label: "แจ้งซ่อม", tint: "primary", onPress: () => navigation.navigate("Maintenance") },
+          ] as const
+        ).map((item) => (
+          <TouchableOpacity key={item.label} style={styles.card} onPress={item.onPress}>
+            <View
+              style={[
+                styles.cardIconWrap,
+                {
+                  backgroundColor:
+                    item.tint === "primary" ? colors.primaryLight : colors.secondaryLight,
+                },
+              ]}
+            >
+              <Text style={styles.cardIcon}>{item.icon}</Text>
+            </View>
+            <Text style={styles.cardLabel}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <Text style={styles.sectionTitle}>ประกาศล่าสุด</Text>
@@ -175,8 +182,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: spacing.lg,
+    backgroundColor: colors.primary,
   },
-  villageName: { fontSize: 18, fontWeight: "700", color: colors.textPrimary },
+  villageName: { fontSize: 18, fontWeight: "700", color: colors.white },
   bell: { padding: spacing.xs },
   bellIcon: { fontSize: 22 },
   badge: {
@@ -199,9 +207,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   sosWrap: { alignItems: "center", marginVertical: spacing.xl },
-  cardsRow: { flexDirection: "row", paddingHorizontal: spacing.lg, gap: spacing.md },
+  cardsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
   card: {
-    flex: 1,
+    // 2 columns: (100% - gap) / 2
+    width: "47%",
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     borderWidth: 1,
@@ -209,8 +223,20 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     alignItems: "center",
     gap: spacing.sm,
+    shadowColor: colors.black,
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  cardIcon: { fontSize: 26 },
+  cardIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardIcon: { fontSize: 22 },
   cardLabel: { fontSize: 13, fontWeight: "600", textAlign: "center", color: colors.textPrimary },
   sectionTitle: {
     fontSize: 15,

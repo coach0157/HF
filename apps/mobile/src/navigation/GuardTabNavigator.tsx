@@ -5,6 +5,7 @@
  * rather than one "home" with shortcuts). "Chat" added for Epic 8 (spec
  * 2.3's "ลูกบ้าน-รปภ." 1:1 chat side, docs/PHASE2_BACKLOG.md Epic 8).
  */
+import { Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { GuardHomeScreen } from "../screens/guard/HomeScreen";
@@ -17,6 +18,14 @@ import { ChatRoomScreen } from "../screens/shared/ChatRoomScreen";
 import { GuardProfileScreen } from "../screens/guard/ProfileScreen";
 import type { ChatStackParamList, GuardTabParamList } from "./types";
 import { colors } from "../theme";
+
+// Emoji tab icons — see ResidentTabNavigator.tsx's TabIcon doc comment for
+// why (no @expo/vector-icons in the dependency tree; previously no
+// tabBarIcon at all, which showed as an empty placeholder box per-tab on a
+// real device).
+function TabIcon({ emoji, color }: { emoji: string; color: string }) {
+  return <Text style={{ fontSize: 20, color }}>{emoji}</Text>;
+}
 
 // Nested stack so ChatListScreen can drill into the shared ChatRoomScreen —
 // same pattern as ResidentTabNavigator's ChatStackNavigator.
@@ -41,25 +50,51 @@ export function GuardTabNavigator() {
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
       }}
     >
-      <Tab.Screen name="Home" component={GuardHomeScreen} options={{ title: "หน้าแรก" }} />
-      <Tab.Screen name="ScanQr" component={ScanQrScreen} options={{ title: "สแกน QR" }} />
+      <Tab.Screen
+        name="Home"
+        component={GuardHomeScreen}
+        options={{ title: "หน้าแรก", tabBarIcon: ({ color }) => <TabIcon emoji="🏠" color={color} /> }}
+      />
+      <Tab.Screen
+        name="ScanQr"
+        component={ScanQrScreen}
+        options={{ title: "สแกน QR", tabBarIcon: ({ color }) => <TabIcon emoji="📷" color={color} /> }}
+      />
       <Tab.Screen
         name="ManualEntry"
         component={ManualEntryScreen}
-        options={{ title: "บันทึกด้วยมือ" }}
+        options={{
+          title: "บันทึกด้วยมือ",
+          tabBarIcon: ({ color }) => <TabIcon emoji="📝" color={color} />,
+        }}
       />
       <Tab.Screen
         name="ExitConfirm"
         component={ExitConfirmScreen}
-        options={{ title: "ยืนยันแขกออก" }}
+        options={{
+          title: "ยืนยันแขกออก",
+          tabBarIcon: ({ color }) => <TabIcon emoji="🚪" color={color} />,
+        }}
       />
-      <Tab.Screen name="SosList" component={SosListScreen} options={{ title: "SOS" }} />
+      <Tab.Screen
+        name="SosList"
+        component={SosListScreen}
+        options={{ title: "SOS", tabBarIcon: ({ color }) => <TabIcon emoji="🚨" color={color} /> }}
+      />
       <Tab.Screen
         name="Chat"
         component={ChatStackNavigator}
-        options={{ headerShown: false, title: "แชท" }}
+        options={{
+          headerShown: false,
+          title: "แชท",
+          tabBarIcon: ({ color }) => <TabIcon emoji="💬" color={color} />,
+        }}
       />
-      <Tab.Screen name="Profile" component={GuardProfileScreen} options={{ title: "โปรไฟล์" }} />
+      <Tab.Screen
+        name="Profile"
+        component={GuardProfileScreen}
+        options={{ title: "โปรไฟล์", tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} /> }}
+      />
     </Tab.Navigator>
   );
 }

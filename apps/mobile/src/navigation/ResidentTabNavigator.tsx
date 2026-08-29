@@ -12,6 +12,7 @@
  * for real `@react-navigation/bottom-tabs` `tabBarIcon`s once icon assets
  * are chosen (e.g. `@expo/vector-icons`, already bundled with Expo).
  */
+import { Text } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ResidentHomeScreen } from "../screens/resident/HomeScreen";
@@ -28,6 +29,16 @@ import { ProfileScreen } from "../screens/resident/ProfileScreen";
 import type { ChatStackParamList, ResidentTabParamList } from "./types";
 import { colors } from "../theme";
 
+// Emoji tab icons — no @expo/vector-icons in this project's dependency
+// tree (checked: not installed, not a transitive dep of the pinned `expo`
+// version), and the app already uses emoji throughout (cards, buttons) as
+// its icon language, so this stays consistent rather than adding a new
+// package. Previously there was NO tabBarIcon at all, which is what showed
+// as an empty/placeholder box in the tab bar on a real device.
+function TabIcon({ emoji, color }: { emoji: string; color: string }) {
+  return <Text style={{ fontSize: 20, color }}>{emoji}</Text>;
+}
+
 const HomeStack = createNativeStackNavigator<ResidentTabParamList>();
 function HomeStackNavigator() {
   return (
@@ -35,7 +46,12 @@ function HomeStackNavigator() {
       <HomeStack.Screen
         name="Home"
         component={ResidentHomeScreen}
-        options={{ title: "หน้าแรก" }}
+        // The screen renders its own top bar (village name + notification
+        // bell) — showing the native stack header too stacked a second,
+        // redundant bar on top of it ("หน้าแรก" title bar + the screen's own
+        // "หมู่บ้าน" row underneath). Hidden here only; other screens in this
+        // stack (InviteGuest, EntryHistory, ...) keep their native header.
+        options={{ headerShown: false }}
       />
       <HomeStack.Screen
         name="InviteGuest"
@@ -101,22 +117,36 @@ export function ResidentTabNavigator() {
       <Tab.Screen
         name="Home"
         component={HomeStackNavigator}
-        options={{ headerShown: false, title: "หน้าแรก" }}
+        options={{
+          headerShown: false,
+          title: "หน้าแรก",
+          tabBarIcon: ({ color }) => <TabIcon emoji="🏠" color={color} />,
+        }}
       />
       <Tab.Screen
         name="Announcements"
         component={AnnouncementsScreen}
-        options={{ title: "ประกาศ" }}
+        options={{
+          title: "ประกาศ",
+          tabBarIcon: ({ color }) => <TabIcon emoji="📢" color={color} />,
+        }}
       />
       <Tab.Screen
         name="Chat"
         component={ChatStackNavigator}
-        options={{ headerShown: false, title: "แชท" }}
+        options={{
+          headerShown: false,
+          title: "แชท",
+          tabBarIcon: ({ color }) => <TabIcon emoji="💬" color={color} />,
+        }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: "เพิ่มเติม" }}
+        options={{
+          title: "เพิ่มเติม",
+          tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} />,
+        }}
       />
     </Tab.Navigator>
   );
