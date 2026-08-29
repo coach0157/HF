@@ -4,11 +4,11 @@ import { colors, radius, semanticColors } from '../theme';
 export type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 const VARIANT_STYLE: Record<BadgeVariant, CSSProperties> = {
-  success: { background: semanticColors.successLight, color: colors.primaryDark },
-  warning: { background: semanticColors.warningLight, color: '#92400E' },
-  danger: { background: semanticColors.dangerLight, color: '#991B1B' },
-  info: { background: semanticColors.infoLight, color: colors.secondaryDark },
-  neutral: { background: colors.border, color: colors.textSecondary },
+  success: { background: semanticColors.successLight, color: colors.primaryDark, border: `1px solid ${colors.primary}` },
+  warning: { background: semanticColors.warningLight, color: '#92400E', border: `1px solid ${colors.warning}` },
+  danger: { background: semanticColors.dangerLight, color: '#991B1B', border: `1px solid ${colors.danger}` },
+  info: { background: semanticColors.infoLight, color: colors.secondaryDark, border: `1px solid ${colors.secondary}` },
+  neutral: { background: colors.border, color: colors.textSecondary, border: `1px solid ${colors.textMuted}` },
 };
 
 interface BadgeProps {

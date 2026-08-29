@@ -204,7 +204,7 @@ export function MaintenanceTicketsPage() {
         <Card style={{ flex: 1, minWidth: 320, padding: 0, overflowX: 'auto' as const }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+              <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, background: colors.primaryLight }}>
                 <th style={thStyle}>เลขที่ใบงาน</th>
                 <th style={thStyle}>บ้าน</th>
                 <th style={thStyle}>หมวดหมู่</th>

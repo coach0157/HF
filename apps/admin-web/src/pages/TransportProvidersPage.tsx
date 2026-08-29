@@ -56,6 +56,7 @@ export function TransportProvidersPage() {
   const [typeFilter, setTypeFilter] = useState<TransportProviderType | 'ALL'>('ALL');
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -82,6 +83,7 @@ export function TransportProvidersPage() {
     setEditingId(p.id);
     setForm({ name: p.name, type: p.type, phone: p.phone, serviceArea: p.serviceArea ?? '' });
     setError(null);
+    setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -89,6 +91,7 @@ export function TransportProvidersPage() {
     setEditingId(null);
     setForm(emptyForm);
     setError(null);
+    setShowForm(false);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -148,9 +151,17 @@ export function TransportProvidersPage() {
 
   return (
     <div>
-      <h1 style={{ color: colors.textPrimary }}>ทำเนียบรถรับจ้าง / เรียกรถโดยสาร</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' }}>
+        <h1 style={{ color: colors.textPrimary, margin: 0 }}>ทำเนียบรถรับจ้าง / เรียกรถโดยสาร</h1>
+        {!showForm && (
+          <Button onClick={() => setShowForm(true)}>
+            <span aria-hidden>＋</span> เพิ่มผู้ให้บริการใหม่
+          </Button>
+        )}
+      </div>
 
-      <Card style={{ marginBottom: spacing.xl, maxWidth: 480 }}>
+      {showForm && (
+      <Card style={{ marginTop: spacing.lg, marginBottom: spacing.xl, maxWidth: 480 }}>
         <form onSubmit={handleSubmit}>
           <h2 style={{ marginTop: 0, fontSize: 18, color: colors.textPrimary }}>
             {editingId ? 'แก้ไขผู้ให้บริการ' : 'เพิ่มผู้ให้บริการใหม่'}
@@ -208,14 +219,13 @@ export function TransportProvidersPage() {
             <Button type="submit" loading={loading} loadingText="กำลังบันทึก...">
               {editingId ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ให้บริการ'}
             </Button>
-            {editingId && (
-              <Button type="button" variant="secondary" onClick={cancelEdit}>
-                ยกเลิก
-              </Button>
-            )}
+            <Button type="button" variant="secondary" onClick={cancelEdit}>
+              ยกเลิก
+            </Button>
           </div>
         </form>
       </Card>
+      )}
 
       <label style={{ fontSize: 14, color: colors.textPrimary }}>
         กรองตามประเภท:{' '}
@@ -240,7 +250,7 @@ export function TransportProvidersPage() {
       <Card style={{ marginTop: spacing.md, padding: 0, overflowX: 'auto' as const }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, background: colors.primaryLight }}>
               <th style={thStyle}>ชื่อ</th>
               <th style={thStyle}>ประเภท</th>
               <th style={thStyle}>เบอร์โทร</th>

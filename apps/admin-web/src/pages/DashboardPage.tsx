@@ -37,12 +37,23 @@ export function DashboardPage() {
     <div>
       <h1 style={{ color: colors.textPrimary }}>Dashboard</h1>
       <div style={{ display: 'flex', gap: spacing.lg, flexWrap: 'wrap' }}>
-        <StatCard title="รถ/แขกเข้า-ออกวันนี้" value={entryToday} linkTo="/entry-logs" />
-        <StatCard title="แจ้งเหตุ SOS ที่รอรับแจ้ง" value={pendingSos} linkTo="/sos" highlight={Boolean(pendingSos)} />
-        <StatCard title="รปภ. ที่กำลังปฏิบัติหน้าที่" value={onDutyGuards} linkTo="/guard-shifts" />
-        <Card style={{ minWidth: 200, opacity: 0.6 }}>
-          <div style={{ fontSize: 13, color: colors.textSecondary }}>ค้างชำระค่าส่วนกลาง</div>
-          <div style={{ fontSize: 14, marginTop: spacing.sm, color: colors.textPrimary }}>
+        <StatCard title="รถ/แขกเข้า-ออกวันนี้" value={entryToday} linkTo="/entry-logs" icon="🚗" iconBg={colors.secondaryLight} iconColor={colors.secondaryDark} />
+        <StatCard
+          title="แจ้งเหตุ SOS ที่รอรับแจ้ง"
+          value={pendingSos}
+          linkTo="/sos"
+          highlight={Boolean(pendingSos)}
+          icon="🚨"
+          iconBg={colors.dangerLight}
+          iconColor={colors.danger}
+        />
+        <StatCard title="รปภ. ที่กำลังปฏิบัติหน้าที่" value={onDutyGuards} linkTo="/guard-shifts" icon="🛡️" iconBg={colors.primaryLight} iconColor={colors.primaryDark} />
+        <Card style={{ minWidth: 200, opacity: 0.65 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+            <IconCircle icon="💰" bg={colors.border} color={colors.textSecondary} />
+            <div style={{ fontSize: 13, color: colors.textSecondary }}>ค้างชำระค่าส่วนกลาง</div>
+          </div>
+          <div style={{ fontSize: 13, marginTop: spacing.sm, color: colors.textPrimary }}>
             ยังไม่พร้อมใช้งาน (โมดูลชำระเงิน — เฟส 3)
           </div>
         </Card>
@@ -51,16 +62,44 @@ export function DashboardPage() {
   );
 }
 
+function IconCircle({ icon, bg, color }: { icon: string; bg: string; color: string }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        background: bg,
+        color,
+        fontSize: 20,
+        flexShrink: 0,
+      }}
+    >
+      {icon}
+    </span>
+  );
+}
+
 function StatCard({
   title,
   value,
   linkTo,
   highlight,
+  icon,
+  iconBg,
+  iconColor,
 }: {
   title: string;
   value: number | null;
   linkTo: string;
   highlight?: boolean;
+  icon: string;
+  iconBg: string;
+  iconColor: string;
 }) {
   return (
     <Link to={linkTo} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -71,9 +110,14 @@ function StatCard({
           background: highlight ? colors.dangerLight : colors.surface,
         }}
       >
-        <div style={{ fontSize: 13, color: highlight ? colors.danger : colors.textSecondary }}>{title}</div>
-        <div style={{ fontSize: 32, fontWeight: 'bold', color: highlight ? colors.danger : colors.textPrimary }}>
-          {value === null ? '—' : value}
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+          <IconCircle icon={icon} bg={highlight ? colors.surface : iconBg} color={highlight ? colors.danger : iconColor} />
+          <div>
+            <div style={{ fontSize: 13, color: highlight ? colors.danger : colors.textSecondary }}>{title}</div>
+            <div style={{ fontSize: 30, fontWeight: 'bold', color: highlight ? colors.danger : colors.textPrimary }}>
+              {value === null ? '—' : value}
+            </div>
+          </div>
         </div>
       </Card>
     </Link>

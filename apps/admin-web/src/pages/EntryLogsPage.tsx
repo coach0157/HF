@@ -98,7 +98,7 @@ export function EntryLogsPage() {
       <Card style={{ padding: 0, overflowX: 'auto' as const }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, background: colors.primaryLight }}>
               <th style={thStyle}>บ้าน</th>
               <th style={thStyle}>ผู้มาเยือน</th>
               <th style={thStyle}>ทะเบียนรถ</th>

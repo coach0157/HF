@@ -80,7 +80,7 @@ export function GuardShiftsPage() {
       <Card style={{ marginTop: spacing.md, padding: 0, overflowX: 'auto' as const }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, background: colors.primaryLight }}>
               <th style={thStyle}>ชื่อ</th>
               <th style={thStyle}>เบอร์โทร</th>
               <th style={thStyle}>สถานะ</th>

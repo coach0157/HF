@@ -44,6 +44,7 @@ export function MembersPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [showUserForm, setShowUserForm] = useState(false);
   const [userError, setUserError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -86,6 +87,7 @@ export function MembersPage() {
     setEditingUserId(u.id);
     setUserForm({ name: u.name, phone: u.phone, role: u.role, houseId: u.houseId ?? '' });
     setUserError(null);
+    setShowUserForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -93,6 +95,7 @@ export function MembersPage() {
     setEditingUserId(null);
     setUserForm(emptyUserForm);
     setUserError(null);
+    setShowUserForm(false);
   }
 
   async function submitUser(e: FormEvent) {
@@ -171,7 +174,14 @@ export function MembersPage() {
 
   return (
     <div>
-      <h1 style={{ color: colors.textPrimary }}>จัดการสมาชิก/บ้าน</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' }}>
+        <h1 style={{ color: colors.textPrimary, margin: 0 }}>จัดการสมาชิก/บ้าน</h1>
+        {!showUserForm && (
+          <Button onClick={() => setShowUserForm(true)}>
+            <span aria-hidden>＋</span> เพิ่มสมาชิก
+          </Button>
+        )}
+      </div>
 
       <section style={{ marginBottom: spacing.xxl }}>
         <h2 style={{ color: colors.textPrimary }}>บ้าน</h2>
@@ -212,6 +222,7 @@ export function MembersPage() {
 
       <section>
         <h2 style={{ color: colors.textPrimary }}>สมาชิก</h2>
+        {showUserForm && (
         <Card style={{ marginBottom: spacing.xl, maxWidth: 480 }}>
           <form onSubmit={submitUser}>
             <h3 style={{ marginTop: 0, color: colors.textPrimary }}>{editingUserId ? 'แก้ไขสมาชิก' : 'เพิ่มสมาชิกใหม่'}</h3>
@@ -275,14 +286,13 @@ export function MembersPage() {
               <Button type="submit" loading={loading} loadingText="กำลังบันทึก...">
                 {editingUserId ? 'บันทึกการแก้ไข' : 'เพิ่มสมาชิก'}
               </Button>
-              {editingUserId && (
-                <Button type="button" variant="secondary" onClick={cancelEdit}>
-                  ยกเลิก
-                </Button>
-              )}
+              <Button type="button" variant="secondary" onClick={cancelEdit}>
+                ยกเลิก
+              </Button>
             </div>
           </form>
         </Card>
+        )}
 
         <label style={{ fontSize: 14, color: colors.textPrimary }}>
           กรองตามบทบาท:{' '}
@@ -306,7 +316,7 @@ export function MembersPage() {
         <Card style={{ marginTop: spacing.md, padding: 0, overflowX: 'auto' as const }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+              <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, background: colors.primaryLight }}>
                 <th style={thStyle}>ชื่อ</th>
                 <th style={thStyle}>เบอร์โทร</th>
                 <th style={thStyle}>บทบาท</th>

@@ -91,15 +91,44 @@ export function LoginPage() {
     <div
       style={{
         minHeight: '100vh',
-        background: colors.background,
+        background: `linear-gradient(160deg, ${colors.primaryLight} 0%, ${colors.background} 45%, ${colors.secondaryLight} 100%)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: font.family,
       }}
     >
-      <Card style={{ width: '100%', maxWidth: 360, margin: spacing.lg }} padding={spacing.xl}>
-        <h1 style={{ fontSize: 22, color: colors.textPrimary, marginTop: 0 }}>เข้าสู่ระบบ (Admin)</h1>
+      <div style={{ width: '100%', maxWidth: 360, margin: spacing.lg }}>
+        <div style={{ textAlign: 'center', marginBottom: spacing.lg }}>
+          <span
+            aria-hidden
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
+              fontSize: 30,
+              boxShadow: '0 6px 16px rgba(16, 185, 129, 0.35)',
+            }}
+          >
+            🏘️
+          </span>
+          <div style={{ marginTop: spacing.sm, fontSize: 18, fontWeight: 800, color: colors.textPrimary }}>
+            ระบบความปลอดภัยและอำนวยความสะดวกหมู่บ้าน
+          </div>
+        </div>
+        <Card
+          style={{
+            width: '100%',
+            borderTop: `4px solid ${colors.primary}`,
+            boxShadow: '0 10px 30px rgba(17, 24, 39, 0.08)',
+          }}
+          padding={spacing.xl}
+        >
+          <h1 style={{ fontSize: 22, color: colors.textPrimary, marginTop: 0 }}>เข้าสู่ระบบ (Admin)</h1>
 
         {step === 'phone' && (
           <form onSubmit={requestOtp}>
@@ -159,7 +188,8 @@ export function LoginPage() {
             </Button>
           </form>
         )}
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }

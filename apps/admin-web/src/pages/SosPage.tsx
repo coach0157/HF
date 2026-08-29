@@ -101,7 +101,7 @@ export function SosPage() {
       <Card style={{ marginTop: spacing.md, padding: 0, overflowX: 'auto' as const }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
+            <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}`, background: colors.primaryLight }}>
               <th style={thStyle}>สถานะ</th>
               <th style={thStyle}>บ้านเลขที่</th>
               <th style={thStyle}>แจ้งโดย</th>

@@ -62,6 +62,7 @@ export function AnnouncementsPage() {
   const [houses, setHouses] = useState<House[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export function AnnouncementsPage() {
 
   function startEdit(a: Announcement) {
     setEditingId(a.id);
+    setShowForm(true);
     setForm({
       title: a.title,
       content: a.content,
@@ -102,6 +104,7 @@ export function AnnouncementsPage() {
     setEditingId(null);
     setForm(emptyForm);
     setError(null);
+    setShowForm(false);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -158,9 +161,17 @@ export function AnnouncementsPage() {
 
   return (
     <div>
-      <h1 style={{ color: colors.textPrimary }}>จัดการประกาศ</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' }}>
+        <h1 style={{ color: colors.textPrimary, margin: 0 }}>จัดการประกาศ</h1>
+        {!showForm && (
+          <Button onClick={() => setShowForm(true)}>
+            <span aria-hidden>＋</span> สร้างประกาศใหม่
+          </Button>
+        )}
+      </div>
 
-      <Card as="div" style={{ marginBottom: spacing.xl, maxWidth: 520 }}>
+      {showForm && (
+      <Card as="div" style={{ marginTop: spacing.lg, marginBottom: spacing.xl, maxWidth: 520 }}>
         <form onSubmit={handleSubmit}>
           <h2 style={{ marginTop: 0, fontSize: 18, color: colors.textPrimary }}>
             {editingId ? 'แก้ไขประกาศ' : 'สร้างประกาศใหม่'}
@@ -268,16 +279,24 @@ export function AnnouncementsPage() {
             <Button type="submit" loading={loading} loadingText="กำลังบันทึก...">
               {editingId ? 'บันทึกการแก้ไข' : 'สร้างประกาศ'}
             </Button>
-            {editingId && (
-              <Button type="button" variant="secondary" onClick={cancelEdit}>
-                ยกเลิก
-              </Button>
-            )}
+            <Button type="button" variant="secondary" onClick={cancelEdit}>
+              ยกเลิก
+            </Button>
           </div>
         </form>
       </Card>
+      )}
 
-      <h2 style={{ color: colors.textPrimary }}>รายการประกาศ</h2>
+      <h2
+        style={{
+          color: colors.textPrimary,
+          background: colors.primaryLight,
+          padding: `${spacing.sm}px ${spacing.md}px`,
+          borderRadius: radius.input,
+        }}
+      >
+        รายการประกาศ
+      </h2>
       {listError && <p style={{ color: colors.danger }}>{listError}</p>}
       {announcements === null && !listError && <p style={{ color: colors.textSecondary }}>กำลังโหลด...</p>}
       {announcements !== null && announcements.length === 0 && (

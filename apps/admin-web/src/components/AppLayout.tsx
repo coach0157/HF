@@ -40,38 +40,49 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: `${spacing.md}px ${spacing.lg}px`,
-          background: colors.surface,
-          borderBottom: `1px solid ${colors.border}`,
+          background: colors.primary,
           marginBottom: spacing.lg,
           flexWrap: 'wrap',
           gap: spacing.sm,
+          boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)',
         }}
       >
-        <div style={{ display: 'flex', gap: spacing.xs, flexWrap: 'wrap' }}>
-          {NAV_ITEMS.map((item) => {
-            const active = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                style={{
-                  textDecoration: 'none',
-                  padding: `${spacing.xs + 2}px ${spacing.md}px`,
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontWeight: active ? 700 : 500,
-                  color: active ? colors.primaryDark : colors.textSecondary,
-                  background: active ? colors.primaryLight : 'transparent',
-                }}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.lg, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontWeight: 800, color: '#FFFFFF', fontSize: 16 }}>
+            <span aria-hidden>🏘️</span>
+            <span>HF Admin</span>
+          </div>
+          <div style={{ display: 'flex', gap: spacing.xs, flexWrap: 'wrap' }}>
+            {NAV_ITEMS.map((item) => {
+              const active = item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  style={{
+                    textDecoration: 'none',
+                    padding: `${spacing.xs + 2}px ${spacing.md}px`,
+                    borderRadius: 8,
+                    fontSize: 14,
+                    fontWeight: active ? 700 : 500,
+                    color: active ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)',
+                    background: active ? 'rgba(255, 255, 255, 0.22)' : 'transparent',
+                    boxShadow: active ? 'inset 0 -2px 0 #FFFFFF' : undefined,
+                  }}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-          {session && <span style={{ fontSize: 14, color: colors.textPrimary }}>{session.name}</span>}
-          <Button variant="danger" onClick={handleLogout} style={{ padding: `6px ${spacing.md}px`, fontSize: 13 }}>
+          {session && <span style={{ fontSize: 14, color: '#FFFFFF' }}>{session.name}</span>}
+          <Button
+            variant="danger"
+            onClick={handleLogout}
+            style={{ padding: `6px ${spacing.md}px`, fontSize: 13, border: '1px solid rgba(255,255,255,0.6)' }}
+          >
             ออกจากระบบ
           </Button>
         </div>
