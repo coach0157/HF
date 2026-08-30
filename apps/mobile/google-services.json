@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "490428154337",
+    "project_id": "safevillage-c3eb5",
+    "storage_bucket": "safevillage-c3eb5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:490428154337:android:f378b1d2faeffdacf692a0",
+        "android_client_info": {
+          "package_name": "app.villagesecurity.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCghydT4rs7QNXAgpNfU3KYNRbwQsnpfZo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
