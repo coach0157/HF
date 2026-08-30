@@ -18,6 +18,7 @@
     },
     "android": {
       "package": "app.villagesecurity.mobile",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -25,7 +26,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -54,7 +58,11 @@
       ]
     ],
     "extra": {
-      "apiBaseUrl": "http://localhost:3001"
-    }
+      "apiBaseUrl": "http://localhost:3001",
+      "eas": {
+        "projectId": "8236b3ac-1d62-40a3-baca-ac2e3888cc48"
+      }
+    },
+    "owner": "coach0157"
   }
 }
