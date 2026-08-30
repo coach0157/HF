@@ -113,11 +113,15 @@ export class EntryLogService {
     // Expo's API call resolves. Only reached on a genuine new scan-in (the
     // `alreadyEntered: true` early-return above never falls through here),
     // matching AC #1's "don't send again for the exit-gate re-scan" rule.
-    this.pushNotificationService.send([pass.createdByUserId], {
-      title: "แขกของท่านมาถึงแล้ว",
-      body: `${pass.visitorName ?? "แขก"} มาถึงป้อมยามแล้ว`,
-      data: { type: "entry", id: entryLog.id },
-    });
+    this.pushNotificationService.send(
+      [pass.createdByUserId],
+      {
+        title: "แขกของท่านมาถึงแล้ว",
+        body: `${pass.visitorName ?? "แขก"} มาถึงป้อมยามแล้ว`,
+        data: { type: "entry", id: entryLog.id },
+      },
+      claims,
+    );
 
     return { entryLog, alreadyEntered: false };
   }

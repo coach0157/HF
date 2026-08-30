@@ -5,6 +5,7 @@ import { Expo } from "expo-server-sdk";
 import { PrismaService } from "../prisma/prisma.service";
 import { getTenantPrismaClient } from "../rls/tenant-context";
 import type { TenantClaims } from "../rls/tenant-context";
+import { runInTenantTransaction } from "../rls/tenant-transaction";
 
 export interface PushTokenRecord {
   userId: string;
@@ -21,14 +22,35 @@ export interface PushTokenRecord {
  * `POST /push-tokens` / `DELETE /push-tokens`, both authenticated HTTP
  * requests.
  *
- * `listTokensForUsers`/`removeTokenByValue` deliberately use the raw
- * `PrismaService` instead — see their own doc comments for why: they are
- * called from `PushNotificationService.send()`, which ADR-006 requires to
- * be fire-and-forget and NOT awaited by any request handler. By the time
- * that background work actually runs, the request that triggered it may
- * have already returned and closed its RLS transaction, so `tx` from that
- * request is not a safe thing to depend on — this mirrors PrismaService's
- * own doc comment carve-out for "genuinely cross-tenant/system code".
+ * `listTokensForUsers`/`removeTokenByValue` are called from
+ * `PushNotificationService.send()`, which ADR-006 requires to be
+ * fire-and-forget and NOT awaited by any request handler — by the time that
+ * background work actually runs, the request that triggered it may have
+ * already returned and closed its own RLS transaction, so that request's
+ * `tx` is not a safe thing to depend on.
+ *
+ * BUG FOUND LIVE IN THIS SESSION (not caught by any of the 47+ mocked-Prisma
+ * unit/e2e tests written for Epic 11 — mocks don't enforce real RLS, so
+ * nothing exercised this path against actual Postgres): these two methods
+ * used to query through the raw `PrismaService` on the theory that it
+ * "bypasses RLS outside a transaction". It does NOT — `PrismaService`
+ * connects as the same `village_app` role as everything else (see
+ * apps/backend/prisma/sql/rls-policies.sql's `FORCE ROW LEVEL SECURITY`),
+ * which silently returns ZERO rows for any query that never set
+ * `app.current_village_id` — this is the exact same wrong assumption
+ * `auth.service.ts`'s cross-village phone lookup made and had to be fixed
+ * for (see `village_app_auth_lookup`'s migration comment). Every real push
+ * trigger (announcement/SOS/chat/entry-log) resolved zero tokens and
+ * silently no-opped, while manual testing against a token value obtained
+ * directly (bypassing this lookup) worked fine — that mismatch is what
+ * exposed the bug. Fixed by using `runInTenantTransaction()` (ADR-005) to
+ * open a fresh, self-contained transaction and set tenant context before
+ * querying, same as any other system code operating outside a request's own
+ * transaction (`prisma/seed.ts` uses the identical pattern by hand).
+ * `userIds` is still a trusted, already-authorized id list (every caller
+ * resolved it from its own RLS-scoped query before calling `send()`) —
+ * `claims` here is only to establish which village's RLS context to run
+ * the query under, not to re-authorize the id list.
  */
 @Injectable()
 export class PushTokenService {
@@ -87,12 +109,17 @@ export class PushTokenService {
    * calling `send()`, so this is a trusted, already-authorized id list, not
    * raw user input.
    */
-  async listTokensForUsers(userIds: string[]): Promise<PushTokenRecord[]> {
+  async listTokensForUsers(
+    userIds: string[],
+    claims: TenantClaims,
+  ): Promise<PushTokenRecord[]> {
     if (userIds.length === 0) return [];
-    return this.prisma.pushToken.findMany({
-      where: { userId: { in: userIds } },
-      select: { userId: true, expoPushToken: true },
-    });
+    return runInTenantTransaction(this.prisma, claims, () =>
+      getTenantPrismaClient<PrismaClient>().pushToken.findMany({
+        where: { userId: { in: userIds } },
+        select: { userId: true, expoPushToken: true },
+      }),
+    );
   }
 
   /**
@@ -106,9 +133,16 @@ export class PushTokenService {
    * `PushNotificationService`'s already-fire-and-forget dispatch path, so
    * it must never surface as an unhandled rejection.
    */
-  async removeTokenByValue(expoPushToken: string): Promise<void> {
+  async removeTokenByValue(
+    expoPushToken: string,
+    claims: TenantClaims,
+  ): Promise<void> {
     try {
-      await this.prisma.pushToken.deleteMany({ where: { expoPushToken } });
+      await runInTenantTransaction(this.prisma, claims, () =>
+        getTenantPrismaClient<PrismaClient>().pushToken.deleteMany({
+          where: { expoPushToken },
+        }),
+      );
     } catch (err) {
       this.logger.warn(
         `Failed to prune dead push token: ${(err as Error).message}`,

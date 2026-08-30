@@ -1,6 +1,14 @@
 import type { ConfigService } from "@nestjs/config";
 import { PushNotificationService } from "./push-notification.service";
 import type { PushTokenService } from "./push-token.service";
+import type { TenantClaims } from "../rls/tenant-context";
+
+const mockClaims: TenantClaims = {
+  userId: "admin-1",
+  villageId: "village-1",
+  role: "ADMIN",
+  houseId: null,
+};
 
 // The mock jest.fn()s are created INSIDE the factory (not as outer `const`s
 // referenced from it) because babel-plugin-jest-hoist moves `jest.mock(...)`
@@ -78,7 +86,7 @@ describe("PushNotificationService", () => {
   describe("ADR-006: fire-and-forget contract", () => {
     it("send() returns void synchronously, not a Promise a caller could accidentally await", () => {
       pushTokenService.listTokensForUsers.mockResolvedValue([]);
-      const result = service.send(["u1"], payload);
+      const result = service.send(["u1"], payload, mockClaims);
       expect(result).toBeUndefined();
     });
 
@@ -86,7 +94,7 @@ describe("PushNotificationService", () => {
       pushTokenService.listTokensForUsers.mockRejectedValue(
         new Error("db unreachable"),
       );
-      expect(() => service.send(["u1"], payload)).not.toThrow();
+      expect(() => service.send(["u1"], payload, mockClaims)).not.toThrow();
       await flush();
       // No unhandled rejection — jest would fail the test run if one occurred.
     });
@@ -102,20 +110,20 @@ describe("PushNotificationService", () => {
         new Error("Expo API timeout"),
       );
 
-      expect(() => service.send(["u1"], payload)).not.toThrow();
+      expect(() => service.send(["u1"], payload, mockClaims)).not.toThrow();
       await flush();
       await flush();
     });
 
     it("does nothing when userIds is empty (no token lookup)", async () => {
-      service.send([], payload);
+      service.send([], payload, mockClaims);
       await flush();
       expect(pushTokenService.listTokensForUsers).not.toHaveBeenCalled();
     });
 
     it("does nothing when no recipient has a registered token", async () => {
       pushTokenService.listTokensForUsers.mockResolvedValue([]);
-      service.send(["u1"], payload);
+      service.send(["u1"], payload, mockClaims);
       await flush();
       expect(mockChunkPushNotifications).not.toHaveBeenCalled();
     });
@@ -131,7 +139,7 @@ describe("PushNotificationService", () => {
       ]);
       mockSendPushNotificationsAsync.mockResolvedValue([{ status: "ok", id: "r1" }]);
 
-      service.send(["u1"], payload);
+      service.send(["u1"], payload, mockClaims);
       await flush();
       await flush();
 
@@ -159,7 +167,7 @@ describe("PushNotificationService", () => {
       ]);
       mockSendPushNotificationsAsync.mockResolvedValue([{ status: "ok", id: "r1" }]);
 
-      service.send(["u1", "u2"], payload);
+      service.send(["u1", "u2"], payload, mockClaims);
       await flush();
       await flush();
 
@@ -186,6 +194,7 @@ describe("PushNotificationService", () => {
       service.send(
         tokens.map((t) => t.userId),
         payload,
+        mockClaims,
       );
       await flush();
       await flush();
@@ -208,7 +217,7 @@ describe("PushNotificationService", () => {
         .mockRejectedValueOnce(new Error("chunk 1 failed"))
         .mockResolvedValueOnce([{ status: "ok", id: "r" }]);
 
-      service.send(["u1", "u2"], payload);
+      service.send(["u1", "u2"], payload, mockClaims);
       await flush();
       await flush();
       await flush();
@@ -236,13 +245,14 @@ describe("PushNotificationService", () => {
         },
       ]);
 
-      service.send(["u1"], payload);
+      service.send(["u1"], payload, mockClaims);
       await flush();
       await flush();
       await flush();
 
       expect(pushTokenService.removeTokenByValue).toHaveBeenCalledWith(
         "ExponentPushToken[dead]",
+        mockClaims,
       );
     });
 
@@ -261,7 +271,7 @@ describe("PushNotificationService", () => {
         },
       ]);
 
-      service.send(["u1"], payload);
+      service.send(["u1"], payload, mockClaims);
       await flush();
       await flush();
       await flush();

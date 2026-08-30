@@ -91,6 +91,7 @@ describe("AnnouncementService", () => {
         expect.objectContaining({
           data: { type: "announcement", id: "ann-1" },
         }),
+        claims,
       );
     });
 
@@ -122,6 +123,7 @@ describe("AnnouncementService", () => {
           title: expect.stringContaining("Fire evacuation"),
           data: { type: "announcement", id: "ann-2" },
         }),
+        claims,
       );
       const [, payload] = pushNotificationService.send.mock.calls[0];
       expect(payload.title).toMatch(/ฉุกเฉิน/);

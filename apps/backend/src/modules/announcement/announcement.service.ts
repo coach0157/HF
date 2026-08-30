@@ -98,14 +98,18 @@ export class AnnouncementService {
         : announcement.level === AnnouncementLevel.IMPORTANT
           ? "⚠️ [สำคัญ] "
           : "";
-    this.pushNotificationService.send(recipientUserIds, {
-      title: `${levelPrefix}${announcement.title}`,
-      body:
-        announcement.content.length > 160
-          ? `${announcement.content.slice(0, 160)}…`
-          : announcement.content,
-      data: { type: "announcement", id: announcement.id },
-    });
+    this.pushNotificationService.send(
+      recipientUserIds,
+      {
+        title: `${levelPrefix}${announcement.title}`,
+        body:
+          announcement.content.length > 160
+            ? `${announcement.content.slice(0, 160)}…`
+            : announcement.content,
+        data: { type: "announcement", id: announcement.id },
+      },
+      claims,
+    );
 
     return { announcement, recipientUserIds };
   }

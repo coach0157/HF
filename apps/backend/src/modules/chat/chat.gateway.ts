@@ -179,11 +179,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       dto.chatRoomId,
       claims.userId,
     );
-    this.pushNotificationService.send(recipientUserIds, {
-      title: "ข้อความใหม่",
-      body: dto.message?.trim() || "ส่งรูปภาพ",
-      data: { type: "chat", id: dto.chatRoomId },
-    });
+    this.pushNotificationService.send(
+      recipientUserIds,
+      {
+        title: "ข้อความใหม่",
+        body: dto.message?.trim() || "ส่งรูปภาพ",
+        data: { type: "chat", id: dto.chatRoomId },
+      },
+      claims,
+    );
 
     return message;
   }

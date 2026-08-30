@@ -61,11 +61,15 @@ export class SosService {
     // this is true even for the single most safety-critical trigger.
     // Routing itself (deciding WHO gets notified) is unaffected — it
     // already fully resolved above, independent of push delivery.
-    this.pushNotificationService.send(routedToGuardUserIds, {
-      title: "🚨 แจ้งเหตุฉุกเฉิน SOS",
-      body: "มีการแจ้งเหตุฉุกเฉินจากลูกบ้าน กรุณาตรวจสอบทันที",
-      data: { type: "sos", id: alert.id },
-    });
+    this.pushNotificationService.send(
+      routedToGuardUserIds,
+      {
+        title: "🚨 แจ้งเหตุฉุกเฉิน SOS",
+        body: "มีการแจ้งเหตุฉุกเฉินจากลูกบ้าน กรุณาตรวจสอบทันที",
+        data: { type: "sos", id: alert.id },
+      },
+      claims,
+    );
 
     // TODO(Dev agent, future): optional neighbor notification within a
     // configurable radius (spec 2.2, haversine over houses.latitude/

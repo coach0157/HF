@@ -99,6 +99,7 @@ describe("EntryLogService", () => {
         expect.objectContaining({
           data: { type: "entry", id: "log-1" },
         }),
+        claims,
       );
     });
 

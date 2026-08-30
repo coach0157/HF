@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { Expo } from "expo-server-sdk";
 import type { ExpoPushMessage, ExpoPushTicket } from "expo-server-sdk";
 import { PushTokenService } from "./push-token.service";
+import type { TenantClaims } from "../rls/tenant-context";
 
 /**
  * ADR-006's deep-link data schema — EXACTLY `{ type, id }`, nothing richer
@@ -66,8 +67,8 @@ export class PushNotificationService {
     });
   }
 
-  send(userIds: string[], payload: PushPayload): void {
-    this.dispatch(userIds, payload).catch((err: unknown) => {
+  send(userIds: string[], payload: PushPayload, claims: TenantClaims): void {
+    this.dispatch(userIds, payload, claims).catch((err: unknown) => {
       // Should be unreachable — dispatch() already catches everything
       // internally — but this is the last line of defense per ADR-006's
       // "a push failure needs its own observability path, not a thrown
@@ -84,12 +85,13 @@ export class PushNotificationService {
   private async dispatch(
     userIds: string[],
     payload: PushPayload,
+    claims: TenantClaims,
   ): Promise<void> {
     if (userIds.length === 0) return;
 
     let tokens;
     try {
-      tokens = await this.pushTokenService.listTokensForUsers(userIds);
+      tokens = await this.pushTokenService.listTokensForUsers(userIds, claims);
     } catch (err) {
       this.logger.error(
         `Failed to look up push tokens for ${userIds.length} user(s): ${
@@ -129,7 +131,7 @@ export class PushNotificationService {
     for (const chunk of chunks) {
       try {
         const tickets = await this.expo.sendPushNotificationsAsync(chunk);
-        this.handleTickets(chunk, tickets);
+        this.handleTickets(chunk, tickets, claims);
       } catch (err) {
         // Whole-chunk failure (network error, Expo API down/timeout) — log
         // and move on to the next chunk. Never throw (ADR-006).
@@ -156,6 +158,7 @@ export class PushNotificationService {
   private handleTickets(
     chunk: ExpoPushMessage[],
     tickets: ExpoPushTicket[],
+    claims: TenantClaims,
   ): void {
     tickets.forEach((ticket, i) => {
       if (ticket.status !== "error") return;
@@ -168,7 +171,9 @@ export class PushNotificationService {
           ticket.details.expoPushToken ??
           (typeof message?.to === "string" ? message.to : undefined);
         if (deadToken) {
-          this.pushTokenService.removeTokenByValue(deadToken).catch(() => undefined);
+          this.pushTokenService
+            .removeTokenByValue(deadToken, claims)
+            .catch(() => undefined);
         }
       }
     });

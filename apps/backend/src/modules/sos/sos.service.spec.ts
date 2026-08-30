@@ -74,6 +74,7 @@ describe("SosService", () => {
         expect.objectContaining({
           data: { type: "sos", id: "alert-1" },
         }),
+        claims,
       );
     });
 
@@ -87,6 +88,7 @@ describe("SosService", () => {
       expect(pushNotificationService.send).toHaveBeenCalledWith(
         [],
         expect.anything(),
+        claims,
       );
     });
 

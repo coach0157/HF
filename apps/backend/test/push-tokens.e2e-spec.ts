@@ -20,6 +20,8 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 import type { CanActivate } from "@nestjs/common";
 import type { AddressInfo } from "node:net";
 import { AppModule } from "../src/app.module";
+import { PushTokenService } from "../src/common/push/push-token.service";
+import type { TenantClaims } from "../src/common/rls/tenant-context";
 import {
   rawPrisma,
   withVillageContext,
@@ -288,6 +290,109 @@ describe("Push Tokens (Epic 11) — API-driven e2e", () => {
       // raw table has no other reason to exclude it.
       const rows = await withVillageContext(villageA.villageId, (tx) =>
         tx.pushToken.findMany({ where: { expoPushToken: villageBToken } }),
+      );
+      expect(rows.length).toBe(0);
+    });
+  });
+
+  /**
+   * Regression guard for a real bug found live (not by any of the 47+
+   * mocked-Prisma tests written for Epic 11): `PushTokenService.
+   * listTokensForUsers()`/`removeTokenByValue()` used to query through the
+   * raw `PrismaService` on the theory that it bypasses RLS outside a
+   * transaction. It does NOT — `PrismaService` connects as the same
+   * `village_app` role as everything else, and `FORCE ROW LEVEL SECURITY`
+   * (rls-policies.sql) silently returns ZERO rows for any query that never
+   * set `app.current_village_id`. Every real push trigger (announcement/
+   * SOS/chat/entry-log) resolved zero tokens and silently no-opped in
+   * production, while every existing unit test passed because it mocked
+   * Prisma entirely and never touched real RLS. This suite resolves the
+   * REAL `PushTokenService` (wired to the real, RLS-enforced Postgres
+   * connection — no Prisma mocking anywhere here) from the same
+   * `moduleRef` the HTTP tests above use, and calls its methods directly —
+   * exactly the code path `PushNotificationService.send()`'s fire-and-forget
+   * dispatch takes in production.
+   */
+  describe("PushTokenService against real Postgres (RLS regression guard)", () => {
+    let pushTokenService: PushTokenService;
+
+    beforeAll(() => {
+      pushTokenService = app.get(PushTokenService);
+    });
+
+    function claimsFor(actor: VillageFixture["resident"], villageId: string): TenantClaims {
+      return {
+        userId: actor.id,
+        villageId,
+        role: actor.role,
+        houseId: actor.houseId,
+      };
+    }
+
+    it("listTokensForUsers finds a real, previously-registered token (this exact call returned [] before the fix)", async () => {
+      const token = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const directToken = "ExponentPushToken[e2e-direct-lookup]";
+      await api(baseUrl, "POST", "/push-tokens", {
+        token,
+        body: { expoPushToken: directToken },
+      });
+
+      const claims = claimsFor(villageA.resident, villageA.villageId);
+      const rows = await pushTokenService.listTokensForUsers(
+        [villageA.resident.id],
+        claims,
+      );
+
+      expect(rows).toContainEqual({
+        userId: villageA.resident.id,
+        expoPushToken: directToken,
+      });
+    });
+
+    it("listTokensForUsers never leaks another village's token even when called with matching claims.villageId", async () => {
+      const tokenB = await loginToken(
+        baseUrl,
+        villageB.resident.phone,
+        villageB.villageId,
+      );
+      const villageBOnlyToken = "ExponentPushToken[e2e-direct-lookup-b]";
+      await api(baseUrl, "POST", "/push-tokens", {
+        token: tokenB,
+        body: { expoPushToken: villageBOnlyToken },
+      });
+
+      // Ask FROM village A's context for village B's user id — RLS must
+      // still block it even though the id list itself "looks" targeted.
+      const claimsA = claimsFor(villageA.resident, villageA.villageId);
+      const rows = await pushTokenService.listTokensForUsers(
+        [villageB.resident.id],
+        claimsA,
+      );
+
+      expect(rows).toEqual([]);
+    });
+
+    it("removeTokenByValue actually deletes the row (this exact call was a silent no-op before the fix)", async () => {
+      const token = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+      const deadToken = "ExponentPushToken[e2e-direct-remove]";
+      await api(baseUrl, "POST", "/push-tokens", {
+        token,
+        body: { expoPushToken: deadToken },
+      });
+
+      const claims = claimsFor(villageA.resident, villageA.villageId);
+      await pushTokenService.removeTokenByValue(deadToken, claims);
+
+      const rows = await withVillageContext(villageA.villageId, (tx) =>
+        tx.pushToken.findMany({ where: { expoPushToken: deadToken } }),
       );
       expect(rows.length).toBe(0);
     });

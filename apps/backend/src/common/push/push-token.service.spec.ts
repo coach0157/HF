@@ -2,9 +2,24 @@ import { BadRequestException } from "@nestjs/common";
 import { PushTokenService } from "./push-token.service";
 import { getTenantPrismaClient } from "../rls/tenant-context";
 import type { TenantClaims } from "../rls/tenant-context";
+import { runInTenantTransaction } from "../rls/tenant-transaction";
 
 jest.mock("../rls/tenant-context", () => ({
   getTenantPrismaClient: jest.fn(),
+}));
+
+// Bug fix regression guard: `listTokensForUsers`/`removeTokenByValue` used to
+// query through the raw `PrismaService` on the (wrong) theory that it
+// bypasses RLS — it doesn't, and every real push trigger silently found
+// zero tokens as a result (see push-token.service.ts's class doc comment).
+// The fix routes both through `runInTenantTransaction()` — mocked here to
+// just invoke the callback directly (a real `$transaction` call against a
+// fully-mocked PrismaService isn't meaningful in a unit test; the actual
+// RLS-scoping behavior of `runInTenantTransaction` itself is covered
+// against real Postgres by tenant-transaction's own e2e coverage via
+// RlsInterceptor/WsRlsInterceptor's existing tests).
+jest.mock("../rls/tenant-transaction", () => ({
+  runInTenantTransaction: jest.fn((_prisma, _claims, fn) => fn()),
 }));
 
 function mockClaims(overrides: Partial<TenantClaims> = {}): TenantClaims {
@@ -22,7 +37,9 @@ const VALID_TOKEN = "ExponentPushToken[abc123DEF456]";
 describe("PushTokenService", () => {
   let service: PushTokenService;
   let prisma: { pushToken: { findMany: jest.Mock; deleteMany: jest.Mock } };
-  let tx: { pushToken: { upsert: jest.Mock; deleteMany: jest.Mock } };
+  let tx: {
+    pushToken: { upsert: jest.Mock; deleteMany: jest.Mock; findMany: jest.Mock };
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -31,8 +48,11 @@ describe("PushTokenService", () => {
     };
     service = new PushTokenService(prisma as any);
     tx = {
-      pushToken: { upsert: jest.fn(), deleteMany: jest.fn() },
+      pushToken: { upsert: jest.fn(), deleteMany: jest.fn(), findMany: jest.fn() },
     };
+    (runInTenantTransaction as jest.Mock).mockImplementation(
+      (_prisma, _claims, fn) => fn(),
+    );
     (getTenantPrismaClient as jest.Mock).mockReturnValue(tx);
   });
 
@@ -99,46 +119,62 @@ describe("PushTokenService", () => {
 
   describe("listTokensForUsers", () => {
     it("returns [] without querying when userIds is empty (no wide-open findMany)", async () => {
-      const result = await service.listTokensForUsers([]);
+      const claims = mockClaims();
+      const result = await service.listTokensForUsers([], claims);
 
       expect(result).toEqual([]);
-      expect(prisma.pushToken.findMany).not.toHaveBeenCalled();
+      expect(tx.pushToken.findMany).not.toHaveBeenCalled();
+      expect(runInTenantTransaction).not.toHaveBeenCalled();
     });
 
-    it("batch-looks-up tokens for multiple users via the raw PrismaClient, not the RLS tx", async () => {
+    it("batch-looks-up tokens for multiple users through runInTenantTransaction (RLS-scoped), not the raw PrismaClient", async () => {
+      const claims = mockClaims({ villageId: "village-9" });
       const rows = [
         { userId: "u1", expoPushToken: "t1" },
         { userId: "u2", expoPushToken: "t2" },
       ];
-      prisma.pushToken.findMany.mockResolvedValue(rows);
+      tx.pushToken.findMany.mockResolvedValue(rows);
 
-      const result = await service.listTokensForUsers(["u1", "u2"]);
+      const result = await service.listTokensForUsers(["u1", "u2"], claims);
 
       expect(result).toBe(rows);
-      expect(prisma.pushToken.findMany).toHaveBeenCalledWith({
+      expect(tx.pushToken.findMany).toHaveBeenCalledWith({
         where: { userId: { in: ["u1", "u2"] } },
         select: { userId: true, expoPushToken: true },
       });
-      expect(getTenantPrismaClient).not.toHaveBeenCalled();
+      // The regression this guards against: a raw `prisma.pushToken.findMany`
+      // call outside any tenant-scoped transaction silently returns zero
+      // rows against real RLS-forced Postgres — see the class doc comment.
+      expect(prisma.pushToken.findMany).not.toHaveBeenCalled();
+      expect(runInTenantTransaction).toHaveBeenCalledWith(
+        prisma,
+        claims,
+        expect.any(Function),
+      );
     });
   });
 
   describe("removeTokenByValue", () => {
-    it("deletes by token value alone, regardless of which user(s) hold it", async () => {
-      prisma.pushToken.deleteMany.mockResolvedValue({ count: 2 });
+    it("deletes by token value alone, regardless of which user(s) hold it — RLS-scoped via runInTenantTransaction", async () => {
+      const claims = mockClaims();
+      tx.pushToken.deleteMany.mockResolvedValue({ count: 2 });
 
-      await service.removeTokenByValue(VALID_TOKEN);
+      await service.removeTokenByValue(VALID_TOKEN, claims);
 
-      expect(prisma.pushToken.deleteMany).toHaveBeenCalledWith({
+      expect(tx.pushToken.deleteMany).toHaveBeenCalledWith({
         where: { expoPushToken: VALID_TOKEN },
       });
+      expect(prisma.pushToken.deleteMany).not.toHaveBeenCalled();
     });
 
     it("swallows errors rather than throwing (called from a fire-and-forget path)", async () => {
-      prisma.pushToken.deleteMany.mockRejectedValue(new Error("db down"));
+      const claims = mockClaims();
+      (runInTenantTransaction as jest.Mock).mockRejectedValueOnce(
+        new Error("db down"),
+      );
 
       await expect(
-        service.removeTokenByValue(VALID_TOKEN),
+        service.removeTokenByValue(VALID_TOKEN, claims),
       ).resolves.toBeUndefined();
     });
   });
