@@ -51,7 +51,6 @@
         "expo-image-picker",
         {
           "photosPermission": "ใช้คลังรูปภาพเพื่อแนบรูปในแชท",
-          "cameraPermission": false,
           "microphonePermission": false
         }
       ],
