@@ -99,6 +99,18 @@ export class FilesService {
       return;
     }
 
+    if (bucketKey === "patrol-logs") {
+      // Epic 12 (Guard Patrol Log, user request — see
+      // docs/PHASE2_BACKLOG.md §5): ADMIN and GUARD only, same access rule
+      // as "sensitive-id" — but deliberately NOT audit-logged, since a
+      // patrol photo is not personal/sensitive data on the same level as an
+      // ID card/plate photo (see PatrolLog's schema.prisma doc comment).
+      if (claims.role !== "ADMIN" && claims.role !== "GUARD") {
+        throw new ForbiddenException("You cannot view this photo");
+      }
+      return;
+    }
+
     if (bucketKey === "sensitive-id") {
       // Spec 3.4: ID-card/plate photos are the most sensitive bucket —
       // ADMIN and GUARD only, never RESIDENT.

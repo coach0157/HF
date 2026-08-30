@@ -178,6 +178,19 @@ export interface MaintenanceTicket {
   createdAt: string;
 }
 
+// Epic 12 — Guard Patrol Log (user request, not in original spec — see
+// docs/PHASE2_BACKLOG.md §5).
+export interface PatrolLog {
+  id: string;
+  villageId: string;
+  guardUserId: string;
+  photoUrl: string;
+  note: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  createdAt: string;
+}
+
 // Epic 8 — Chat (spec 2.3 / docs/PHASE2_BACKLOG.md Epic 8, ADR-004/005 in
 // docs/ARCHITECTURE.md §8.1-8.2). Shapes mirror apps/backend's
 // chat.service.ts return values.

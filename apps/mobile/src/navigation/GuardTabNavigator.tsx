@@ -13,6 +13,7 @@ import { ScanQrScreen } from "../screens/guard/ScanQrScreen";
 import { ManualEntryScreen } from "../screens/guard/ManualEntryScreen";
 import { ExitConfirmScreen } from "../screens/guard/ExitConfirmScreen";
 import { SosListScreen } from "../screens/guard/SosListScreen";
+import { PatrolLogScreen } from "../screens/guard/PatrolLogScreen";
 import { ChatListScreen } from "../screens/guard/ChatListScreen";
 import { ChatRoomScreen } from "../screens/shared/ChatRoomScreen";
 import { GuardProfileScreen } from "../screens/guard/ProfileScreen";
@@ -92,6 +93,30 @@ export function GuardTabNavigator() {
         name="SosList"
         component={SosListScreen}
         options={{ title: "SOS", tabBarIcon: ({ color }) => <TabIcon emoji="🚨" color={color} /> }}
+      />
+      {/*
+        Epic 12 — Guard Patrol Log (user request, docs/PHASE2_BACKLOG.md
+        §5). A real Tab.Screen (so GuardHomeScreen's quick-link card can
+        reach it with a plain `navigation.navigate("PatrolLog")`, exactly
+        like ManualEntry/ExitConfirm/SosList above) but hidden from the
+        visible tab bar via `tabBarButton: () => null` — 7 visible tabs is
+        already dense with Thai labels on a real phone width; an 8th would
+        make labels wrap/truncate. `tabBarButton: () => null` is the
+        standard React Navigation pattern for a "hidden tab" reachable only
+        by explicit navigation, chosen over restructuring "Home" into a
+        nested stack (which would require rewriting every existing
+        `navigation.navigate(...)` call in GuardHomeScreen to
+        `navigation.getParent()?.navigate(...)`, per ResidentTabNavigator's
+        own HomeStackNavigator precedent — much larger blast radius for one
+        new screen).
+      */}
+      <Tab.Screen
+        name="PatrolLog"
+        component={PatrolLogScreen}
+        options={{
+          title: "บันทึกตรวจรอบ",
+          tabBarButton: () => null,
+        }}
       />
       <Tab.Screen
         name="Chat"

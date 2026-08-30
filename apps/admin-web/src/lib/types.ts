@@ -150,6 +150,19 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+// Epic 12 — Guard Patrol Log (user request, not in original spec — see
+// docs/PHASE2_BACKLOG.md §5).
+export interface PatrolLog {
+  id: string;
+  villageId: string;
+  guardUserId: string;
+  photoUrl: string;
+  note: string | null;
+  latitude: string | null;
+  longitude: string | null;
+  createdAt: string;
+}
+
 // Return shape of GET /chat-rooms (ChatService.listRooms) — a ChatRoom row
 // enriched with the caller's own read state, a preview of the last message,
 // and (for DIRECT rooms only) the other participant's basic identity.

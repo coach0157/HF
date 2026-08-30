@@ -20,6 +20,7 @@ const NAV_ITEMS: { to: string; label: string }[] = [
   { to: '/transport-providers', label: 'ทำเนียบรถรับจ้าง' },
   { to: '/maintenance-tickets', label: 'แจ้งซ่อม' },
   { to: '/chat', label: 'แชท' },
+  { to: '/patrol-logs', label: 'ประวัติตรวจรอบ' },
 ];
 
 export function AppLayout({ children }: { children?: ReactNode }) {

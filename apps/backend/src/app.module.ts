@@ -11,6 +11,7 @@ import { HouseModule } from "./modules/house/house.module";
 import { TransportProviderModule } from "./modules/transport-provider/transport-provider.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { ChatModule } from "./modules/chat/chat.module";
+import { PatrolLogModule } from "./modules/patrol-log/patrol-log.module";
 import { FilesModule } from "./common/files/files.module";
 
 @Module({
@@ -26,6 +27,7 @@ import { FilesModule } from "./common/files/files.module";
     TransportProviderModule,
     MaintenanceModule,
     ChatModule,
+    PatrolLogModule,
     FilesModule,
   ],
 })

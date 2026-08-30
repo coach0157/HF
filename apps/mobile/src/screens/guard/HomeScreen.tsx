@@ -143,6 +143,11 @@ export function GuardHomeScreen() {
             { icon: "📝", label: "บันทึกด้วยมือ", tint: "primary", onPress: () => navigation.navigate("ManualEntry") },
             { icon: "🚪", label: "ยืนยันแขกออก", tint: "secondary", onPress: () => navigation.navigate("ExitConfirm") },
             { icon: "🚨", label: "แจ้งเหตุ SOS", tint: "secondary", onPress: () => navigation.navigate("SosList") },
+            // Epic 12 — Guard Patrol Log (docs/PHASE2_BACKLOG.md §5).
+            // "PatrolLog" is a hidden Tab.Screen (see
+            // GuardTabNavigator.tsx's comment) — this quick-link card is its
+            // only entry point.
+            { icon: "📸", label: "บันทึกตรวจรอบ", tint: "primary", onPress: () => navigation.navigate("PatrolLog") },
           ] as const
         ).map((item) => (
           <TouchableOpacity key={item.label} style={styles.linkCard} onPress={item.onPress}>

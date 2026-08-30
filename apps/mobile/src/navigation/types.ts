@@ -47,6 +47,12 @@ export type GuardTabParamList = {
   ManualEntry: undefined;
   ExitConfirm: undefined;
   SosList: undefined;
+  // Epic 12 — Guard Patrol Log (docs/PHASE2_BACKLOG.md §5). Registered as a
+  // Tab.Screen (so plain `navigation.navigate("PatrolLog")` works from
+  // GuardHomeScreen's quick-links grid, same as every other quick link) but
+  // hidden from the visible tab bar via `tabBarButton` in
+  // GuardTabNavigator.tsx — the tab bar is already at 7 visible items.
+  PatrolLog: undefined;
   Chat: undefined;
   Profile: undefined;
 };

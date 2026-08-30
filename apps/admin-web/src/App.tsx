@@ -11,6 +11,7 @@ import { EntryLogsPage } from './pages/EntryLogsPage';
 import { TransportProvidersPage } from './pages/TransportProvidersPage';
 import { MaintenanceTicketsPage } from './pages/MaintenanceTicketsPage';
 import { ChatPage } from './pages/ChatPage';
+import { PatrolLogsPage } from './pages/PatrolLogsPage';
 
 // Route map per spec 1.3 (Admin Dashboard screens) + MVP_BACKLOG.md Epic 5.
 export function App() {
@@ -34,6 +35,7 @@ export function App() {
           <Route path="/transport-providers" element={<TransportProvidersPage />} />
           <Route path="/maintenance-tickets" element={<MaintenanceTicketsPage />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/patrol-logs" element={<PatrolLogsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
