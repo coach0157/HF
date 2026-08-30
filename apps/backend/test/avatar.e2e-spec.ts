@@ -18,6 +18,8 @@ import { ThrottlerGuard } from "@nestjs/throttler";
 import type { CanActivate } from "@nestjs/common";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { AddressInfo } from "node:net";
+import { promises as fs } from "node:fs";
+import * as path from "node:path";
 import { AppModule } from "../src/app.module";
 import {
   rawPrisma,
@@ -79,6 +81,25 @@ describe("Avatar upload (Users module) — API-driven e2e", () => {
       token,
       body: { photoDataUrl },
     });
+  }
+
+  // Mirrors FileStorageService's private refToPath() so tests can assert
+  // directly against disk state (old file actually removed, new file
+  // actually written) rather than only the DB column.
+  function refToDiskPath(ref: string): string {
+    const match = /^local:\/\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(ref);
+    if (!match) throw new Error(`not a local:// ref: ${ref}`);
+    const [, bucketFolder, villageId, filename] = match;
+    return path.resolve(process.cwd(), "uploads", bucketFolder, villageId, filename);
+  }
+
+  async function fileExists(p: string): Promise<boolean> {
+    try {
+      await fs.access(p);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   describe("PATCH /users/me/avatar — RBAC", () => {
@@ -184,6 +205,70 @@ describe("Avatar upload (Users module) — API-driven e2e", () => {
         body: {},
       });
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe("PATCH /users/me/avatar — old file cleanup", () => {
+    it("first-ever upload succeeds with no old avatar to clean up (no crash on null previous.avatarUrl)", async () => {
+      const token = await loginToken(
+        baseUrl,
+        villageB.guardOnDuty.phone,
+        villageB.villageId,
+      );
+      const res = await uploadAvatar(token, SMALL_AVATAR);
+      expect(res.status).toBe(200);
+      expect(await fileExists(refToDiskPath(res.body.avatarUrl))).toBe(true);
+    });
+
+    it("re-uploading deletes the old file from disk and keeps only the new one readable via the DB row", async () => {
+      const token = await loginToken(
+        baseUrl,
+        villageA.resident.phone,
+        villageA.villageId,
+      );
+
+      const first = await uploadAvatar(token, SMALL_AVATAR);
+      expect(first.status).toBe(200);
+      const oldPath = refToDiskPath(first.body.avatarUrl);
+      expect(await fileExists(oldPath)).toBe(true);
+
+      const second = await uploadAvatar(token, SMALL_AVATAR);
+      expect(second.status).toBe(200);
+      const newPath = refToDiskPath(second.body.avatarUrl);
+
+      expect(newPath).not.toBe(oldPath);
+      expect(await fileExists(newPath)).toBe(true);
+      expect(await fileExists(oldPath)).toBe(false);
+
+      const row = await withVillageContext(villageA.villageId, (tx) =>
+        tx.user.findUnique({ where: { id: villageA.resident.id } }),
+      );
+      expect(row?.avatarUrl).toBe(second.body.avatarUrl);
+    });
+  });
+
+  describe("PATCH /users/me/avatar — tenant isolation on disk", () => {
+    it("stores each village's avatar under its own villageId folder", async () => {
+      const tokenA = await loginToken(
+        baseUrl,
+        villageA.admin.phone,
+        villageA.villageId,
+      );
+      const tokenB = await loginToken(
+        baseUrl,
+        villageB.admin.phone,
+        villageB.villageId,
+      );
+
+      const resA = await uploadAvatar(tokenA, SMALL_AVATAR);
+      const resB = await uploadAvatar(tokenB, SMALL_AVATAR);
+      expect(resA.status).toBe(200);
+      expect(resB.status).toBe(200);
+
+      expect(resA.body.avatarUrl).toContain(`/${villageA.villageId}/`);
+      expect(resB.body.avatarUrl).toContain(`/${villageB.villageId}/`);
+      expect(resA.body.avatarUrl).not.toContain(villageB.villageId);
+      expect(resB.body.avatarUrl).not.toContain(villageA.villageId);
     });
   });
 

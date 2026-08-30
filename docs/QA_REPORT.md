@@ -803,3 +803,147 @@ Specific to this pass:
 - `npm run build`, `npm run lint` (backend), full unit suite (129 tests),
   and full e2e suite (150 tests, including all of Chat's 36) all pass with
   zero regressions against MVP + this phase's other two modules.
+
+## QA pass 5 — Avatar upload (Epic 1 addition) + visual design polish (admin-web + mobile)
+
+Covers the ~8 commits since QA pass 4 that had never been independently
+verified (only build/typecheck during development): the avatar-upload
+feature end to end (backend + mobile), and several rounds of visual design
+polish across `apps/admin-web` and `apps/mobile` (design-token rollout,
+green headers, colored icon circles, badges, mint background wash).
+
+### 1. Avatar upload — deep review (business logic/security surface)
+
+Read `users.service.ts`'s `updateAvatar()`/`findOne()`, `users.controller.ts`,
+`dto/update-avatar.dto.ts`, `common/storage/file-storage.service.ts`, and
+`test/avatar.e2e-spec.ts`.
+
+- **Ownership:** `PATCH /users/me/avatar` takes no id from the client at
+  all — the service always writes to `claims.userId` from the verified JWT.
+  There is no route or code path that lets any role (including ADMIN) set
+  another user's avatar. Confirmed both by reading the code and by an
+  e2e test that uploads as one user and asserts a different user's row in
+  the same village is untouched.
+- **File validation is server-enforced, not client-trusted:** MIME is
+  checked against an explicit allow-list (`image/jpeg`, `image/png`,
+  `image/webp`) and size against a 3MB cap, both computed from the decoded
+  base64 payload in `UsersService.updateAvatar()` — independent of
+  whatever the mobile client already checks in `Avatar.tsx`. Verified with
+  e2e tests: unsupported mime (`image/gif`) → 400, oversized payload → 400,
+  non-data-URL string → 400.
+- **Old avatar cleanup:** confirmed by new tests (see below) that
+  re-uploading actually deletes the previous file from disk, not just
+  overwrites the DB column, and that the very first upload (no previous
+  avatar) does not throw — `FileStorageService.delete()` treats `ENOENT`
+  as a no-op, so this is safe by construction, but it was previously
+  untested.
+- **Tenant isolation on disk:** avatars are written under
+  `uploads/village-avatars/<villageId>/<uuid>.<ext>`, and
+  `FileStorageService`'s ref parser looks up the bucket folder name by
+  value against a known set (not trusted from the ref string), which
+  blocks path traversal via a crafted `photo_url`. There is no HTTP route
+  anywhere in the backend that serves files out of `uploads/` (no
+  `ServeStaticModule`/`express.static` registered), so the `local://...`
+  ref is not fetchable or guessable-and-fetchable by any client — same
+  design already accepted for the entry-log/sensitive-id photo buckets.
+- **Gap found and fixed:** none of this (cleanup-actually-happens,
+  first-upload-doesn't-crash, per-village disk isolation) had a test
+  before this pass. Added 3 new e2e tests to
+  `apps/backend/test/avatar.e2e-spec.ts` that assert directly against disk
+  state (`fs.access`), not just the DB column:
+  - first-ever upload succeeds and the file exists on disk;
+  - a second upload deletes the old file and keeps only the new one;
+  - two villages' avatars land under separate `villageId` folders.
+
+  `avatar.e2e-spec.ts` now has 13 tests (was 10), all passing.
+
+### 2. Design/visual changes — code review
+
+No emulator/device available, so this was a source-level review, not a
+rendered-UI review.
+
+- **Business logic drift check:** diffed every design-polish commit
+  (`68067b8..HEAD`) against the pre-polish baseline and searched the diffs
+  for anything besides styling props (color/background/spacing/JSX
+  rewrapping/Badge-variant swaps). Found zero added/removed/changed
+  `api.get/post/patch/put/delete` calls anywhere in `apps/admin-web/src`
+  or `apps/mobile/src` across the whole polish series (checked via diff,
+  not just eyeballing) — confirms no data-fetching/mutation behavior moved
+  during restyling.
+  - The one real (intentional, not accidental) behavior addition found:
+    `AnnouncementsPage.tsx`, `MembersPage.tsx`, and
+    `TransportProvidersPage.tsx` each gained a `showForm`/`showUserForm`
+    toggle so the create form is collapsed by default behind a button
+    ("prominent create-action buttons" per the a8987d9 commit message).
+    Verified `startEdit()` correctly flips it open and
+    submit/cancel correctly flip it closed in all three pages — no dead
+    end where the form can't be reached.
+  - Mobile guard/resident home screens: quick-link `TouchableOpacity`
+    blocks were refactored into an array `.map()`, but the
+    `navigation.navigate(...)` targets for every link are unchanged
+    (spot-checked against the pre-polish version).
+  - `f918886`'s expo-notifications lazy-`require()` fix (mixed into the
+    same commit range) is a real, already-landed crash fix, not something
+    this pass needed to redo.
+- **Contrast check:** grepped both apps for `colors.white` / hardcoded
+  `#FFFFFF` text usage and checked each site's container background.
+  Every hit sits on top of an explicitly dark/colored background (green
+  nav bar and headers, primary/danger buttons, image-loading overlay
+  scrim, dark-tinted badge overrides). No white-on-white or white-on-light
+  case found. One badge (`SosListScreen.tsx`'s "รอรับเรื่อง" pending pill)
+  overrides its background to white via a style prop, but its text color
+  comes from the shared `Badge` component's `danger` variant (red), so it
+  reads as red-on-white, not white-on-white — a slightly inconsistent
+  visual override, not a legibility bug.
+- **Theme token consistency:** grepped for hex literals (`#[0-9A-Fa-f]{6}`)
+  outside the two `theme.ts` files. `apps/mobile/src` has zero strays.
+  `apps/admin-web/src` has a handful in `AppLayout.tsx` (`#FFFFFF` for nav
+  text/active-state), `Badge.tsx` (`#92400E`/`#991B1B` — darker
+  amber/red text for the warning/danger pill variants, sitting on their
+  matching light backgrounds), and `Button.tsx` (`#FFFFFF` label color for
+  primary/danger buttons). All are deliberate, correctly-contrasted
+  choices, not tokens that fell out of sync — but they should really pull
+  from `colors.surface`/`colors.white` for consistency with the stated "no
+  hand-rolled hex" rule in `theme.ts`'s own doc comment. Left as-is (cosmetic
+  nit, not a bug) rather than churning working styling further.
+- Both admin-web and mobile theme tokens (`colors.background`,
+  `primary`/`secondary` families, spacing/radius scales) match exactly
+  between the two `theme.ts` files, as `DESIGN_SYSTEM.md` requires.
+
+### 3. Build / typecheck / full regression
+
+- `npm run build` (root — backend `nest build` + admin-web `tsc -b && vite
+  build`): clean, zero errors.
+- `npm run typecheck --workspace apps/mobile` (`tsc --noEmit`): clean,
+  zero errors.
+- Backend unit suite: **158/158 passing** (15 suites), matches the
+  previously-reported count exactly — no regression.
+- Backend e2e suite: **175/175 passing** (was ~162 before this pass; +13
+  from `avatar.e2e-spec.ts`, of which 3 are new this pass, 10 already
+  existed from the avatar-upload dev round).
+
+### 4. Bugs found
+
+- **Avatar feature:** none. Design (ownership via JWT claims only,
+  server-side validation independent of client, best-effort cleanup that
+  no-ops safely on `ENOENT`, no file-serving route to attack) held up
+  under adversarial review; the only gap was missing test coverage for
+  cleanup/tenant-isolation-on-disk, now closed.
+- **Design polish:** none. No business logic was found altered by any of
+  the styling commits; the one cosmetic nit noted above (a few
+  admin-web components using literal `#FFFFFF` instead of importing
+  `colors.white`/`colors.surface`) is not a functional bug and was left
+  alone.
+
+### 5. Go/No-Go
+
+**GO.** The avatar-upload feature is correctly scoped (ownership, file
+validation, cleanup, tenant isolation) and now has test coverage matching
+that of every other module in this codebase. The design-polish commits
+introduced no detectable business-logic regressions and no contrast/theme
+problems beyond one cosmetic token nit. Standing caveat, unchanged from
+prior passes: none of the new/changed screens (avatar picker included)
+have been exercised on a real device or emulator — this pass, like the
+ones before it, verifies source-level logic and server-side behavior only,
+not on-device rendering, gesture handling, or the actual
+`expo-image-picker` permission/crop UX.
