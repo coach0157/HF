@@ -17,8 +17,11 @@ export const colors = {
   secondaryDark: "#0284C7",
   secondaryLight: "#E0F2FE",
 
-  // Neutral
-  background: "#F9FAFB",
+  // Neutral — `background` carries a soft mint-blue wash (not stark
+  // white/gray) so the page body itself reads as colorful, not just its
+  // header/buttons — user feedback: "ตรงกลางในทุกหน้า...มันสีขาว". Cards
+  // stay pure `surface` white on top of it for contrast.
+  background: "#EAF6F3",
   surface: "#FFFFFF",
   border: "#E5E7EB",
   textPrimary: "#111827",

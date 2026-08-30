@@ -18,8 +18,8 @@ Secondary (ฟ้า — ปุ่มรอง, ลิงก์, info, header ac
   secondaryLight #E0F2FE   (sky-100)
 
 Neutral (พื้นหลัง/ตัวหนังสือ — เน้นความสะอาด):
-  background     #F9FAFB   (พื้นหลังทั้งหน้า)
-  surface        #FFFFFF   (การ์ด/พื้นผิวที่ยกขึ้นมา)
+  background     #EAF6F3   (พื้นหลังทั้งหน้า — เขียว-ฟ้าอ่อนผสม ไม่ใช่ขาว/เทาล้วน)
+  surface        #FFFFFF   (การ์ด/พื้นผิวที่ยกขึ้นมา — ขาวล้วน ตัดกับพื้นหลัง)
   border         #E5E7EB
   textPrimary    #111827
   textSecondary  #6B7280
