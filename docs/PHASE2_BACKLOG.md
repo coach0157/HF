@@ -357,3 +357,50 @@ Controller/Service/DTO จริงของทั้ง 3 module (Epic 8-10 —
 admin-web/mobile UI จริง (รวมถึง mobile push registration จริง),
 WebSocket gateway implementation จริง (Epic 8 — implement แล้วในรอบถัดจาก
 planning), Facility Booking/Payment/LPR (เฟส 3)
+
+---
+
+## 5. Epic 12 — Guard Patrol Log (ผู้ใช้ขอเพิ่มนอกสเปกเดิม)
+
+**User Story:** ในฐานะ รปภ. ฉันต้องการถ่ายรูปพร้อมเวลาประทับตอนเดินตรวจรอบหมู่บ้าน
+เพื่อเป็นหลักฐานว่าได้ตรวจจริง — ในฐานะแอดมิน ฉันต้องการดูประวัติการตรวจรอบย้อนหลัง
+เพื่อตรวจสอบว่า รปภ. ปฏิบัติหน้าที่ตามรอบจริง
+
+**Acceptance Criteria:**
+- ถ่ายรูปแบบอิสระ **ไม่มีจุดตรวจ (checkpoint) ตายตัว** — ผู้ใช้เลือกทางเลือกนี้เอง
+  (เร็ว/ง่ายกว่าระบบ checkpoint ที่ต้องตั้งค่าล่วงหน้า)
+- แนบหมายเหตุ (note) และพิกัด GPS ได้ แต่ทั้งคู่เป็น optional
+- บันทึกเวลาที่ถ่าย (`createdAt`) และ รปภ. ที่บันทึก (`guardUserId`) เสมอ — นี่คือ
+  "หลักฐานตามเวลา" ที่ผู้ใช้ต้องการ
+- ADMIN และ GUARD (ทุกคน ไม่จำกัดแค่คนที่บันทึก) ดูประวัติย้อนหลังได้ — RESIDENT ไม่เห็น
+  (ไม่ใช่ข้อมูลที่ลูกบ้านต้องรู้โดยตรง)
+- กรองตามวันที่ได้ (pattern เดียวกับ `GET /entry-logs?date=`)
+
+**Schema (วางแล้ว — schema.prisma):** model `PatrolLog` (id, villageId, guardUserId,
+photoUrl, note NULLABLE, latitude/longitude NULLABLE, createdAt) — bucket ใหม่
+`"patrol-logs"` แยกจาก `"entry-logs"` โดยตั้งใจ (กัน authorization reverse-lookup
+ของ `FilesService` ไม่ต้องเพิ่ม table ที่ 4 เข้า chain เดิม — ดู
+`file-storage.service.ts` bucket comment)
+
+**Implementation Tasks:**
+- [ ] Migration: apply `PatrolLog` model + RLS policy (table `patrol_logs` เพิ่มใน
+      `rls-policies.sql`'s array แล้ว ต้องสร้าง migration จริงตามขั้นตอนเดิม)
+- [ ] Backend module `src/common/files/`'s `FilesService` — เพิ่ม authorization
+      rule สำหรับ bucket `"patrol-logs"`: ADMIN หรือ GUARD เท่านั้น (เหมือน
+      `"sensitive-id"` แต่ไม่ต้อง audit-log เพราะไม่ใช่ข้อมูลส่วนบุคคลอ่อนไหวระดับเดียวกัน)
+- [ ] `src/modules/patrol-log/` — `POST /patrol-logs` (GUARD เท่านั้น, รับรูปผ่าน
+      `FileStorageService` bucket `"patrol-logs"`), `GET /patrol-logs?date=`
+      (ADMIN + GUARD, pagination เหมือน entry-logs)
+- [ ] Admin-web: หน้าใหม่ "ประวัติตรวจรอบ" — list พร้อมรูป (ผ่าน `AuthedImage`/
+      `useImageBlobUrl` pattern ที่มีอยู่แล้ว ไม่ใช่ token-in-URL แบบเก่าที่เคยพัง),
+      กรองวันที่, แสดงชื่อ รปภ. + เวลา + หมายเหตุ
+- [ ] Mobile (guard): หน้าใหม่ "บันทึกตรวจรอบ" — ถ่ายรูปด้วย `expo-camera` (pattern
+      เดียวกับ ManualEntryScreen), หมายเหตุ (optional), แนบ GPS อัตโนมัติถ้ามีสิทธิ์
+      (pattern เดียวกับ resident's SOS — เงียบๆ ถ้าไม่มีสิทธิ์ ไม่บังคับ), เพิ่ม
+      เป็น tab ใหม่หรือ quick-link จาก Guard Home (ตัดสินใจตอน implement — tab bar
+      ตอนนี้มี 7 อันแล้ว ถ้าแน่นเกินไปให้ทำเป็น quick-link แทนก็ได้)
+- [ ] Unit + e2e test: RBAC (resident เห็นไม่ได้, guard คนอื่นเห็นได้), tenant
+      isolation, ไม่มี checkpoint validation (ยืนยันว่ารับ note/GPS เป็น optional จริง)
+
+**Priority:** P2 (นอก scope เดิมทั้งหมด ไม่มี dependency กับ Epic 8-11)
+**Dependency:** Epic 0, Epic 1 (auth/RBAC พื้นฐาน) เท่านั้น

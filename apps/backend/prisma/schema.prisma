@@ -177,6 +177,7 @@ model Village {
   announcements             Announcement[]
   sosAlerts                 SosAlert[]
   guardShifts               GuardShift[]
+  patrolLogs                PatrolLog[]
   chatRooms                 ChatRoom[]
   maintenanceTickets        MaintenanceTicket[]
   maintenanceTicketCounters MaintenanceTicketCounter[]
@@ -225,6 +226,7 @@ model User {
   triggeredSosAlerts     SosAlert[]          @relation("SosAlertTriggeredBy")
   acknowledgedSosAlerts  SosAlert[]          @relation("SosAlertAcknowledgedByGuard")
   guardShifts            GuardShift[]
+  patrolLogs             PatrolLog[]
   chatParticipants       ChatParticipant[]
   sentChatMessages       ChatMessage[]
   maintenanceTickets     MaintenanceTicket[] @relation("MaintenanceTicketCreatedBy")
@@ -440,6 +442,33 @@ model GuardShift {
   // Routing query for Epic 4: `WHERE village_id = ? AND status = 'on_duty'`.
   @@index([villageId, status])
   @@map("guard_shifts")
+}
+
+// ---------------------------------------------------------------------------
+// Guard Patrol Log (Epic 12 — user request, not in original spec) — a
+// free-form, timestamped photo a guard takes anywhere in the village while
+// on rounds, as time-stamped evidence of an inspection pass. Deliberately
+// no fixed checkpoint list (user's own choice over the checkpoint-required
+// alternative) — `note` and `latitude`/`longitude` are both optional.
+// ---------------------------------------------------------------------------
+
+model PatrolLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  villageId    String   @map("village_id") @db.Uuid
+  guardUserId  String   @map("guard_user_id") @db.Uuid
+  photoUrl     String   @map("photo_url")
+  note         String?
+  latitude     Decimal? @db.Decimal(9, 6)
+  longitude    Decimal? @db.Decimal(9, 6)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  village Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  guard   User    @relation(fields: [guardUserId], references: [id], onDelete: Cascade)
+
+  // Supports `GET /patrol-logs?date=` ordered/filtered by time, same access
+  // pattern as entry_logs' own index.
+  @@index([villageId, createdAt])
+  @@map("patrol_logs")
 }
 
 // ---------------------------------------------------------------------------

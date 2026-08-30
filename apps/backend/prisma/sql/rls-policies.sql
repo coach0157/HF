@@ -62,7 +62,8 @@ BEGIN
     'chat_rooms', 'chat_participants', 'chat_messages',
     'maintenance_tickets', 'maintenance_ticket_counters', 'transport_providers',
     'facilities', 'bookings',
-    'bills', 'payments', 'refresh_tokens', 'audit_logs', 'push_tokens'
+    'bills', 'payments', 'refresh_tokens', 'audit_logs', 'push_tokens',
+    'patrol_logs'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);

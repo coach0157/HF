@@ -4,7 +4,11 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 
-export type PhotoBucket = "entry-logs" | "sensitive-id" | "avatars";
+export type PhotoBucket =
+  | "entry-logs"
+  | "sensitive-id"
+  | "avatars"
+  | "patrol-logs";
 
 /**
  * Path-traversal guard for `resolveDiskPath()` below — rejects a segment
@@ -67,6 +71,17 @@ export class FileStorageService {
       avatars: this.config.get<string>(
         "S3_BUCKET_AVATARS",
         "village-avatars",
+      ),
+      // Epic 12 (Guard Patrol Log, user request) — free-form timestamped
+      // photos a guard takes on rounds. Own bucket rather than reusing the
+      // shared "entry-logs" bucket, so FilesService's authorization
+      // reverse-lookup (files.service.ts) stays a flat per-bucket rule
+      // (ADMIN + GUARD) instead of extending that bucket's already
+      // three-way entry_logs/maintenance_tickets/chat_messages lookup chain
+      // with a fourth table.
+      "patrol-logs": this.config.get<string>(
+        "S3_BUCKET_PATROL_LOGS",
+        "village-patrol-logs",
       ),
     };
   }
