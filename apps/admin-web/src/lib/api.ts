@@ -96,6 +96,43 @@ export async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
+/**
+ * Blob variant of `apiFetch` — same auth-attach + 401-refresh-and-retry
+ * behavior, but for endpoints that return raw bytes (`GET /files/...`,
+ * ADR-007) rather than JSON. A plain `<img src="...">` can't attach an
+ * `Authorization` header or react to a 401 by refreshing, which is exactly
+ * why images silently broke once the access token (15min TTL,
+ * JWT_ACCESS_EXPIRES_IN) expired mid-session — see lib/image.ts's
+ * `useImageBlobUrl()`, the hook that calls this instead of building a raw
+ * `<img src>` URL with a token baked in.
+ */
+export async function apiFetchBlob(
+  path: string,
+  _retried = false,
+): Promise<Blob> {
+  const session = getSession();
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    headers: session ? { Authorization: `Bearer ${session.accessToken}` } : {},
+  });
+
+  if (res.status === 401 && session && !_retried) {
+    const refreshed = await refreshTokens();
+    if (refreshed) {
+      return apiFetchBlob(path, true);
+    }
+    clearSession();
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+    throw new ApiError(401, 'Session expired — please log in again');
+  }
+
+  if (!res.ok) {
+    throw new ApiError(res.status, `Failed to load file: ${res.status} ${res.statusText}`);
+  }
+  return res.blob();
+}
+
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path),
   post: <T>(path: string, body?: unknown) =>

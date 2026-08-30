@@ -3,10 +3,10 @@ import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import { disconnectChatSocket, getChatSocket } from '../lib/chat';
 import { getSession } from '../lib/auth';
-import { resolveImageUrl } from '../lib/image';
 import type { AppUser, ChatMessage, ChatRoomSummary } from '../lib/types';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { AuthedImage } from '../components/AuthedImage';
 import { colors, radius, spacing } from '../theme';
 
 /**
@@ -345,12 +345,13 @@ export function ChatPage() {
                           padding: '8px 12px',
                         }}
                       >
-                        {m.imageUrl && session && (
-                          // ADR-007 (docs/ARCHITECTURE.md) — resolveImageUrl()
-                          // turns the stored "local://bucket/village/file" ref
-                          // into a real fetchable URL against `GET /files/...`.
-                          <img
-                            src={resolveImageUrl(m.imageUrl, session.accessToken)}
+                        {m.imageUrl && (
+                          // ADR-007 (docs/ARCHITECTURE.md) — AuthedImage fetches
+                          // via an access-token-refresh-aware blob request
+                          // instead of a token-baked-into-the-URL <img src>,
+                          // which silently broke once the token expired.
+                          <AuthedImage
+                            ref_={m.imageUrl}
                             alt="รูปภาพแนบ"
                             style={{
                               maxWidth: 220,

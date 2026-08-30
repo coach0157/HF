@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
-import { getSession } from '../lib/auth';
-import { resolveImageUrl } from '../lib/image';
 import type { House, MaintenanceCategory, MaintenanceStatus, MaintenanceTicket, Paginated } from '../lib/types';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
+import { AuthedImage } from '../components/AuthedImage';
 import type { BadgeVariant } from '../components/Badge';
 import { colors, radius, spacing } from '../theme';
 
@@ -60,7 +59,6 @@ const thStyle = { padding: spacing.sm, fontSize: 13, color: colors.textSecondary
 const tdStyle = { padding: spacing.sm, fontSize: 14, color: colors.textPrimary };
 
 export function MaintenanceTicketsPage() {
-  const session = getSession();
   const [houses, setHouses] = useState<House[]>([]);
   const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | ''>('');
   const [categoryFilter, setCategoryFilter] = useState<MaintenanceCategory | ''>('');
@@ -265,13 +263,13 @@ export function MaintenanceTicketsPage() {
             <p style={{ color: colors.textPrimary }}>
               <strong>รูปแนบ:</strong>
               <br />
-              {selected.imageUrl && session ? (
-                // ADR-007 (docs/ARCHITECTURE.md) — resolveImageUrl() turns the
-                // stored "local://bucket/village/file" ref (see
-                // file-storage.service.ts) into a real fetchable URL against
-                // `GET /files/...`.
-                <img
-                  src={resolveImageUrl(selected.imageUrl, session.accessToken)}
+              {selected.imageUrl ? (
+                // ADR-007 (docs/ARCHITECTURE.md) — AuthedImage fetches via an
+                // access-token-refresh-aware blob request instead of a
+                // token-baked-into-the-URL <img src>, which silently broke
+                // once the token expired (see lib/image.ts's doc comment).
+                <AuthedImage
+                  ref_={selected.imageUrl}
                   alt="รูปแนบใบงานซ่อม"
                   style={{ maxWidth: '100%', borderRadius: radius.input, marginTop: spacing.xs }}
                 />
