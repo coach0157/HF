@@ -15,7 +15,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { getSession, type MobileSession } from "../lib/auth";
+import { getSession, setSession as persistSession, type MobileSession } from "../lib/auth";
 import { setOnSessionExpired } from "../lib/api";
 import { registerForPushNotificationsAsync } from "../lib/push";
 
@@ -23,6 +23,14 @@ interface AuthContextValue {
   session: MobileSession | null;
   loading: boolean;
   setSession: (session: MobileSession | null) => void;
+  // Avatar upload feature (Dev-agent addition). Deliberately separate from
+  // `setSession` above — that function re-triggers push-token registration
+  // for every non-null session it's given (see its own comment), which we
+  // don't want firing again just because the user changed their profile
+  // picture. This only patches `avatarUrl` in both the in-memory context
+  // state and SecureStore, so ProfileScreen's avatar reflects immediately
+  // and survives an app relaunch.
+  updateAvatarUrl: (avatarUrl: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -65,9 +73,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const updateAvatarUrl = useCallback((avatarUrl: string | null) => {
+    setSessionState((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, avatarUrl };
+      void persistSession(next);
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ session, loading, setSession }),
-    [session, loading, setSession],
+    () => ({ session, loading, setSession, updateAvatarUrl }),
+    [session, loading, setSession, updateAvatarUrl],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

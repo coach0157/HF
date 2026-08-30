@@ -17,6 +17,10 @@ export interface AppUser {
   phone: string;
   role: UserRole;
   houseId: string | null;
+  // Dev-agent addition (avatar upload feature). `local://avatars/...` ref
+  // from the backend's FileStorageService, mirrored from the Prisma
+  // `User.avatarUrl` column — see users.service.ts's updateAvatar().
+  avatarUrl?: string | null;
   createdAt?: string;
 }
 

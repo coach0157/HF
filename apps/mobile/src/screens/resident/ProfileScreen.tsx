@@ -1,29 +1,33 @@
 /**
  * "หน้าเพิ่มเติม / โปรไฟล์" (spec 1.1) — MVP_BACKLOG.md Epic 6.
  *
- * Household info: `GET /users/me` only returns JWT claims
- * (villageId/userId/role/houseId — see users.controller.ts's `me()`, which
- * literally returns `@CurrentUser()`), not name/phone/house_no. Name/phone
- * already live in the locally-stored session (from the login response), so
- * this screen shows those immediately and additionally calls
- * `GET /users/:id` (self) + `GET /houses/:id` (own house) — both opened to
- * RESIDENT-for-own-record by the previous dev-agent round — for house_no/
- * zone, which the session doesn't carry.
+ * Household info: name/phone/role/houseId already live in the
+ * locally-stored session (from the login response), so this screen shows
+ * those immediately and additionally calls `GET /houses/:id` (own house)
+ * for house_no/zone, which the session doesn't carry.
+ *
+ * Dev-agent note (avatar upload feature): `GET /users/me` used to only
+ * return JWT claims (villageId/userId/role/houseId — see
+ * users.controller.ts's `me()`, which used to literally return
+ * `@CurrentUser()`), but was changed to return the live DB row instead so
+ * this screen (and GuardProfileScreen) can fetch `avatarUrl`, which isn't
+ * part of the login response or the JWT claims.
  */
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { api, ApiError } from "../../lib/api";
 import { clearSession } from "../../lib/auth";
 import { disconnectChatSocket } from "../../lib/chat";
 import { unregisterPushTokenAsync } from "../../lib/push";
 import { useAuth } from "../../context/AuthContext";
-import type { House } from "../../lib/types";
+import type { AppUser, House } from "../../lib/types";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
+import { Avatar } from "../../components/Avatar";
 import { colors, spacing } from "../../theme";
 
 export function ProfileScreen() {
-  const { session, setSession } = useAuth();
+  const { session, setSession, updateAvatarUrl } = useAuth();
   const [house, setHouse] = useState<House | null>(null);
   const [loadingHouse, setLoadingHouse] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -40,6 +44,29 @@ export function ProfileScreen() {
       })
       .finally(() => setLoadingHouse(false));
   }, [session?.houseId]);
+
+  // Avatar upload feature (Dev-agent addition). `POST /auth/login`'s
+  // response never carries avatarUrl (see lib/auth.ts's MobileSession doc
+  // comment), so the session doesn't have it right after login — fetch it
+  // once here via `GET /users/me` (now returns the live DB row, per
+  // users.controller.ts's `me()` doc comment) and fold it into the session
+  // so it's available everywhere and survives a relaunch.
+  useEffect(() => {
+    if (!session?.userId) return;
+    api
+      .get<AppUser>("/users/me")
+      .then((me) => {
+        if (me.avatarUrl !== session.avatarUrl) {
+          updateAvatarUrl(me.avatarUrl ?? null);
+        }
+      })
+      .catch(() => {
+        // Non-critical — falls back to the initial-letter placeholder.
+      });
+    // Only re-run when the logged-in user changes, not on every avatarUrl
+    // update this effect itself may cause.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.userId]);
 
   async function handleLogout() {
     if (!session) return;
@@ -69,6 +96,15 @@ export function ProfileScreen() {
   return (
     <ScrollView style={styles.container}>
       <Card>
+        <View style={styles.avatarWrap}>
+          <Avatar
+            name={session.name}
+            avatarUrl={session.avatarUrl}
+            editable
+            onUploaded={updateAvatarUrl}
+          />
+        </View>
+
         <Text style={styles.label}>ชื่อ</Text>
         <Text style={styles.value}>{session.name}</Text>
 
@@ -99,6 +135,7 @@ export function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
+  avatarWrap: { marginBottom: spacing.sm },
   label: { fontSize: 12, color: colors.textMuted, marginTop: spacing.md },
   value: { fontSize: 16, fontWeight: "600", color: colors.textPrimary, marginTop: 2 },
   logoutButton: { marginTop: spacing.xl },

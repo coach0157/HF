@@ -28,6 +28,13 @@ export interface MobileSession {
   houseId: string | null;
   name: string;
   phone: string;
+  // Dev-agent addition (avatar upload feature). Not part of the
+  // `POST /auth/login` response (see auth.service.ts's issueTokenPair() —
+  // deliberately narrow `Pick<User, ...>`), so this starts undefined after
+  // a fresh login and is filled in by ProfileScreen's `GET /users/me` call
+  // / kept in sync via AuthContext's `updateAvatarUrl()` after a successful
+  // avatar upload.
+  avatarUrl?: string | null;
 }
 
 const STORAGE_KEY = "village_mobile_session";
