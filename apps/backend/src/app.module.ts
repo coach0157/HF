@@ -11,6 +11,7 @@ import { HouseModule } from "./modules/house/house.module";
 import { TransportProviderModule } from "./modules/transport-provider/transport-provider.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { ChatModule } from "./modules/chat/chat.module";
+import { FilesModule } from "./common/files/files.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ChatModule } from "./modules/chat/chat.module";
     TransportProviderModule,
     MaintenanceModule,
     ChatModule,
+    FilesModule,
   ],
 })
 export class AppModule implements NestModule {

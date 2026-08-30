@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
+import { resolveImageUrl } from "../../lib/image";
+import { useAuth } from "../../context/AuthContext";
 import type { EntryLog, Paginated } from "../../lib/types";
 import { Button } from "../../components/Button";
 import { Badge } from "../../components/Badge";
@@ -28,6 +30,7 @@ function fmt(iso: string | null): string {
 }
 
 export function EntryHistoryScreen() {
+  const { session } = useAuth();
   const [logs, setLogs] = useState<EntryLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [date, setDate] = useState(""); // YYYY-MM-DD filter, optional
@@ -97,8 +100,11 @@ export function EntryHistoryScreen() {
         ListEmptyComponent={!loading ? <Text style={styles.empty}>ไม่มีประวัติเข้า-ออก</Text> : null}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            {item.photoUrl ? (
-              <Image source={{ uri: item.photoUrl }} style={styles.photo} />
+            {item.photoUrl && session ? (
+              <Image
+                source={{ uri: resolveImageUrl(item.photoUrl, session.accessToken) }}
+                style={styles.photo}
+              />
             ) : (
               <View style={[styles.photo, styles.photoPlaceholder]}>
                 <Text style={{ fontSize: 18 }}>👤</Text>

@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -30,6 +31,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import { api, ApiError } from "../../lib/api";
 import { getChatSocket } from "../../lib/chat";
+import { resolveImageUrl } from "../../lib/image";
 import { useAuth } from "../../context/AuthContext";
 import type { ChatMessage, Paginated } from "../../lib/types";
 import type { ChatStackParamList } from "../../navigation/types";
@@ -182,10 +184,12 @@ export function ChatRoomScreen() {
           return (
             <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
               <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                {item.imageUrl && (
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>📷 รูปภาพแนบ</Text>
-                  </View>
+                {item.imageUrl && session && (
+                  <Image
+                    source={{ uri: resolveImageUrl(item.imageUrl, session.accessToken) }}
+                    style={styles.attachedImage}
+                    resizeMode="cover"
+                  />
                 )}
                 {item.message && (
                   <Text style={mine ? styles.bubbleTextMine : styles.bubbleTextTheirs}>{item.message}</Text>
@@ -238,13 +242,12 @@ const styles = StyleSheet.create({
   bubbleTheirs: { backgroundColor: colors.border },
   bubbleTextMine: { color: colors.white, fontSize: 14 },
   bubbleTextTheirs: { color: colors.textPrimary, fontSize: 14 },
-  imagePlaceholder: {
-    backgroundColor: "rgba(0,0,0,0.08)",
+  attachedImage: {
+    width: 200,
+    height: 200,
     borderRadius: radius.card - 4,
-    padding: spacing.sm + 2,
     marginBottom: spacing.xs,
   },
-  imagePlaceholderText: { fontSize: 12 },
   timestamp: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
   timestampMine: { textAlign: "right" },
   timestampTheirs: { textAlign: "left" },

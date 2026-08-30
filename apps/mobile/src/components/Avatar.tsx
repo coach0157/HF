@@ -28,6 +28,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { api, ApiError } from "../lib/api";
+import { resolveImageUrl } from "../lib/image";
 import type { AppUser } from "../lib/types";
 import { colors } from "../theme";
 
@@ -40,6 +41,10 @@ const MAX_AVATAR_BYTES = 3 * 1024 * 1024;
 export interface AvatarProps {
   name: string;
   avatarUrl?: string | null;
+  // ADR-007 (docs/ARCHITECTURE.md) — required to build the `GET
+  // /files/...?token=` URL via resolveImageUrl(). Every caller already has
+  // this on hand from useAuth()'s session.
+  accessToken: string;
   size?: number;
   editable?: boolean;
   onUploaded?: (avatarUrl: string | null) => void;
@@ -50,33 +55,25 @@ function getInitial(name: string): string {
   return trimmed ? trimmed[0].toUpperCase() : "?";
 }
 
-// The backend stores avatarUrl as a `local://bucket/village/filename` ref
-// (see FileStorageService.savePhoto's doc comment) — not a real fetchable
-// HTTP URL in this MVP's local-disk storage implementation. RN's <Image>
-// can't load that scheme, so only render it for a URI we know the device
-// can actually fetch. This is the same caution ChatRoomScreen.tsx already
-// takes with `imageUrl` (it shows a "📷 รูปภาพแนบ" placeholder instead of
-// rendering the image) — not a new limitation introduced here.
-function isFetchableUri(uri: string): boolean {
-  return /^(https?:|data:|file:|content:|ph:|assets-library:)/.test(uri);
-}
-
 export function Avatar({
   name,
   avatarUrl,
+  accessToken,
   size = 72,
   editable = false,
   onUploaded,
 }: AvatarProps) {
   const [uploading, setUploading] = useState(false);
   // Optimistic local preview shown right after a successful pick+upload,
-  // before relying on the (non-fetchable) `local://` ref the backend
-  // returns — see isFetchableUri above.
+  // before the backend's `local://...` ref round-trips through
+  // resolveImageUrl() below (also works fine either way — a `data:`/
+  // `file:` URI isn't a `local://` ref, so resolveImageUrl would just pass
+  // it through unchanged, but the immediate local URI avoids the extra
+  // network round-trip to `GET /files/...` right after upload).
   const [localPreviewUri, setLocalPreviewUri] = useState<string | null>(null);
 
   const displayUri =
-    localPreviewUri ??
-    (avatarUrl && isFetchableUri(avatarUrl) ? avatarUrl : null);
+    localPreviewUri ?? resolveImageUrl(avatarUrl, accessToken) ?? null;
 
   async function handlePress() {
     if (!editable || uploading) return;

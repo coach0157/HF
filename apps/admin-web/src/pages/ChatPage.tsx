@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
 import { disconnectChatSocket, getChatSocket } from '../lib/chat';
 import { getSession } from '../lib/auth';
+import { resolveImageUrl } from '../lib/image';
 import type { AppUser, ChatMessage, ChatRoomSummary } from '../lib/types';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -344,10 +345,21 @@ export function ChatPage() {
                           padding: '8px 12px',
                         }}
                       >
-                        {m.imageUrl && (
-                          <div style={{ fontSize: 12, wordBreak: 'break-all', marginBottom: m.message ? 6 : 0 }}>
-                            📷 <code>{m.imageUrl}</code>
-                          </div>
+                        {m.imageUrl && session && (
+                          // ADR-007 (docs/ARCHITECTURE.md) — resolveImageUrl()
+                          // turns the stored "local://bucket/village/file" ref
+                          // into a real fetchable URL against `GET /files/...`.
+                          <img
+                            src={resolveImageUrl(m.imageUrl, session.accessToken)}
+                            alt="รูปภาพแนบ"
+                            style={{
+                              maxWidth: 220,
+                              maxHeight: 220,
+                              borderRadius: radius.input,
+                              display: 'block',
+                              marginBottom: m.message ? 6 : 0,
+                            }}
+                          />
                         )}
                         {m.message && <div>{m.message}</div>}
                       </div>

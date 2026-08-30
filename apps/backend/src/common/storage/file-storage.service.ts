@@ -7,6 +7,23 @@ import * as path from "node:path";
 export type PhotoBucket = "entry-logs" | "sensitive-id" | "avatars";
 
 /**
+ * Path-traversal guard for `resolveDiskPath()` below — rejects a segment
+ * that could escape the intended `<bucket>/<village>/<filename>` directory
+ * (a bare `..`, an embedded `..`, or anything containing a path separator).
+ * Only relevant to villageId/filename coming from an untrusted request path
+ * (the files-serving endpoint); `savePhoto()`'s own writes never need this
+ * since it always generates the filename itself via `randomUUID()`.
+ */
+function isSafePathSegment(segment: string): boolean {
+  return (
+    segment.length > 0 &&
+    !segment.includes("/") &&
+    !segment.includes("\\") &&
+    !segment.includes("..")
+  );
+}
+
+/**
  * Spec 3.4: "แยกนโยบายเก็บข้อมูลภาพบัตรประชาชน/ทะเบียนรถออกจากประวัติเข้า-ออกทั่วไป" —
  * ID-card/plate photos are more sensitive than a general entry-log photo and
  * need a separate bucket/permission + shorter retention (90 days) than the
@@ -90,14 +107,52 @@ export class FileStorageService {
   private refToPath(ref: string): string | null {
     const match = /^local:\/\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(ref);
     if (!match) return null;
-    const [, , villageId, filename] = match;
-    // Bucket folder name is looked up by value, not trusted from the ref,
-    // to avoid path traversal via a crafted photo_url.
-    const bucketFolder = match[1];
+    const [, bucketFolder, villageId, filename] = match;
+    return this.resolveDiskPath(bucketFolder, villageId, filename);
+  }
+
+  /**
+   * Reverse of the `bucket` half of `bucketNames` — given the folder name
+   * that appears in a `local://<folder>/<village>/<filename>` ref (e.g.
+   * "village-avatars"), returns which `PhotoBucket` key it is (e.g.
+   * "avatars"), or `null` if it doesn't match any configured bucket.
+   *
+   * Used by FilesController (src/common/files/) to decide which
+   * authorization rule applies to a requested file — the ref/URL only ever
+   * carries the folder name, not the short bucket key, so this is how the
+   * files endpoint maps a URL path segment back to "is this the sensitive
+   * bucket, the avatars bucket, or the shared entry-logs bucket".
+   */
+  resolveBucketKey(bucketFolder: string): PhotoBucket | null {
+    const entry = (Object.entries(this.bucketNames) as [PhotoBucket, string][]).find(
+      ([, folder]) => folder === bucketFolder,
+    );
+    return entry ? entry[0] : null;
+  }
+
+  /**
+   * Public counterpart to the private `refToPath()` above, taking the three
+   * ref components separately (as they arrive as individual route params on
+   * `GET /files/:bucket/:villageId/:filename`) instead of a pre-joined ref
+   * string. Returns `null` if `bucketFolder` isn't a recognized bucket, or if
+   * `villageId`/`filename` contain path-separator or `..` characters — those
+   * two segments are never trusted here (unlike `savePhoto()`'s
+   * server-generated `randomUUID()` filename, these come straight from a
+   * request path segment), so this is the path-traversal guard for the
+   * files-serving endpoint specifically.
+   */
+  resolveDiskPath(
+    bucketFolder: string,
+    villageId: string,
+    filename: string,
+  ): string | null {
     const knownFolder = Object.values(this.bucketNames).includes(bucketFolder)
       ? bucketFolder
       : null;
     if (!knownFolder) return null;
+    if (!isSafePathSegment(villageId) || !isSafePathSegment(filename)) {
+      return null;
+    }
     return path.join(this.rootDir, knownFolder, villageId, filename);
   }
 

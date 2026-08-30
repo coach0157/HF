@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, ApiError } from '../lib/api';
+import { getSession } from '../lib/auth';
+import { resolveImageUrl } from '../lib/image';
 import type { House, MaintenanceCategory, MaintenanceStatus, MaintenanceTicket, Paginated } from '../lib/types';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -58,6 +60,7 @@ const thStyle = { padding: spacing.sm, fontSize: 13, color: colors.textSecondary
 const tdStyle = { padding: spacing.sm, fontSize: 14, color: colors.textPrimary };
 
 export function MaintenanceTicketsPage() {
+  const session = getSession();
   const [houses, setHouses] = useState<House[]>([]);
   const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | ''>('');
   const [categoryFilter, setCategoryFilter] = useState<MaintenanceCategory | ''>('');
@@ -260,13 +263,18 @@ export function MaintenanceTicketsPage() {
               {selected.description}
             </p>
             <p style={{ color: colors.textPrimary }}>
-              <strong>รูปแนบ:</strong>{' '}
-              {selected.imageUrl ? (
-                // Local-dev file storage returns a "local://bucket/village/file"
-                // reference, not a fetchable HTTP URL (see
-                // file-storage.service.ts) — shown as text, not <img>, until a
-                // real S3/R2 signed-URL backend is wired up.
-                <code style={{ fontSize: 12, wordBreak: 'break-all' }}>{selected.imageUrl}</code>
+              <strong>รูปแนบ:</strong>
+              <br />
+              {selected.imageUrl && session ? (
+                // ADR-007 (docs/ARCHITECTURE.md) — resolveImageUrl() turns the
+                // stored "local://bucket/village/file" ref (see
+                // file-storage.service.ts) into a real fetchable URL against
+                // `GET /files/...`.
+                <img
+                  src={resolveImageUrl(selected.imageUrl, session.accessToken)}
+                  alt="รูปแนบใบงานซ่อม"
+                  style={{ maxWidth: '100%', borderRadius: radius.input, marginTop: spacing.xs }}
+                />
               ) : (
                 'ไม่มีรูปแนบ'
               )}

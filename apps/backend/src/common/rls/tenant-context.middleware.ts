@@ -47,11 +47,33 @@ export class TenantContextMiddleware implements NestMiddleware {
     req: Request,
   ): Promise<TenantClaims | undefined> {
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer ")) {
-      return undefined;
+    let token: string | undefined;
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.slice("Bearer ".length);
+    } else if (
+      // NOTE: `req.path` is NOT usable here — this middleware is mounted via
+      // `consumer.apply(...).forRoutes('*')` (AppModule.configure()), which
+      // Express treats as a path-prefixed mount matching the ENTIRE request
+      // path, so `req.path`/`req.url` inside it are rewritten relative to
+      // that mount point and always read "/" regardless of the real
+      // request. `req.originalUrl` is unaffected by that rewriting and still
+      // carries the real path.
+      req.originalUrl.split("?")[0].startsWith("/files/") &&
+      typeof req.query.token === "string"
+    ) {
+      // GET /files/:bucket/:villageId/:filename (src/common/files/) is
+      // rendered via <img src>/RN <Image> on both clients, neither of which
+      // can attach a custom Authorization header to the request they fire
+      // internally. Scoped to this one route (not accepted anywhere else)
+      // to avoid widening every endpoint's attack surface to token-in-URL
+      // (server/proxy access logs, browser history) — validated by the
+      // exact same JwtService.verifyAsync() call as the header path below.
+      token = req.query.token;
     }
 
-    const token = authHeader.slice("Bearer ".length);
+    if (!token) {
+      return undefined;
+    }
 
     try {
       const payload = await this.jwtService.verifyAsync<{

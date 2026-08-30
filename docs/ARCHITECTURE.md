@@ -982,3 +982,108 @@ succeed with no TypeScript errors; `npm run typecheck:mobile` also still
 passes (mobile doesn't reference `PushToken` yet — no push code has been
 written — but this confirms the workspace-wide dependency graph wasn't
 perturbed by the schema change, same check §8.6 ran for Epic 8-10).
+
+### ADR-007 — File-serving endpoint (`GET /files/:bucket/:villageId/:filename`)
+
+**Problem.** `FileStorageService.savePhoto()` (§ its own doc comment) has
+always returned a `local://<bucket>/<village>/<filename>` reference, stored
+verbatim on `entry_logs.photo_url`, `maintenance_tickets.image_url`,
+`chat_messages.image_url`, and `users.avatar_url`. Nothing ever served that
+reference back out as fetchable bytes — every client (mobile's `<Image
+source={{ uri }}>`, admin-web's would-be `<img src>`) was handed that raw
+`local://...` string directly. Neither React Native's `<Image>` nor a
+browser's `<img>` understands the `local://` scheme, so **every photo in the
+system — chat images, avatars, entry-log/ID-card photos, maintenance
+photos — was silently unviewable**, on both clients, in every module that
+uses `FileStorageService`. (Some screens/pages had already worked around
+this by not attempting to render the image at all — see e.g.
+`ChatRoomScreen.tsx`'s "📷 รูปภาพแนบ" placeholder and admin-web's
+`MaintenanceTicketsPage.tsx` showing the raw ref as `<code>` text — rather
+than a genuine per-feature decision, these were symptoms of the same
+underlying gap.)
+
+**Decision — one new endpoint, `GET
+/files/:bucket/:villageId/:filename`,** added in `src/common/files/`
+(`FilesController` + `FilesService`), plus a `resolveImageUrl()` helper in
+each client (`apps/mobile/src/lib/image.ts`,
+`apps/admin-web/src/lib/image.ts`) that rewrites a `local://bucket/village/
+filename` ref into `${API_BASE_URL}/files/bucket/village/filename?token=
+<accessToken>` before it ever reaches an `<Image>`/`<img>` tag. Every
+render point that used to pass a raw ref straight to `<Image>`/`<img>` now
+goes through this helper first (Avatar.tsx, both ProfileScreens,
+EntryHistoryScreen, ChatRoomScreen, AnnouncementsScreen on mobile;
+MaintenanceTicketsPage, ChatPage on admin-web).
+
+**Sub-decision 1 — the access token travels as a `?token=` query param on
+this route, in addition to (not instead of) the normal `Authorization:
+Bearer` header every other endpoint uses.** An `<img src>`/RN `<Image
+source={{ uri }}>` request is fired by the platform itself — neither can
+attach a custom header. This is scoped narrowly: `TenantContextMiddleware`
+(§1 of the RLS pattern write-up above) only falls back to
+`req.query.token` when the request path starts with `/files/` AND no
+`Authorization` header was present; every other route is unaffected. The
+query-param token is validated by the *exact same*
+`JwtService.verifyAsync()` call the header path already uses — no second,
+separately-maintained verification path. Accepted trade-off: a bearer token
+sitting in a URL can end up in server/proxy access logs or browser history,
+which is why this is opt-in per-route rather than a blanket alternative auth
+mechanism — the alternative (no way at all to authenticate an `<img>`
+request) is strictly worse for an MVP with no S3 signed-URL infrastructure
+to fall back on.
+
+**Sub-decision 2 — authorization is per-bucket, and for the shared
+"entry-logs" bucket, per-*row* via reverse lookup — not a single role
+check.** The three buckets have three different sensitivity levels (spec
+3.4):
+- **`avatars`** — any authenticated same-village user may view any avatar.
+  Low sensitivity; every role already sees other users' `avatarUrl` in some
+  context (chat, guard/admin entry-log views, the staff directory).
+- **`sensitive-id`** — ADMIN or GUARD only (spec 3.4's ID-card/plate photo
+  restriction). An ADMIN view is audit-logged via the same
+  `AuditService.log()` path `entry-log.service.ts`'s `findOne()`/`list()`
+  already use for admin access to sensitive entry-log data — action
+  `VIEW_SENSITIVE_ID_PHOTO`.
+- **`entry-logs`** — shared by THREE unrelated resource types, since
+  `entry-log.service.ts` (QR-scan gate photo), `maintenance.service.ts`
+  (repair photo), and `chat.service.ts` (image attachment) all call
+  `savePhoto("entry-logs", ...)` (a prior dev-agent decision, not new here).
+  `FilesService.authorize()` reverse-looks-up the ref against
+  `entry_logs.photo_url`, then `maintenance_tickets.image_url`, then
+  `chat_messages.image_url`, in that order, and applies THAT row's own
+  ownership rule (entry log: GUARD/ADMIN always, RESIDENT only their own
+  house; maintenance: ADMIN always, RESIDENT only their own house, GUARD
+  never — the module has no guard-facing routes at all; chat: reuses
+  `ChatService.assertCanJoin()`, i.e. the identical room-membership check
+  every other chat action already enforces, with **no ADMIN bypass** — an
+  admin who isn't a participant of a room cannot read its photos any more
+  than they can read its text). A ref matching none of the three is a
+  dangling/forged reference and gets a flat 404, same as a genuinely
+  missing file — never a 403, so a crafted filename can't be used to probe
+  "does this row exist" versus "do I lack permission for it".
+- Every DB lookup in `FilesService` goes through `getTenantPrismaClient()`
+  (§3.1) so it's RLS-scoped to the caller's own village like every other
+  query in the app; the path's `villageId` segment is additionally checked
+  for exact equality with `claims.villageId` *before* any DB/disk access,
+  since a mismatched `local://` folder path lives on disk outside RLS's
+  reach entirely — RLS alone cannot be the thing stopping cross-tenant file
+  access here.
+
+**Sub-decision 3 — this does not replace or bypass the existing entry-log
+audit trigger.** `entry-log.service.ts`'s `findOne()` already
+`AuditService.log()`s `VIEW_ENTRY_LOG_PHOTO` whenever an ADMIN fetches a
+single entry log's JSON (spec 3.4 requirement (b)). That call is unchanged
+and still fires exactly as before — `GET /files/...` only serves the
+*bytes* for whatever `photoUrl` a client already has from that JSON
+response; it does not duplicate, skip, or stand in for the JSON-fetch audit
+log. (The "entry-logs" bucket branch in `FilesService.authorize()`
+deliberately does NOT audit-log an ADMIN view a second time here — doing so
+would be a redundant/inflated audit trail for the same access event.)
+
+**Not done, deliberately out of scope:** no path-traversal-hardened
+directory listing, no signed/expiring URL (the token itself expires per the
+normal 15-minute access-token lifetime, which is the only expiry this MVP's
+local-disk storage has room for), no CDN/cache-control tuning. Revisit if a
+real S3/R2 swap (per `FileStorageService`'s own doc comment) makes signed
+URLs the more natural mechanism — at that point this endpoint's
+`resolveFilePath()` authorization logic is exactly what a presign step
+would need to gate on anyway.

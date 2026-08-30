@@ -13,7 +13,10 @@
  */
 import { clearSession, getSession, updateTokens } from './auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001';
+// Exported (Dev-agent change, ADR-007) so lib/image.ts's resolveImageUrl()
+// can build a `GET /files/...` URL against the same backend origin without
+// duplicating this env-var lookup.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001';
 
 export class ApiError extends Error {
   status: number;

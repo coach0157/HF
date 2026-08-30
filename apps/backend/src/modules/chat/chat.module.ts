@@ -11,9 +11,16 @@ import { WsRateLimiterService } from "./ws-rate-limiter.service";
  * (used by ChatService / WsRlsInterceptor) are all registered globally
  * (see CommonModule) — no imports needed here beyond this module's own
  * providers.
+ *
+ * `ChatService` is exported (ADR-007, docs/ARCHITECTURE.md) so
+ * `src/common/files/files.module.ts` can import this module and reuse
+ * `assertCanJoin()` — the files-serving endpoint's chat-image authorization
+ * must apply the exact same room-membership rule as every other chat
+ * action, not a second hand-rolled copy of it.
  */
 @Module({
   controllers: [ChatController],
   providers: [ChatService, ChatGateway, WsRateLimiterService],
+  exports: [ChatService],
 })
 export class ChatModule {}

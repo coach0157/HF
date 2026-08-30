@@ -70,6 +70,7 @@ export function GuardProfileScreen() {
           <Avatar
             name={session.name}
             avatarUrl={session.avatarUrl}
+            accessToken={session.accessToken}
             editable
             onUploaded={updateAvatarUrl}
           />

@@ -21,6 +21,8 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { api, ApiError } from "../../lib/api";
+import { resolveImageUrl } from "../../lib/image";
+import { useAuth } from "../../context/AuthContext";
 import type { Announcement } from "../../lib/types";
 import { Badge, type BadgeVariant } from "../../components/Badge";
 import { colors, radius, spacing } from "../../theme";
@@ -37,6 +39,7 @@ const LEVEL_BADGE_VARIANT: Record<Announcement["level"], BadgeVariant> = {
 };
 
 export function AnnouncementsScreen() {
+  const { session } = useAuth();
   const [items, setItems] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,8 +107,12 @@ export function AnnouncementsScreen() {
               {expanded && (
                 <View style={styles.detail}>
                   <Text style={styles.content}>{item.content}</Text>
-                  {item.imageUrl ? (
-                    <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
+                  {item.imageUrl && session ? (
+                    <Image
+                      source={{ uri: resolveImageUrl(item.imageUrl, session.accessToken) }}
+                      style={styles.image}
+                      resizeMode="cover"
+                    />
                   ) : null}
                 </View>
               )}
