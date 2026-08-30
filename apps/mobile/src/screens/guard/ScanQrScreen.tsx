@@ -10,6 +10,7 @@
  */
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
 import { api, ApiError } from "../../lib/api";
 import type { VisitorPassScanResult } from "../../lib/types";
@@ -26,6 +27,20 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ScanQrScreen() {
   const [permission, requestPermission] = useCameraPermissions();
+  // `useCameraPermissions()` only reads the OS permission state on mount —
+  // it never notices a change made outside the app (e.g. the guard leaves
+  // via "เปิดการตั้งค่า" below, grants Camera in Android Settings, then
+  // returns via the tab bar rather than a full app relaunch). Re-checking
+  // on every focus picks that up. Calling `requestPermission()` when
+  // already granted is a no-op (resolves immediately, no dialog); when
+  // still denied it's the same silent re-check Android already does for a
+  // permanently-denied permission (no repeat dialog either way).
+  useFocusEffect(
+    useCallback(() => {
+      requestPermission();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
   const scannedRef = useRef(false);
   const [result, setResult] = useState<VisitorPassScanResult | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
