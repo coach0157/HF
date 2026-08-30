@@ -139,6 +139,13 @@ npx eas-cli build --platform android --profile preview
 รอ build เสร็จ (ปกติ 5-15 นาที) จะได้ลิงก์ดาวน์โหลด `.apk` ติดตั้งตรงบนมือถือได้เลย
 (profile `preview` ใน `apps/mobile/eas.json` ตั้งไว้ให้ build เป็น APK ไม่ใช่ AAB)
 
+> ⚠️ **สำคัญ — IP หลังบ้าน:** `apps/mobile/.env.local` เป็นไฟล์ที่ gitignore ไว้
+> **EAS Build (cloud) ไม่อัปโหลดไฟล์นี้ไปด้วย** จึงต้องกำหนด
+> `EXPO_PUBLIC_API_BASE_URL` ไว้ตรงใน `apps/mobile/eas.json` (คีย์ `build.preview.env`)
+> แทน — ถ้า LAN IP ของเครื่องที่รัน backend เปลี่ยน (เช่น ต่อ WiFi คนละที่ หรือ
+> router จ่าย IP ใหม่) ต้องแก้ค่านี้ใน `eas.json` แล้ว build ใหม่ ไม่งั้นแอปที่ build
+> ไว้จะเชื่อมต่อ backend ไม่ได้ (อาการ: "ส่ง OTP ไม่สำเร็จ" ทั้งที่ backend รันอยู่ปกติ)
+
 ## Database access / Prisma Studio
 
 ```bash
