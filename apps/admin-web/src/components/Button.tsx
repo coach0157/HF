@@ -15,7 +15,7 @@ interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'sty
 const VARIANT_STYLE: Record<ButtonVariant, CSSProperties> = {
   primary: {
     background: colors.primary,
-    color: '#FFFFFF',
+    color: colors.white,
     border: `1px solid ${colors.primary}`,
   },
   secondary: {
@@ -25,7 +25,7 @@ const VARIANT_STYLE: Record<ButtonVariant, CSSProperties> = {
   },
   danger: {
     background: colors.danger,
-    color: '#FFFFFF',
+    color: colors.white,
     border: `1px solid ${colors.danger}`,
   },
 };

@@ -31,6 +31,9 @@ export const colors = {
   dangerLight: '#FEE2E2',
   warning: '#F59E0B',
   warningLight: '#FEF3C7',
+
+  white: '#FFFFFF',
+  black: '#000000',
 } as const;
 
 // success/info are aliases per design system ("success = primary", "info = secondary")

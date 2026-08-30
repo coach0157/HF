@@ -48,7 +48,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: spacing.lg, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontWeight: 800, color: '#FFFFFF', fontSize: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontWeight: 800, color: colors.white, fontSize: 16 }}>
             <span aria-hidden>🏘️</span>
             <span>HF Admin</span>
           </div>
@@ -65,9 +65,9 @@ export function AppLayout({ children }: { children?: ReactNode }) {
                     borderRadius: 8,
                     fontSize: 14,
                     fontWeight: active ? 700 : 500,
-                    color: active ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)',
+                    color: active ? colors.white : 'rgba(255, 255, 255, 0.85)',
                     background: active ? 'rgba(255, 255, 255, 0.22)' : 'transparent',
-                    boxShadow: active ? 'inset 0 -2px 0 #FFFFFF' : undefined,
+                    boxShadow: active ? `inset 0 -2px 0 ${colors.white}` : undefined,
                   }}
                 >
                   {item.label}
@@ -77,7 +77,7 @@ export function AppLayout({ children }: { children?: ReactNode }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-          {session && <span style={{ fontSize: 14, color: '#FFFFFF' }}>{session.name}</span>}
+          {session && <span style={{ fontSize: 14, color: colors.white }}>{session.name}</span>}
           <Button
             variant="danger"
             onClick={handleLogout}
