@@ -61,7 +61,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "extra": {
       "apiBaseUrl": "http://localhost:3001",

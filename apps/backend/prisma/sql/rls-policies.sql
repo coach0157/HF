@@ -13,8 +13,16 @@
 -- itself was created by prisma/migrations/20260828223706_add_push_tokens/
 -- migration.sql, and its RLS coverage was shipped as a further follow-up
 -- migration (prisma/migrations/20260828223707_rls_push_tokens/migration.sql)
--- the same way. This file's ARRAY[...] below was updated to include all of
--- them so it stays correct as documentation/reference, but replaying
+-- the same way. A fourth such table (blocked_visitors, the user-requested
+-- blocklist add-on) followed the same pattern again: the table itself came
+-- from prisma/migrations/20260831070817_add_blocked_visitors/migration.sql,
+-- and its RLS coverage shipped as
+-- prisma/migrations/20260831070900_rls_blocked_visitors/migration.sql (a
+-- preceding 20260831070831_rls_blocked_visitors/ was auto-scaffolded empty
+-- by `prisma migrate dev --create-only` and left unused — harmless artifact
+-- of the create-then-fill workflow). This file's ARRAY[...] below was
+-- updated to include all of them so it stays correct as documentation/
+-- reference, but replaying
 -- migration history top-to-bottom (`prisma migrate deploy` on a fresh
 -- database) is what actually applies RLS in practice — every migration runs
 -- in order and their combined effect matches what's below.
@@ -63,7 +71,7 @@ BEGIN
     'maintenance_tickets', 'maintenance_ticket_counters', 'transport_providers',
     'facilities', 'bookings',
     'bills', 'payments', 'refresh_tokens', 'audit_logs', 'push_tokens',
-    'patrol_logs'
+    'patrol_logs', 'blocked_visitors'
   ]
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY;', t);

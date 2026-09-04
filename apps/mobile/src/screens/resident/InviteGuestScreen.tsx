@@ -181,6 +181,7 @@ export function InviteGuestScreen() {
               { label: "24 ชม.", hours: 24 },
               { label: "3 วัน", hours: 72 },
               { label: "7 วัน", hours: 168 },
+              { label: "1 ปี (แขกประจำ)", hours: 8760 },
             ].map((opt) => (
               <TouchableOpacity
                 key={opt.hours}
@@ -208,6 +209,9 @@ export function InviteGuestScreen() {
               </TouchableOpacity>
             ))}
           </View>
+          <Text style={styles.hint}>
+            เคล็ดลับ: สำหรับแขกประจำ (แม่บ้าน/คนส่งของ) เลือก "1 ปี (แขกประจำ)" คู่กับ "ใช้ได้หลายครั้ง" จะได้ไม่ต้องสร้าง QR ใหม่ทุกครั้ง
+          </Text>
 
           {error ? <Text style={styles.fieldError}>{error}</Text> : null}
 
@@ -264,6 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   fieldError: { color: colors.danger, fontSize: 12, marginTop: spacing.xs },
+  hint: { fontSize: 12, color: colors.textMuted, marginTop: spacing.sm },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     borderWidth: 1,

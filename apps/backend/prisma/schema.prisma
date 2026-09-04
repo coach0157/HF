@@ -182,6 +182,7 @@ model Village {
   maintenanceTickets        MaintenanceTicket[]
   maintenanceTicketCounters MaintenanceTicketCounter[]
   transportProviders        TransportProvider[]
+  blockedVisitors           BlockedVisitor[]
   facilities                Facility[]
   bills                     Bill[]
   auditLogs                 AuditLog[]
@@ -234,6 +235,7 @@ model User {
   auditLogs              AuditLog[]
   refreshTokens          RefreshToken[]
   pushTokens             PushToken[]
+  blockedVisitorsCreated BlockedVisitor[]    @relation("BlockedVisitorCreatedBy")
 
   // Same phone number cannot be registered twice within the same village.
   // (A person living in two different villages could reuse a phone number —
@@ -622,6 +624,35 @@ model TransportProvider {
   @@index([villageId, isActive])
   @@index([villageId, type])
   @@map("transport_providers")
+}
+
+// ---------------------------------------------------------------------------
+// Blocked visitors (village-wide ban list, user-requested add-on — see
+// docs/PHASE2_BACKLOG.md §6 (Epic 13)/Epic "แขกประจำ + บล็อกลิสต์"). Admin-managed;
+// checked against a phone/plate BEFORE a resident can create a VisitorPass
+// QR and BEFORE a guard can record either a QR-scan or manual entry (see
+// visitor-pass.service.ts's create() and entry-log.service.ts's
+// createFromQr()/createManual() — all three call
+// BlockedVisitorService.assertNotBlocked()). At least one of phone/
+// vehiclePlate is required, enforced in the service (not expressible as a
+// Prisma-level constraint).
+// ---------------------------------------------------------------------------
+
+model BlockedVisitor {
+  id              String   @id @default(uuid()) @db.Uuid
+  villageId       String   @map("village_id") @db.Uuid
+  phone           String?
+  vehiclePlate    String?  @map("vehicle_plate")
+  reason          String?
+  createdByUserId String   @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  village   Village @relation(fields: [villageId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("BlockedVisitorCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([villageId, phone])
+  @@index([villageId, vehiclePlate])
+  @@map("blocked_visitors")
 }
 
 // ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ describe("VisitorPassService", () => {
   let service: VisitorPassService;
   let qrToken: { sign: jest.Mock; verify: jest.Mock };
   let auditService: { log: jest.Mock };
+  let blockedVisitorService: { assertNotBlocked: jest.Mock };
   let tx: {
     visitorPass: {
       create: jest.Mock;
@@ -40,7 +41,14 @@ describe("VisitorPassService", () => {
       verify: jest.fn(),
     };
     auditService = { log: jest.fn().mockResolvedValue(undefined) };
-    service = new VisitorPassService(qrToken as any, auditService as any);
+    blockedVisitorService = {
+      assertNotBlocked: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new VisitorPassService(
+      qrToken as any,
+      auditService as any,
+      blockedVisitorService as any,
+    );
     tx = {
       visitorPass: {
         create: jest.fn(),
@@ -97,6 +105,32 @@ describe("VisitorPassService", () => {
           claims,
         ),
       ).rejects.toThrow(BadRequestException);
+      expect(tx.visitorPass.create).not.toHaveBeenCalled();
+    });
+
+    it("edge case (docs/PHASE2_BACKLOG.md §6 (Epic 13)): a blocklisted phone/plate is rejected before a QR is ever signed", async () => {
+      const claims = mockClaims();
+      blockedVisitorService.assertNotBlocked.mockRejectedValue(
+        new ForbiddenException("This visitor is on the village block list"),
+      );
+
+      await expect(
+        service.create(
+          {
+            visitorName: "Somchai",
+            visitorPhone: "0899999999",
+            validFrom: new Date(Date.now() + 60_000).toISOString(),
+            validTo: new Date(Date.now() + 3_600_000).toISOString(),
+            usageType: "SINGLE",
+          } as any,
+          claims,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(blockedVisitorService.assertNotBlocked).toHaveBeenCalledWith({
+        phone: "0899999999",
+        vehiclePlate: undefined,
+      });
+      expect(qrToken.sign).not.toHaveBeenCalled();
       expect(tx.visitorPass.create).not.toHaveBeenCalled();
     });
   });

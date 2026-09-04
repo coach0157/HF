@@ -4,16 +4,24 @@
  *
  * Takes the full `VisitorPass` via route params (see navigation/types.ts's
  * doc comment on why — there is no resident-callable "get one pass"
- * endpoint). Share uses React Native core's `Share.share()` as the simple
- * first cut noted in the original doc comment (`expo-sharing` is not a
- * listed dependency, so not added just for this).
+ * endpoint).
+ *
+ * Share captures the on-screen QR as a PNG (`react-native-view-shot`) and
+ * hands it to the native share sheet via `expo-sharing` — a guest opening
+ * the shared image in e.g. LINE gets an actual scannable QR, not just the
+ * raw token text a guard can't do anything with off-screen. Falls back to
+ * the old text-only `Share.share()` if the platform reports sharing
+ * unavailable (`Sharing.isAvailableAsync()` — always true on iOS/Android,
+ * kept only as a defensive fallback).
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert, Share, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { RouteProp } from "@react-navigation/native";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import QRCode from "react-native-qrcode-svg";
+import ViewShot, { type ViewShotRef } from "react-native-view-shot";
+import * as Sharing from "expo-sharing";
 import { api, ApiError } from "../../lib/api";
 import type { VisitorPass } from "../../lib/types";
 import type { ResidentTabParamList } from "../../navigation/types";
@@ -45,11 +53,26 @@ export function QrDisplayScreen({
     useNavigation<NativeStackNavigationProp<ResidentTabParamList, "QrDisplay">>();
   const [pass, setPass] = useState<VisitorPass>(route.params.pass);
   const [revoking, setRevoking] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const qrShotRef = useRef<ViewShotRef>(null);
 
   const canRevoke = pass.status === "UNUSED" || pass.status === "ENTERED";
 
   async function handleShare() {
+    if (sharing) return;
+    setSharing(true);
     try {
+      const available = qrShotRef.current && (await Sharing.isAvailableAsync());
+      if (available) {
+        const uri = await qrShotRef.current!.capture();
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/png",
+          dialogTitle: `เชิญเข้าหมู่บ้าน: ${pass.visitorName}`,
+        });
+        return;
+      }
+      // Fallback (sharing unavailable, or the capture ref wasn't ready) —
+      // text-only, same as before this feature existed.
       await Share.share({
         message: `เชิญเข้าหมู่บ้าน: ${pass.visitorName}\nรหัส QR: ${pass.qrToken}\nใช้ได้ถึง: ${new Date(
           pass.validTo,
@@ -57,6 +80,8 @@ export function QrDisplayScreen({
       });
     } catch {
       // Share sheet dismissed/cancelled — nothing to do.
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -83,9 +108,9 @@ export function QrDisplayScreen({
 
   return (
     <View style={styles.container}>
-      <View style={styles.qrWrap}>
+      <ViewShot ref={qrShotRef} style={styles.qrWrap} options={{ format: "png", quality: 1 }}>
         <QRCode value={pass.qrToken} size={260} />
-      </View>
+      </ViewShot>
 
       <Text style={styles.visitorName}>{pass.visitorName}</Text>
       {pass.visitorPhone ? <Text style={styles.meta}>โทร: {pass.visitorPhone}</Text> : null}
@@ -98,7 +123,12 @@ export function QrDisplayScreen({
 
       <Badge label={STATUS_LABEL[pass.status]} variant={STATUS_BADGE_VARIANT[pass.status]} style={styles.statusBadge} />
 
-      <Button title="แชร์ QR" onPress={handleShare} style={styles.shareButton} />
+      <Button
+        title="แชร์ QR"
+        onPress={handleShare}
+        loading={sharing}
+        style={styles.shareButton}
+      />
 
       {canRevoke && (
         <Button

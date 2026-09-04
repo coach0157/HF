@@ -21,6 +21,7 @@ const NAV_ITEMS: { to: string; label: string }[] = [
   { to: '/maintenance-tickets', label: 'แจ้งซ่อม' },
   { to: '/chat', label: 'แชท' },
   { to: '/patrol-logs', label: 'ประวัติตรวจรอบ' },
+  { to: '/blocked-visitors', label: 'บล็อกลิสต์' },
 ];
 
 export function AppLayout({ children }: { children?: ReactNode }) {

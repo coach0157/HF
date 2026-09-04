@@ -151,7 +151,7 @@ export interface ChatMessage {
 }
 
 // Epic 12 — Guard Patrol Log (user request, not in original spec — see
-// docs/PHASE2_BACKLOG.md §5).
+// docs/PHASE2_BACKLOG.md §6 (Epic 13)).
 export interface PatrolLog {
   id: string;
   villageId: string;
@@ -160,6 +160,19 @@ export interface PatrolLog {
   note: string | null;
   latitude: string | null;
   longitude: string | null;
+  createdAt: string;
+}
+
+// Blocklist add-on (user request, not in original spec — see
+// docs/PHASE2_BACKLOG.md §6 (Epic 13)). At least one of phone/vehiclePlate is always
+// present (enforced server-side in blocked-visitor.service.ts).
+export interface BlockedVisitor {
+  id: string;
+  villageId: string;
+  phone: string | null;
+  vehiclePlate: string | null;
+  reason: string | null;
+  createdByUserId: string;
   createdAt: string;
 }
 

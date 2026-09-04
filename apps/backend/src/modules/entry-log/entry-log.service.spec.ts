@@ -27,6 +27,7 @@ describe("EntryLogService", () => {
   let fileStorage: { savePhoto: jest.Mock };
   let auditService: { log: jest.Mock };
   let pushNotificationService: { send: jest.Mock };
+  let blockedVisitorService: { assertNotBlocked: jest.Mock };
   let tx: {
     entryLog: {
       findFirst: jest.Mock;
@@ -49,11 +50,15 @@ describe("EntryLogService", () => {
     fileStorage = { savePhoto: jest.fn() };
     auditService = { log: jest.fn().mockResolvedValue(undefined) };
     pushNotificationService = { send: jest.fn() };
+    blockedVisitorService = {
+      assertNotBlocked: jest.fn().mockResolvedValue(undefined),
+    };
     service = new EntryLogService(
       visitorPassService as any,
       fileStorage as any,
       auditService as any,
       pushNotificationService as any,
+      blockedVisitorService as any,
     );
     tx = {
       entryLog: {
@@ -123,6 +128,27 @@ describe("EntryLogService", () => {
       // Epic 11 (ADR-006) AC #1: no push on the exit-gate re-scan.
       expect(pushNotificationService.send).not.toHaveBeenCalled();
     });
+
+    it("edge case (docs/PHASE2_BACKLOG.md §6 (Epic 13)): a blocklisted phone/plate on the resolved pass is rejected — defense-in-depth, blocked AFTER the QR was already issued", async () => {
+      const claims = mockClaims();
+      visitorPassService.resolveForScan.mockResolvedValue({
+        id: "pass-1",
+        status: "UNUSED",
+        createdByUserId: "resident-1",
+        visitorName: "Somchai",
+        visitorPhone: "0899999999",
+        vehiclePlate: null,
+      });
+      blockedVisitorService.assertNotBlocked.mockRejectedValue(
+        new ForbiddenException("This visitor is on the village block list"),
+      );
+
+      await expect(service.create({ qrToken: "tok" }, claims)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(tx.entryLog.create).not.toHaveBeenCalled();
+      expect(visitorPassService.markEntered).not.toHaveBeenCalled();
+    });
   });
 
   describe("confirmExit — the ONLY method allowed to set exitTime", () => {
@@ -190,6 +216,27 @@ describe("EntryLogService", () => {
         BadRequestException,
       );
       expect(tx.entryLog.create).not.toHaveBeenCalled();
+    });
+
+    it("edge case (docs/PHASE2_BACKLOG.md §6 (Epic 13)): a blocklisted vehicle plate is rejected", async () => {
+      const claims = mockClaims();
+      blockedVisitorService.assertNotBlocked.mockRejectedValue(
+        new ForbiddenException("This visitor is on the village block list"),
+      );
+
+      await expect(
+        service.create(
+          {
+            visitorName: "Somchai",
+            vehiclePlate: "กข1234",
+            houseId: "house-1",
+            photoDataUrl: "data:image/jpeg;base64,xx",
+          } as any,
+          claims,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(tx.entryLog.create).not.toHaveBeenCalled();
+      expect(fileStorage.savePhoto).not.toHaveBeenCalled();
     });
   });
 

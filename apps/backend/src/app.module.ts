@@ -13,6 +13,7 @@ import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { ChatModule } from "./modules/chat/chat.module";
 import { PatrolLogModule } from "./modules/patrol-log/patrol-log.module";
 import { FilesModule } from "./common/files/files.module";
+import { BlockedVisitorModule } from "./modules/blocked-visitor/blocked-visitor.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { FilesModule } from "./common/files/files.module";
     ChatModule,
     PatrolLogModule,
     FilesModule,
+    BlockedVisitorModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -404,3 +404,53 @@ photoUrl, note NULLABLE, latitude/longitude NULLABLE, createdAt) — bucket ใ�
 
 **Priority:** P2 (นอก scope เดิมทั้งหมด ไม่มี dependency กับ Epic 8-11)
 **Dependency:** Epic 0, Epic 1 (auth/RBAC พื้นฐาน) เท่านั้น
+
+---
+
+## 6. Epic 13 — แขกประจำ + บล็อกลิสต์ (ผู้ใช้ขอเพิ่มนอกสเปกเดิม)
+
+**User Story:** ในฐานะลูกบ้าน ฉันต้องการสร้าง QR สำหรับแขกที่มาประจำ (แม่บ้าน/
+คนส่งของ) โดยไม่ต้องสร้างใหม่ทุกครั้ง — ในฐานะแอดมิน ฉันต้องการขึ้นบัญชีดำ
+เบอร์โทร/ทะเบียนรถที่ห้ามเข้าหมู่บ้าน เพื่อไม่ให้ลูกบ้านสร้าง QR หรือยามบันทึกเข้า
+ให้คนกลุ่มนี้ได้อีก
+
+**Acceptance Criteria — แขกประจำ:**
+- ใช้ `VisitorPass` เดิมที่มีอยู่แล้ว (usageType `MULTI` + validTo ไกลๆ) ไม่สร้าง
+  model/state machine ใหม่ — spec เดิมออกแบบ `MULTI` ไว้รองรับกรณีนี้อยู่แล้ว,
+  `validTo` ไม่มีเพดานสูงสุดในโค้ดเดิม (แค่เช็ค `> now`)
+- Mobile InviteGuestScreen เพิ่มตัวเลือกระยะเวลา "1 ปี (แขกประจำ)" ในชุด chip
+  เดิม + คำแนะนำให้เลือกคู่กับ "ใช้ได้หลายครั้ง"
+
+**Acceptance Criteria — บล็อกลิสต์:**
+- แอดมินเพิ่ม/ลบรายการบล็อกได้ (เบอร์โทรและ/หรือทะเบียนรถ อย่างน้อย 1 อย่าง +
+  เหตุผล optional) — village-wide ไม่ผูกกับบ้านใดบ้านหนึ่ง
+- ลูกบ้านสร้าง QR ด้วยเบอร์/ทะเบียนที่อยู่ในบล็อกลิสต์ไม่ได้ (reject ตอน
+  `POST /visitor-passes`)
+- ยามบันทึกเข้าด้วยเบอร์/ทะเบียนที่อยู่ในบล็อกลิสต์ไม่ได้ ทั้งสองทาง: สแกน QR
+  (`POST /entry-logs` พร้อม `qrToken`) และบันทึกด้วยมือ (`POST /entry-logs`
+  ไม่มี `qrToken`) — เช็คซ้ำที่ทางเข้า QR ด้วย (ไม่ใช่แค่ตอนสร้าง QR) เพราะเบอร์
+  อาจถูกบล็อกหลัง QR ถูกออกไปแล้ว
+- RESIDENT/GUARD ดูรายการบล็อกลิสต์ไม่ได้ (ADMIN เท่านั้น — ป้องกันการเดา/หลบเลี่ยง)
+
+**Schema (สร้างแล้ว — schema.prisma):** model `BlockedVisitor` (id, villageId,
+phone NULLABLE, vehiclePlate NULLABLE, reason NULLABLE, createdByUserId,
+createdAt) — อย่างน้อย 1 ใน phone/vehiclePlate ต้องมี (enforce ใน service ไม่ใช่
+Prisma constraint)
+
+**Implementation Tasks (เสร็จแล้ว):**
+- [x] Migration: `BlockedVisitor` model + RLS policy (`blocked_visitors` เพิ่มใน
+      `rls-policies.sql`'s array แล้ว)
+- [x] Backend module `src/modules/blocked-visitor/` — `POST/GET/DELETE
+      /blocked-visitors` (ADMIN เท่านั้น) + `BlockedVisitorService.assertNotBlocked()`
+      ที่ `VisitorPassService.create()` และ `EntryLogService`'s `createFromQr()`/
+      `createManual()` เรียกก่อนเขียนข้อมูลจริง
+- [x] Mobile: เพิ่ม chip "1 ปี (แขกประจำ)" ใน InviteGuestScreen — ไม่มีหน้าจอใหม่
+      (ข้อความ error จากบล็อกลิสต์ขึ้นผ่าน alert/error state เดิมของแต่ละหน้าจอ
+      อัตโนมัติ เพราะทุกหน้าจอ handle `ApiError` แบบ generic อยู่แล้ว)
+- [x] Admin-web: หน้าใหม่ "บล็อกลิสต์" — เพิ่ม/ลบ (ไม่มีแก้ไข — ลบ+เพิ่มใหม่ง่ายกว่า
+      สำหรับข้อมูล 3 field)
+- [x] Unit + e2e test: RBAC, tenant isolation, และ integration test ที่ยืนยันว่า
+      บล็อกลิสต์บล็อกจริงทั้ง QR creation และ manual entry (ไม่ใช่แค่ CRUD endpoint)
+
+**Priority:** P2 (นอก scope เดิมทั้งหมด ไม่มี dependency กับ Epic 8-12)
+**Dependency:** Epic 2 (Visitor QR + Entry Log พื้นฐาน) เท่านั้น

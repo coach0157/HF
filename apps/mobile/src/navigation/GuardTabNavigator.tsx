@@ -73,12 +73,24 @@ export function GuardTabNavigator() {
         component={ScanQrScreen}
         options={{ title: "สแกน QR", tabBarIcon: ({ color }) => <TabIcon emoji="📷" color={color} /> }}
       />
+      {/*
+        QA fix (user-reported, screenshot on a real device): with all 7
+        screens as visible tabs, every label past "SOS"/"แชท" truncated with
+        "..." — Thai labels don't fit React Navigation's default equal-width
+        tab columns at 7-wide on a normal phone. ManualEntry and ExitConfirm
+        are both already one-tap reachable from GuardHomeScreen's quick-link
+        cards (see HomeScreen.tsx's `quickLinks`), so they're hidden here via
+        `tabBarButton: () => null` — same technique already used for
+        PatrolLog below, for the same reason. ScanQr and SosList stay
+        visible tabs (not just Home cards) because a guard needs to reach
+        them fast from anywhere mid-shift, not only from Home.
+      */}
       <Tab.Screen
         name="ManualEntry"
         component={ManualEntryScreen}
         options={{
           title: "บันทึกด้วยมือ",
-          tabBarIcon: ({ color }) => <TabIcon emoji="📝" color={color} />,
+          tabBarButton: () => null,
         }}
       />
       <Tab.Screen
@@ -86,7 +98,7 @@ export function GuardTabNavigator() {
         component={ExitConfirmScreen}
         options={{
           title: "ยืนยันแขกออก",
-          tabBarIcon: ({ color }) => <TabIcon emoji="🚪" color={color} />,
+          tabBarButton: () => null,
         }}
       />
       <Tab.Screen
@@ -99,12 +111,13 @@ export function GuardTabNavigator() {
         §5). A real Tab.Screen (so GuardHomeScreen's quick-link card can
         reach it with a plain `navigation.navigate("PatrolLog")`, exactly
         like ManualEntry/ExitConfirm/SosList above) but hidden from the
-        visible tab bar via `tabBarButton: () => null` — 7 visible tabs is
-        already dense with Thai labels on a real phone width; an 8th would
-        make labels wrap/truncate. `tabBarButton: () => null` is the
-        standard React Navigation pattern for a "hidden tab" reachable only
-        by explicit navigation, chosen over restructuring "Home" into a
-        nested stack (which would require rewriting every existing
+        visible tab bar via `tabBarButton: () => null` — see the comment
+        above ManualEntry for the full reasoning (this was the original,
+        narrower version of that same fix before ManualEntry/ExitConfirm
+        needed it too). `tabBarButton: () => null` is the standard React
+        Navigation pattern for a "hidden tab" reachable only by explicit
+        navigation, chosen over restructuring "Home" into a nested stack
+        (which would require rewriting every existing
         `navigation.navigate(...)` call in GuardHomeScreen to
         `navigation.getParent()?.navigate(...)`, per ResidentTabNavigator's
         own HomeStackNavigator precedent — much larger blast radius for one

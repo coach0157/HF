@@ -14,6 +14,7 @@ import {
 import { getTenantPrismaClient } from "../../common/rls/tenant-context";
 import type { TenantClaims } from "../../common/rls/tenant-context";
 import { AuditService } from "../../common/audit/audit.service";
+import { BlockedVisitorService } from "../blocked-visitor/blocked-visitor.service";
 import { QrTokenService } from "./qr-token.service";
 import { CreateVisitorPassDto } from "./dto/create-visitor-pass.dto";
 
@@ -30,12 +31,20 @@ export class VisitorPassService {
   constructor(
     private readonly qrToken: QrTokenService,
     private readonly auditService: AuditService,
+    private readonly blockedVisitorService: BlockedVisitorService,
   ) {}
 
   async create(
     dto: CreateVisitorPassDto,
     claims: TenantClaims,
   ): Promise<VisitorPass> {
+    // User-requested add-on (docs/PHASE2_BACKLOG.md §6 (Epic 13)): reject up front so
+    // a resident never gets as far as a signed QR for a banned phone/plate.
+    await this.blockedVisitorService.assertNotBlocked({
+      phone: dto.visitorPhone,
+      vehiclePlate: dto.vehiclePlate,
+    });
+
     const validFrom = new Date(dto.validFrom);
     const validTo = new Date(dto.validTo);
 

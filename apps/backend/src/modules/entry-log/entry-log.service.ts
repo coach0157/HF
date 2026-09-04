@@ -16,6 +16,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { FileStorageService } from "../../common/storage/file-storage.service";
 import { PushNotificationService } from "../../common/push/push-notification.service";
 import { VisitorPassService } from "../visitor-pass/visitor-pass.service";
+import { BlockedVisitorService } from "../blocked-visitor/blocked-visitor.service";
 import { CreateEntryLogDto } from "./dto/create-entry-log.dto";
 
 export interface ListEntryLogsFilters {
@@ -41,6 +42,7 @@ export class EntryLogService {
     private readonly fileStorage: FileStorageService,
     private readonly auditService: AuditService,
     private readonly pushNotificationService: PushNotificationService,
+    private readonly blockedVisitorService: BlockedVisitorService,
   ) {}
 
   async create(dto: CreateEntryLogDto, claims: TenantClaims) {
@@ -72,6 +74,15 @@ export class EntryLogService {
       // Data inconsistency fallback (pass says ENTERED, no open log found) —
       // fall through and create a fresh entry rather than error the guard.
     }
+
+    // Defense-in-depth (docs/PHASE2_BACKLOG.md §6 (Epic 13)): the phone/plate may have
+    // been added to the block list AFTER this QR was already issued — the
+    // create()-time check in visitor-pass.service.ts can't catch that, so
+    // re-check here, at the actual gate, before a genuinely new entry.
+    await this.blockedVisitorService.assertNotBlocked({
+      phone: pass.visitorPhone,
+      vehiclePlate: pass.vehiclePlate,
+    });
 
     const host = await tx.user.findUnique({
       where: { id: pass.createdByUserId },
@@ -132,6 +143,13 @@ export class EntryLogService {
         "Manual entry requires visitorName, houseId, and a photo of the ID card/plate (photoDataUrl)",
       );
     }
+
+    // User-requested add-on (docs/PHASE2_BACKLOG.md §6 (Epic 13)) — same block-list
+    // check as the QR path, since manual entry has no pass to have already
+    // been checked at creation time.
+    await this.blockedVisitorService.assertNotBlocked({
+      vehiclePlate: dto.vehiclePlate,
+    });
 
     const tx = getTenantPrismaClient<PrismaClient>();
     const house = await tx.house.findUnique({ where: { id: dto.houseId } });
