@@ -382,25 +382,26 @@ photoUrl, note NULLABLE, latitude/longitude NULLABLE, createdAt) — bucket ใ�
 ของ `FilesService` ไม่ต้องเพิ่ม table ที่ 4 เข้า chain เดิม — ดู
 `file-storage.service.ts` bucket comment)
 
-**Implementation Tasks:**
-- [ ] Migration: apply `PatrolLog` model + RLS policy (table `patrol_logs` เพิ่มใน
-      `rls-policies.sql`'s array แล้ว ต้องสร้าง migration จริงตามขั้นตอนเดิม)
-- [ ] Backend module `src/common/files/`'s `FilesService` — เพิ่ม authorization
-      rule สำหรับ bucket `"patrol-logs"`: ADMIN หรือ GUARD เท่านั้น (เหมือน
-      `"sensitive-id"` แต่ไม่ต้อง audit-log เพราะไม่ใช่ข้อมูลส่วนบุคคลอ่อนไหวระดับเดียวกัน)
-- [ ] `src/modules/patrol-log/` — `POST /patrol-logs` (GUARD เท่านั้น, รับรูปผ่าน
+**Implementation Tasks (เสร็จแล้ว):**
+- [x] Migration: `PatrolLog` model + RLS policy (`20260830161829_add_patrol_logs` +
+      `20260830161843_rls_patrol_logs` ประยุกต์ใช้แล้วกับ DB local)
+- [x] Backend module `src/common/files/`'s `FilesService` — authorization rule
+      สำหรับ bucket `"patrol-logs"`: ADMIN หรือ GUARD เท่านั้น (เหมือน
+      `"sensitive-id"` แต่ไม่ audit-log ตามที่ตั้งใจไว้ — ดู comment ใน
+      `files.service.ts`'s `authorize()`)
+- [x] `src/modules/patrol-log/` — `POST /patrol-logs` (GUARD เท่านั้น, รับรูปผ่าน
       `FileStorageService` bucket `"patrol-logs"`), `GET /patrol-logs?date=`
       (ADMIN + GUARD, pagination เหมือน entry-logs)
-- [ ] Admin-web: หน้าใหม่ "ประวัติตรวจรอบ" — list พร้อมรูป (ผ่าน `AuthedImage`/
-      `useImageBlobUrl` pattern ที่มีอยู่แล้ว ไม่ใช่ token-in-URL แบบเก่าที่เคยพัง),
+- [x] Admin-web: `PatrolLogsPage.tsx` — list พร้อมรูป (ผ่าน `AuthedImage`/
+      `useImageBlobUrl` pattern เดิม ไม่ใช่ token-in-URL แบบเก่าที่เคยพัง),
       กรองวันที่, แสดงชื่อ รปภ. + เวลา + หมายเหตุ
-- [ ] Mobile (guard): หน้าใหม่ "บันทึกตรวจรอบ" — ถ่ายรูปด้วย `expo-camera` (pattern
-      เดียวกับ ManualEntryScreen), หมายเหตุ (optional), แนบ GPS อัตโนมัติถ้ามีสิทธิ์
-      (pattern เดียวกับ resident's SOS — เงียบๆ ถ้าไม่มีสิทธิ์ ไม่บังคับ), เพิ่ม
-      เป็น tab ใหม่หรือ quick-link จาก Guard Home (ตัดสินใจตอน implement — tab bar
-      ตอนนี้มี 7 อันแล้ว ถ้าแน่นเกินไปให้ทำเป็น quick-link แทนก็ได้)
-- [ ] Unit + e2e test: RBAC (resident เห็นไม่ได้, guard คนอื่นเห็นได้), tenant
-      isolation, ไม่มี checkpoint validation (ยืนยันว่ารับ note/GPS เป็น optional จริง)
+- [x] Mobile (guard): `PatrolLogScreen.tsx` — ถ่ายรูปด้วย `expo-camera`, หมายเหตุ
+      (optional), แนบ GPS อัตโนมัติถ้ามีสิทธิ์ — เข้าถึงเป็น **hidden-tab
+      quick-link** จาก Guard `HomeScreen` (ตัดสินใจแล้ว: ไม่เพิ่ม tab ที่ 8 ใน
+      `GuardTabNavigator`, `navigation.navigate("PatrolLog")` ตรงจาก Home แทน)
+- [x] Unit + e2e test: `patrol-log.service.spec.ts` + `patrol-log.e2e-spec.ts` —
+      RBAC (resident เห็นไม่ได้, guard คนอื่นเห็นได้), tenant isolation, ไม่มี
+      checkpoint validation (note/GPS เป็น optional จริง)
 
 **Priority:** P2 (นอก scope เดิมทั้งหมด ไม่มี dependency กับ Epic 8-11)
 **Dependency:** Epic 0, Epic 1 (auth/RBAC พื้นฐาน) เท่านั้น
