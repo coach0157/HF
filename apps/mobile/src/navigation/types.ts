@@ -30,6 +30,8 @@ export type ChatStackParamList = {
 
 export type ResidentTabParamList = {
   Home: undefined;
+  // Root screen of the Home tab's nested stack (see ResidentTabNavigator).
+  ResidentHome: undefined;
   InviteGuest: undefined;
   QrDisplay: { pass: VisitorPass };
   EntryHistory: undefined;

@@ -43,7 +43,7 @@ const LEVEL_COLOR: Record<Announcement["level"], string> = {
 };
 
 export function ResidentHomeScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<ResidentTabParamList, "Home">>();
+  const navigation = useNavigation<NativeStackNavigationProp<ResidentTabParamList, "ResidentHome">>();
   const { session } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);

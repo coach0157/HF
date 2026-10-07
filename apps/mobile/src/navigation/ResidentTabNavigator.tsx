@@ -56,7 +56,9 @@ function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={themedHeaderOptions}>
       <HomeStack.Screen
-        name="Home"
+        // Not "Home": that's the tab's name, and a same-named nested screen
+        // triggers React Navigation's "ResidentApp > Home > Home" warning.
+        name="ResidentHome"
         component={ResidentHomeScreen}
         // The screen renders its own top bar (village name + notification
         // bell) — showing the native stack header too stacked a second,
