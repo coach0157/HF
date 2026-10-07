@@ -18,8 +18,13 @@ QR_TOKEN_SECRET="change-me-qr-secret"
 ```
 **นี่คือรูรั่วความปลอดภัยที่ร้ายแรงที่สุดถ้าลืมแก้** — ถ้าใครเดาค่าพวกนี้ได้ ปลอม JWT
 login เข้าระบบเป็นใครก็ได้ทันที (รวมถึงปลอม QR แขกด้วย)
-- สร้างค่าสุ่มยาวๆ ใหม่ (เช่น `openssl rand -base64 48`) ให้ทั้ง 3 ตัวนี้ต่างกัน
+- สร้างค่าสุ่มยาวๆ ใหม่ให้ทั้ง 3 ตัวนี้ต่างกัน — รันคำสั่งนี้ 3 ครั้ง (ใช้ได้ทั้ง Windows/Linux
+  ไม่ต้องมี openssl):
+  `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
 - ใส่ในไฟล์ `.env` ของเซิร์ฟเวอร์ production เท่านั้น **ห้าม commit เข้า git เด็ดขาด**
+- **มีตัวกันลืมแล้ว:** ถ้า `NODE_ENV=production` แต่ค่ายังเป็น `change-me-*`, สั้นกว่า 32
+  ตัวอักษร, ไม่ได้ตั้ง, หรือใช้ค่าซ้ำกัน — backend จะ**ไม่ยอมสตาร์ท**และบอกว่าตัวไหนผิด
+  (`apps/backend/src/common/config/startup-config.ts`)
 
 ### 1.2 ย้ายจากดิสก์เครื่อง local ไปเป็น cloud storage จริง
 ตอนนี้รูปภาพทั้งหมด (บัตร ปชช., รูปแชท, avatar, รูปตรวจรอบ) เก็บในโฟลเดอร์
@@ -45,13 +50,13 @@ login เข้าระบบเป็นใครก็ได้ทันท�
   แต่ยังไม่มี `EXPO_PUBLIC_API_BASE_URL` — ต้องเติมโดเมนจริงก่อน build/submit
   ขึ้น store จริง
 
-### 1.4 จำกัด CORS
-`apps/backend/src/main.ts` บรรทัด 13 มีคอมเมนต์เตือนตัวเองไว้แล้วว่า:
-```ts
-app.enableCors(); // TODO: restrict to the admin-web origin(s) before staging.
-```
-ตอนนี้ backend รับ request จาก**เว็บไหนก็ได้ในโลก** — ต้องจำกัดให้รับเฉพาะโดเมนเว็บ
-admin จริงของเรา ก่อนเปิดใช้งานจริง
+### 1.4 จำกัด CORS — ✅ โค้ดเสร็จแล้ว (2026-10-07) เหลือแค่ตั้งค่าตอนขึ้น server
+backend (ทั้ง REST และแชท Socket.IO) รับ request จากเว็บที่อยู่ในรายการ `CORS_ORIGINS`
+เท่านั้น — ตอน dev ถ้าไม่ตั้งจะอนุญาตแค่ `http://localhost:5173` (admin-web)
+- ตอนขึ้น production ใส่ใน `.env` ของ server เช่น
+  `CORS_ORIGINS="https://admin.yourdomain.com"` (หลายโดเมนคั่นด้วย `,`)
+- **ถ้าลืมตั้ง backend จะไม่ยอมสตาร์ทตอน `NODE_ENV=production`**
+- แอปมือถือไม่กระทบ (แอป native ไม่ส่ง Origin header)
 
 ### 1.5 ต่อ SMS gateway จริง (OTP ตอนนี้เป็น mock)
 ตอนนี้รหัส OTP แค่ log ออก console เซิร์ฟเวอร์ ไม่มีใครได้รับ SMS จริง — ต้องสมัคร
@@ -59,9 +64,11 @@ admin จริงของเรา ก่อนเปิดใช้งาน�
 (โครงโค้ดรองรับไว้แล้ว แค่ยังไม่มี provider จริง)
 
 ### 1.6 ตั้งค่า production build ของแอปมือถือให้ถูกต้อง
-`eas.json` ตอนนี้มีแค่ `preview` profile (สำหรับทดสอบ) ที่ตั้งค่า LAN IP ไว้ —
-ต้องเพิ่ม `production` profile ที่ชี้ไป backend โดเมนจริง ก่อน submit ขึ้น Play Store/
-App Store จริง
+`eas.json` มี `production` profile แล้วแต่ยังไม่มี `EXPO_PUBLIC_API_BASE_URL` (ดู 1.3)
+— ต้องเติมโดเมนจริงก่อน build/submit ขึ้น Play Store/App Store จริง
+- **APK `preview` ที่ติดตั้งอยู่ตอนนี้ล็อกอินไม่ได้แล้ว** เพราะ Cloudflare Tunnel ชั่วคราวที่ฝัง
+  ไว้ปิดไปแล้ว — ระหว่างยังไม่มีโดเมนให้ทดสอบผ่าน Expo Go บน WiFi เดียวกันแทน
+- แอปยังไม่มี `expo-updates` → เปลี่ยน URL backend ทีไรต้อง build APK ใหม่ทุกครั้ง
 
 ### 1.7 ย้าย backend + database ไป server จริง (ไม่ใช่ docker-compose บนเครื่องนี้)
 ตอนนี้ Postgres รันผ่าน `docker-compose.yml` บนเครื่องนี้เท่านั้น — ต้องมี:
@@ -118,7 +125,7 @@ Oppo อีก 1-2 เครื่อง (ยี่ห้อพวกนี้�
 
 1. เปลี่ยน secrets (1.1) — ทำได้เดี๋ยวนี้ ไม่มีข้อแม้
 2. ย้าย server+database ไป production จริง (1.7)
-3. ต่อ HTTPS (1.3) + จำกัด CORS (1.4)
+3. ต่อ HTTPS (1.3) + ตั้ง `CORS_ORIGINS` (1.4 — โค้ดเสร็จแล้ว)
 4. ย้าย file storage ไป R2 (1.2)
 5. ต่อ SMS gateway จริง (1.5)
 6. ตั้ง `production` build profile มือถือ (1.6) แล้ว build/submit ขึ้น store

@@ -71,29 +71,29 @@ Dev agent รอบถัดไปเริ่มจากศูนย์โด�
 - การเข้าห้องแชท (join room) ต้องเช็คสิทธิ์ระดับห้อง (เป็น `ChatParticipant` ของห้องนั้นจริง) เพิ่มเติมจาก RLS ระดับหมู่บ้าน — RLS ป้องกันข้ามหมู่บ้านเท่านั้น ไม่ป้องกันข้ามห้องภายในหมู่บ้านเดียวกัน
 
 **Implementation Tasks — Backend:**
-- [ ] เพิ่ม dependency: `@nestjs/websockets`, `@nestjs/platform-socket.io`, `socket.io` (เวอร์ชันคู่กับ Nest 11.x ตาม ADR §4 เดิม — ดู ARCHITECTURE.md §8.1 สำหรับเวอร์ชันแนะนำ)
-- [ ] Refactor: แยก transaction-wrap + `SET LOCAL app.current_village_id/current_user_id/current_role` logic ออกจาก `RlsInterceptor` เป็น helper กลาง (`common/rls/tenant-transaction.ts`) ให้ `RlsInterceptor` (HTTP) และ gateway ใหม่ (WS) เรียกใช้ร่วมกัน — ห้ามเขียน SET LOCAL sequence ซ้ำมือใน gateway (ADR-005)
-- [ ] `ChatGateway` (`@WebSocketGateway`) — `handleConnection`: verify JWT จาก `socket.handshake.auth.token`, decode claims, เก็บใน `socket.data`, disconnect ทันทีถ้า invalid/expired
-- [ ] `WsRlsInterceptor`/guard สำหรับแต่ละ `@SubscribeMessage` handler — เปิด transaction + SET LOCAL ต่อ event โดยใช้ helper ข้างบน แล้วให้ service เรียก `getTenantPrismaClient()` แบบเดียวกับ REST module
-- [ ] WS events: `join_room` (verify `ChatParticipant` membership ก่อน `socket.join()`), `send_message` (persist `ChatMessage`, broadcast ไปยัง socket.io room), `mark_read` (update `ChatParticipant.lastReadAt`), `typing` (optional, ephemeral ไม่ persist)
-- [ ] REST: `POST /chat-rooms` (find-or-create ห้อง DIRECT ระหว่าง 2 คน; สร้างห้อง GROUP เฉพาะ ADMIN), `GET /chat-rooms` (รายการห้องของ user ปัจจุบัน พร้อม unread count จาก `lastReadAt`), `GET /chat-rooms/:id/messages?page=&pageSize=` (ประวัติ, ใช้ index `[villageId, chatRoomId, createdAt]` ที่มีอยู่แล้ว)
-- [ ] Image upload endpoint สำหรับแนบรูปในแชท (คืน URL แล้วส่งผ่าน WS `send_message` พร้อม `imageUrl`)
-- [ ] Village group room provisioning: สร้าง `GROUP` ChatRoom เริ่มต้น 1 ห้องต่อหมู่บ้าน (lazy-create ตอน admin คนแรก login หรือ seed ตอนสร้างหมู่บ้าน — ตัดสินใจตอน implement) + sync participant (เพิ่มลูกบ้าน/รปภ./แอดมินใหม่เข้าห้องอัตโนมัติ)
-- [ ] Rate-limit `send_message` ต่อ user (ป้องกัน spam/flood คล้าย pattern `perUserThrottle` ที่ใช้กับ SOS/entry-log)
-- [ ] Unit test: WS auth ปฏิเสธ token ผิด/หมดอายุ, RLS กันข้ามหมู่บ้านใน WS event, กันข้ามห้อง (ไม่ใช่ participant เข้าไม่ได้), group room read-only enforcement เมื่อ `residentsCanPost=false`
-- [ ] Integration test: สร้างห้อง DIRECT → ส่งข้อความ → อีกฝั่ง (WS client) ได้รับ real-time → history ผ่าน REST ตรงกัน; group broadcast ทดสอบ 1 เคส
+- [x] เพิ่ม dependency: `@nestjs/websockets`, `@nestjs/platform-socket.io`, `socket.io` (เวอร์ชันคู่กับ Nest 11.x ตาม ADR §4 เดิม — ดู ARCHITECTURE.md §8.1 สำหรับเวอร์ชันแนะนำ)
+- [x] Refactor: แยก transaction-wrap + `SET LOCAL app.current_village_id/current_user_id/current_role` logic ออกจาก `RlsInterceptor` เป็น helper กลาง (`common/rls/tenant-transaction.ts`) ให้ `RlsInterceptor` (HTTP) และ gateway ใหม่ (WS) เรียกใช้ร่วมกัน — ห้ามเขียน SET LOCAL sequence ซ้ำมือใน gateway (ADR-005)
+- [x] `ChatGateway` (`@WebSocketGateway`) — `handleConnection`: verify JWT จาก `socket.handshake.auth.token`, decode claims, เก็บใน `socket.data`, disconnect ทันทีถ้า invalid/expired
+- [x] `WsRlsInterceptor`/guard สำหรับแต่ละ `@SubscribeMessage` handler — เปิด transaction + SET LOCAL ต่อ event โดยใช้ helper ข้างบน แล้วให้ service เรียก `getTenantPrismaClient()` แบบเดียวกับ REST module
+- [x] WS events: `join_room` (verify `ChatParticipant` membership ก่อน `socket.join()`), `send_message` (persist `ChatMessage`, broadcast ไปยัง socket.io room), `mark_read` (update `ChatParticipant.lastReadAt`), `typing` (optional, ephemeral ไม่ persist)
+- [x] REST: `POST /chat-rooms` (find-or-create ห้อง DIRECT ระหว่าง 2 คน; สร้างห้อง GROUP เฉพาะ ADMIN), `GET /chat-rooms` (รายการห้องของ user ปัจจุบัน พร้อม unread count จาก `lastReadAt`), `GET /chat-rooms/:id/messages?page=&pageSize=` (ประวัติ, ใช้ index `[villageId, chatRoomId, createdAt]` ที่มีอยู่แล้ว)
+- [x] Image upload endpoint สำหรับแนบรูปในแชท (คืน URL แล้วส่งผ่าน WS `send_message` พร้อม `imageUrl`)
+- [x] Village group room provisioning: สร้าง `GROUP` ChatRoom เริ่มต้น 1 ห้องต่อหมู่บ้าน (lazy-create ตอน admin คนแรก login หรือ seed ตอนสร้างหมู่บ้าน — ตัดสินใจตอน implement) + sync participant (เพิ่มลูกบ้าน/รปภ./แอดมินใหม่เข้าห้องอัตโนมัติ)
+- [x] Rate-limit `send_message` ต่อ user (ป้องกัน spam/flood คล้าย pattern `perUserThrottle` ที่ใช้กับ SOS/entry-log)
+- [x] Unit test: WS auth ปฏิเสธ token ผิด/หมดอายุ, RLS กันข้ามหมู่บ้านใน WS event, กันข้ามห้อง (ไม่ใช่ participant เข้าไม่ได้), group room read-only enforcement เมื่อ `residentsCanPost=false`
+- [x] Integration test: สร้างห้อง DIRECT → ส่งข้อความ → อีกฝั่ง (WS client) ได้รับ real-time → history ผ่าน REST ตรงกัน; group broadcast ทดสอบ 1 เคส
 
 **Implementation Tasks — admin-web ("นิติบุคคล" persona):**
-- [ ] หน้าแชท: รายการห้องสนทนา (DIRECT จากลูกบ้านทุกคน + GROUP), เปิดดูข้อความ/ส่งข้อความ/แนบรูป, mark read
-- [ ] Composer สำหรับ broadcast กลุ่มหมู่บ้าน (เมื่อ `residentsCanPost=false` เป็นช่องทางเดียวที่โพสต์ในกลุ่มได้)
-- [ ] Socket.io client (`socket.io-client`) wiring ผูกกับ `lib/auth.ts` token เดิม, reconnect + refresh token ก่อน reconnect เมื่อ token หมดอายุ
+- [x] หน้าแชท: รายการห้องสนทนา (DIRECT จากลูกบ้านทุกคน + GROUP), เปิดดูข้อความ/ส่งข้อความ/แนบรูป, mark read
+- [x] Composer สำหรับ broadcast กลุ่มหมู่บ้าน (เมื่อ `residentsCanPost=false` เป็นช่องทางเดียวที่โพสต์ในกลุ่มได้)
+- [x] Socket.io client (`socket.io-client`) wiring ผูกกับ `lib/auth.ts` token เดิม, reconnect + refresh token ก่อน reconnect เมื่อ token หมดอายุ
 
 **Implementation Tasks — mobile:**
-- [ ] Resident `ChatScreen`: 3 แท็บ "นิติบุคคล" / "รปภ." / "กลุ่มหมู่บ้าน" ตาม mockup สเปก 1.1 — แต่ละแท็บ find-or-create ห้อง DIRECT ที่เหมาะสมหรือเข้าห้อง GROUP
-- [ ] Guard `ChatScreen`: รายการแชท DIRECT จากลูกบ้านที่ทักเข้ามา
-- [ ] `lib/chat.ts`: `socket.io-client` wiring แบบเดียวกับ admin-web, reuse `lib/auth.ts`/`lib/api.ts` token
-- [ ] แนบรูปผ่าน `expo-image-picker` (dependency ใหม่ — ยังไม่มีใน `apps/mobile` วันนี้)
-- [ ] Push notification เมื่อมีข้อความใหม่ตอนแอปอยู่ background — ใช้ FCM gap เดียวกับที่ report ไว้แล้วใน MVP Epic 6/7 (ยังไม่มี push token registration endpoint) ไม่ใช่ gap ใหม่
+- [x] Resident `ChatScreen`: 3 แท็บ "นิติบุคคล" / "รปภ." / "กลุ่มหมู่บ้าน" ตาม mockup สเปก 1.1 — แต่ละแท็บ find-or-create ห้อง DIRECT ที่เหมาะสมหรือเข้าห้อง GROUP
+- [x] Guard `ChatScreen`: รายการแชท DIRECT จากลูกบ้านที่ทักเข้ามา
+- [x] `lib/chat.ts`: `socket.io-client` wiring แบบเดียวกับ admin-web, reuse `lib/auth.ts`/`lib/api.ts` token
+- [x] แนบรูปผ่าน `expo-image-picker` (dependency ใหม่ — ยังไม่มีใน `apps/mobile` วันนี้)
+- [x] Push notification เมื่อมีข้อความใหม่ตอนแอปอยู่ background — ใช้ FCM gap เดียวกับที่ report ไว้แล้วใน MVP Epic 6/7 (ยังไม่มี push token registration endpoint) ไม่ใช่ gap ใหม่
 
 **Priority:** P1 — **Dependency:** Epic 0 (multi-tenant/RLS), Epic 1 (Auth/JWT) เท่านั้น
 
@@ -114,23 +114,23 @@ Dev agent รอบถัดไปเริ่มจากศูนย์โด�
 - ลูกบ้านเห็นเฉพาะใบงานของบ้านตัวเอง, แอดมินเห็นทุกใบงานในหมู่บ้าน กรองตามสถานะ/หมวดหมู่ได้
 
 **Implementation Tasks — Backend:**
-- [ ] สร้าง module `src/modules/maintenance/` (controller/service/dto ตาม pattern เดียวกับ `sos`/`entry-log`)
-- [ ] `POST /maintenance-tickets` — `@Roles("RESIDENT")`, validate category/description, `houseId` มาจาก JWT claims เท่านั้น (ห้าม trust จาก client), generate `ticketNumber` แบบ atomic ภายใน transaction เดียวกับการ insert ticket (`UPDATE maintenance_ticket_counters SET last_seq = last_seq + 1 WHERE village_id = ... RETURNING last_seq`, upsert แถวถ้ายังไม่มี)
-- [ ] `PATCH /maintenance-tickets/:id/status` — `@Roles("ADMIN")`, บังคับ transition ไปข้างหน้าเท่านั้น (OPEN→IN_PROGRESS→DONE), reject ข้าม/ย้อน
-- [ ] `PATCH /maintenance-tickets/:id/assign` — `@Roles("ADMIN")`, set `assignedTo` + `scheduledDate`
-- [ ] `GET /maintenance-tickets` — resident scope เฉพาะ `houseId` ของตัวเอง (เหมือน pattern `entry-log`'s `list()`), admin เห็นทั้งหมด + filter `status`/`category`, pagination
-- [ ] `GET /maintenance-tickets/:id` — detail รวมรูป
-- [ ] Photo upload — reuse `file-storage.service.ts` (bucket ทั่วไป `S3_BUCKET_ENTRY_LOGS` ไม่ใช่ sensitive bucket — รูปงานซ่อมไม่ใช่บัตร ปชช.)
-- [ ] Push notification แจ้งลูกบ้านเมื่อสถานะเปลี่ยน — gap เดียวกับ FCM ที่ยังไม่ wire จริงใน MVP (report ไม่ implement, เหมือน SOS/announcement)
-- [ ] Unit test: status transition guard (ปฏิเสธข้าม/ย้อน), `ticketNumber` ไม่ชนกันภายใต้การสร้างพร้อมกัน (concurrency test), resident เห็นเฉพาะใบงานบ้านตัวเอง
-- [ ] Integration test: full flow สร้าง → assign → in_progress → done, เลขที่ใบงาน sequential ต่อหมู่บ้าน
+- [x] สร้าง module `src/modules/maintenance/` (controller/service/dto ตาม pattern เดียวกับ `sos`/`entry-log`)
+- [x] `POST /maintenance-tickets` — `@Roles("RESIDENT")`, validate category/description, `houseId` มาจาก JWT claims เท่านั้น (ห้าม trust จาก client), generate `ticketNumber` แบบ atomic ภายใน transaction เดียวกับการ insert ticket (`UPDATE maintenance_ticket_counters SET last_seq = last_seq + 1 WHERE village_id = ... RETURNING last_seq`, upsert แถวถ้ายังไม่มี)
+- [x] `PATCH /maintenance-tickets/:id/status` — `@Roles("ADMIN")`, บังคับ transition ไปข้างหน้าเท่านั้น (OPEN→IN_PROGRESS→DONE), reject ข้าม/ย้อน
+- [x] `PATCH /maintenance-tickets/:id/assign` — `@Roles("ADMIN")`, set `assignedTo` + `scheduledDate`
+- [x] `GET /maintenance-tickets` — resident scope เฉพาะ `houseId` ของตัวเอง (เหมือน pattern `entry-log`'s `list()`), admin เห็นทั้งหมด + filter `status`/`category`, pagination
+- [x] `GET /maintenance-tickets/:id` — detail รวมรูป
+- [x] Photo upload — reuse `file-storage.service.ts` (bucket ทั่วไป `S3_BUCKET_ENTRY_LOGS` ไม่ใช่ sensitive bucket — รูปงานซ่อมไม่ใช่บัตร ปชช.)
+- [ ] Push notification แจ้งลูกบ้านเมื่อสถานะเปลี่ยน — gap เดียวกับ FCM ที่ยังไม่ wire จริงใน MVP (report ไม่ implement, เหมือน SOS/announcement) — **ยังไม่ทำ (ตรวจ 2026-10-07):** maintenance.service.ts ยังไม่เรียก PushNotificationService
+- [x] Unit test: status transition guard (ปฏิเสธข้าม/ย้อน), `ticketNumber` ไม่ชนกันภายใต้การสร้างพร้อมกัน (concurrency test), resident เห็นเฉพาะใบงานบ้านตัวเอง
+- [x] Integration test: full flow สร้าง → assign → in_progress → done, เลขที่ใบงาน sequential ต่อหมู่บ้าน
 
 **Implementation Tasks — admin-web:**
-- [ ] หน้า "แจ้งซ่อม": list ทุกใบงาน (filter สถานะ/หมวดหมู่), detail view พร้อมรูป, ฟอร์ม assign (`assignedTo` + `scheduledDate`), ปุ่มเปลี่ยนสถานะ (บังคับลำดับใน UI ให้ตรงกับ backend guard)
+- [x] หน้า "แจ้งซ่อม": list ทุกใบงาน (filter สถานะ/หมวดหมู่), detail view พร้อมรูป, ฟอร์ม assign (`assignedTo` + `scheduledDate`), ปุ่มเปลี่ยนสถานะ (บังคับลำดับใน UI ให้ตรงกับ backend guard)
 
 **Implementation Tasks — mobile (resident):**
-- [ ] "แจ้งซ่อม" screen: ฟอร์ม (เลือกหมวดหมู่, คำอธิบาย, ถ่ายรูปผ่าน `expo-camera`/`expo-image-picker`) → `POST /maintenance-tickets`
-- [ ] รายการใบงาน + หน้ารายละเอียด/ติดตามสถานะ (badge สีตาม status คล้าย pattern announcement level)
+- [x] "แจ้งซ่อม" screen: ฟอร์ม (เลือกหมวดหมู่, คำอธิบาย, ถ่ายรูปผ่าน `expo-camera`/`expo-image-picker`) → `POST /maintenance-tickets`
+- [x] รายการใบงาน + หน้ารายละเอียด/ติดตามสถานะ (badge สีตาม status คล้าย pattern announcement level)
 
 **Priority:** P1 — **Dependency:** Epic 0, Epic 1 เท่านั้น
 
@@ -147,19 +147,19 @@ Dev agent รอบถัดไปเริ่มจากศูนย์โด�
 - เรียง/กรองตามประเภทได้ (optional, index `[villageId, type]` รองรับไว้แล้ว)
 
 **Implementation Tasks — Backend:**
-- [ ] สร้าง module `src/modules/transport-provider/` (controller/service/dto)
-- [ ] `POST /transport-providers` — `@Roles("ADMIN")`
-- [ ] `PATCH /transport-providers/:id` — `@Roles("ADMIN")` (แก้ไขทุก field รวม toggle `isActive`)
-- [ ] `DELETE /transport-providers/:id` — `@Roles("ADMIN")` (ลบจริง — สเปกแยก "ลบ" ออกจาก "เปิด-ปิดการแสดงผล" เป็นคนละ action)
-- [ ] `GET /transport-providers` — admin เห็นทั้งหมดรวม inactive; resident/guard เห็นเฉพาะ `isActive=true`, รองรับ `?type=` filter
-- [ ] Unit test: resident ไม่เห็นรายการ inactive, admin CRUD ครบ, RLS กันข้ามหมู่บ้าน
-- [ ] Integration test: สร้าง → resident list เห็น (active) → admin toggle inactive → resident list ไม่เห็นอีกต่อไป
+- [x] สร้าง module `src/modules/transport-provider/` (controller/service/dto)
+- [x] `POST /transport-providers` — `@Roles("ADMIN")`
+- [x] `PATCH /transport-providers/:id` — `@Roles("ADMIN")` (แก้ไขทุก field รวม toggle `isActive`)
+- [x] `DELETE /transport-providers/:id` — `@Roles("ADMIN")` (ลบจริง — สเปกแยก "ลบ" ออกจาก "เปิด-ปิดการแสดงผล" เป็นคนละ action)
+- [x] `GET /transport-providers` — admin เห็นทั้งหมดรวม inactive; resident/guard เห็นเฉพาะ `isActive=true`, รองรับ `?type=` filter
+- [x] Unit test: resident ไม่เห็นรายการ inactive, admin CRUD ครบ, RLS กันข้ามหมู่บ้าน
+- [x] Integration test: สร้าง → resident list เห็น (active) → admin toggle inactive → resident list ไม่เห็นอีกต่อไป
 
 **Implementation Tasks — admin-web:**
-- [ ] หน้า "ทำเนียบรถรับจ้าง": list/create/edit/delete, toggle switch เปิด-ปิดการแสดงผล
+- [x] หน้า "ทำเนียบรถรับจ้าง": list/create/edit/delete, toggle switch เปิด-ปิดการแสดงผล
 
 **Implementation Tasks — mobile (resident):**
-- [ ] "เรียกรถโดยสาร" screen: รายการผู้ให้บริการ active (filter ตามประเภทได้), แต่ละแถวมีปุ่มโทร (`Linking.openURL('tel:' + phone)`)
+- [x] "เรียกรถโดยสาร" screen: รายการผู้ให้บริการ active (filter ตามประเภทได้), แต่ละแถวมีปุ่มโทร (`Linking.openURL('tel:' + phone)`)
 
 **Priority:** P1 — **Dependency:** Epic 0, Epic 1 เท่านั้น — เป็น epic ที่ complexity ต่ำสุดในเฟส 2 (CRUD ตรงไปตรงมา ไม่มี real-time/state machine)
 
@@ -232,10 +232,10 @@ decision และ deep-link data schema
   (`DeviceNotRegistered` receipt error) ไม่ให้ค้างส่งซ้ำไปเรื่อยๆ
 
 **Implementation Tasks — Backend:**
-- [ ] เพิ่ม dependency `expo-server-sdk-node` (เวอร์ชันล่าสุดที่รองรับ
+- [x] เพิ่ม dependency `expo-server-sdk-node` (เวอร์ชันล่าสุดที่รองรับ
   Node 20+ ตาม `apps/backend/package.json`'s `engines.node` — Dev agent
   ระบุ pin เวอร์ชันแบบเดียวกับที่ ADR-004 ทำกับ `socket.io`)
-- [ ] สร้าง `src/common/push/` module:
+- [x] สร้าง `src/common/push/` module:
   - `push-token.service.ts` — `registerToken(userId, expoPushToken, claims)`
     (upsert บน `@@unique([userId, expoPushToken])`),
     `removeToken(userId, expoPushToken)` (สำหรับ logout — ดู mobile task
@@ -254,12 +254,12 @@ decision และ deep-link data schema
   - `push.module.ts` — `@Global()` เหมือน `AuditModule`/`FileStorageModule`
     (ทุก feature module เรียกใช้ได้โดยไม่ต้อง import ซ้ำ), wire เข้า
     `common.module.ts`
-- [ ] `POST /push-tokens` (register — `@Roles("RESIDENT", "GUARD", "ADMIN")`,
+- [x] `POST /push-tokens` (register — `@Roles("RESIDENT", "GUARD", "ADMIN")`,
   body `{ expoPushToken: string }`, `userId` มาจาก JWT claims เท่านั้น)
-- [ ] `DELETE /push-tokens` (unregister เฉพาะ token ของตัวเอง — เรียกตอน
+- [x] `DELETE /push-tokens` (unregister เฉพาะ token ของตัวเอง — เรียกตอน
   logout ให้เครื่องที่ logout แล้วไม่ได้รับ push อีกถ้า login คนละบัญชีบน
   เครื่องเดิม)
-- [ ] เพิ่มเรียก `PushNotificationService.send(...)` ที่ 4 จุด (นอก
+- [x] เพิ่มเรียก `PushNotificationService.send(...)` ที่ 4 จุด (นอก
   transaction เสมอ ตาม §3.3's trade-off note — ดู ADR-006 สำหรับตำแหน่ง
   เรียกที่แน่นอนในแต่ละไฟล์):
   - `entry-log.service.ts`'s `createFromQr()` — แทน TODO comment เดิม
@@ -269,41 +269,41 @@ decision และ deep-link data schema
   - `announcement.service.ts`'s `create()` — แทน TODO comment เดิม (SMS
     fallback ยังไม่ทำ — คง TODO ไว้)
   - `chat.gateway.ts`'s `onSendMessage()` — เพิ่มใหม่ (ไม่มี TODO เดิม)
-- [ ] แก้ `.env.example`: ลบ/แทนที่ `FCM_PROJECT_ID`/`FCM_SERVICE_ACCOUNT_JSON`
+- [x] แก้ `.env.example`: ลบ/แทนที่ `FCM_PROJECT_ID`/`FCM_SERVICE_ACCOUNT_JSON`
   (ค้างมาจากตอนที่ยังไม่ได้ตัดสินใจ transport) ด้วย `EXPO_ACCESS_TOKEN`
   (optional — enhanced security ของ Expo push service, ไม่บังคับสำหรับ
   Expo Go/dev)
-- [ ] Unit test: `PushNotificationService.send()` ไม่ throw เมื่อ Expo API
+- [x] Unit test: `PushNotificationService.send()` ไม่ throw เมื่อ Expo API
   error/timeout (mock `expo-server-sdk-node`), chunking ทำงานถูกต้องเมื่อ
   recipient list ยาวเกิน 1 chunk, `PushTokenService` upsert ไม่สร้าง row
   ซ้ำเมื่อ register token เดิมซ้ำ
-- [ ] Integration test: 1 เคสต่อ trigger (mock Expo SDK ที่ transport
+- [x] Integration test: 1 เคสต่อ trigger (mock Expo SDK ที่ transport
   boundary) ยืนยันว่า payload/data ที่ส่งตรงตาม deep-link schema (ADR-006)
   และ recipient list ตรงกับ routing logic ที่มีอยู่แล้ว (เช่น SOS ต้องไม่ส่ง
   หา guard ที่ off-duty — routing เดิมยังถูกต้อง แค่เพิ่มการยืนยันว่า
   `send()` ถูกเรียกด้วย list เดียวกับที่ routing คืนมา)
 
 **Implementation Tasks — mobile:**
-- [ ] `lib/push.ts` (ใหม่) — `registerForPushNotificationsAsync()`:
+- [x] `lib/push.ts` (ใหม่) — `registerForPushNotificationsAsync()`:
   ขอ permission (`Notifications.requestPermissionsAsync()`), ดึง
   `expo-notifications`'s `getExpoPushTokenAsync()`, เรียก
   `POST /push-tokens` ผ่าน `lib/api.ts` เดิม (pattern เดียวกับทุก
   authenticated call อื่น)
-- [ ] เรียก `registerForPushNotificationsAsync()` ใน `AuthContext.tsx`
+- [x] เรียก `registerForPushNotificationsAsync()` ใน `AuthContext.tsx`
   หลัง `setSession()` สำเร็จ (ทั้ง flow login และ flow restore-session ตอน
   app เปิดใหม่ — ดู `AuthContext.tsx`'s `useEffect` ที่เรียก `getSession()`
   ตอน mount) — **ไม่ใช่**ใน `RootNavigator` เพราะต้องมี JWT ก่อนเรียก
   `POST /push-tokens` ได้ และ context คือจุดที่ session state พร้อมใช้งาน
   ก่อนสุด
-- [ ] เรียก `DELETE /push-tokens` ตอน logout (หาจุด logout handler ที่มีอยู่
+- [x] เรียก `DELETE /push-tokens` ตอน logout (หาจุด logout handler ที่มีอยู่
   แล้ว — clear secure storage) ก่อนเคลียร์ session ไม่ใช่หลัง (ต้องมี JWT
   ตอนเรียก)
-- [ ] `Notifications.addNotificationResponseReceivedListener()` — handler
+- [x] `Notifications.addNotificationResponseReceivedListener()` — handler
   กลางที่ decode `data: { type, id }` ตาม deep-link schema (ADR-006) แล้ว
   `navigation.navigate(...)` ไปหน้าที่ถูกต้องตาม `type` (สแกน/SOS/
   ประกาศ/แชท) — วางใน `RootNavigator` หรือ root component ที่มี navigation
   ref อยู่แล้ว (Dev agent ตัดสินใจตำแหน่งที่แน่นอนตอน implement)
-- [ ] Foreground notification handler (`Notifications.setNotificationHandler`)
+- [x] Foreground notification handler (`Notifications.setNotificationHandler`)
   — ตั้งค่า `shouldShowAlert: true` ให้แสดง banner แม้แอปเปิดอยู่หน้าจอ
   (ต่างจาก background ที่ OS จัดการเอง)
 - [ ] Unit/component test เมื่อเริ่ม implement (ยังไม่มี test setup สำหรับ
