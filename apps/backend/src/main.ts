@@ -5,12 +5,22 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
+import {
+  assertProductionSecrets,
+  resolveCorsOrigins,
+} from "./common/config/startup-config";
+import { CorsIoAdapter } from "./common/config/cors-io.adapter";
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // ConfigModule (inside AppModule) has loaded .env by this point.
+  assertProductionSecrets();
+  const corsOrigins = resolveCorsOrigins();
+
   app.use(helmet());
-  app.enableCors(); // TODO(Dev agent): restrict to the admin-web origin(s) before staging.
+  app.enableCors({ origin: corsOrigins });
+  app.useWebSocketAdapter(new CorsIoAdapter(app, corsOrigins));
   // Dev-agent change (avatar upload feature): the default body-parser JSON
   // limit (100kb) is too small for a base64-encoded photo — this same
   // constraint already silently affected entry-log/chat/maintenance's

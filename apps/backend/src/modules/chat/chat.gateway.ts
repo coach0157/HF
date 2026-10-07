@@ -33,11 +33,11 @@ import { ChatWsExceptionFilter } from "./chat-ws-exception.filter";
  * Epic 8 — Chat WebSocket transport. Implements ADR-004/005
  * (docs/ARCHITECTURE.md §8.1-8.2) — read those before touching this file.
  *
- * cors: '*' mirrors main.ts's `app.enableCors()` (also unrestricted, also
- * flagged TODO there) — restrict both together before staging, not just
- * this one.
+ * CORS is applied by CorsIoAdapter (main.ts) from the same CORS_ORIGINS
+ * list as REST — not here, since a decorator is evaluated before
+ * ConfigModule has loaded .env.
  */
-@WebSocketGateway({ cors: { origin: "*" } })
+@WebSocketGateway()
 @UsePipes(
   new ValidationPipe({
     whitelist: true,
