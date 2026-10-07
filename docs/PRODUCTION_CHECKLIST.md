@@ -37,8 +37,13 @@ login เข้าระบบเป็นใครก็ได้ทันท�
 - พอมี `https://` แล้ว **ต้องลบ `usesCleartextTraffic: true` ออก** จาก
   `app.json` แล้ว build APK ใหม่ — ค่านี้ตอนนี้เปิดช่องให้ดักจับข้อมูลระหว่างทางได้
   ถ้าเจอ network แปลกๆ (เช่น WiFi สาธารณะ) ไม่ควรเปิดค้างไว้ในเวอร์ชันที่ขายจริง
-- อัปเดต `eas.json`'s `EXPO_PUBLIC_API_BASE_URL` ให้เป็นโดเมนจริง (ไม่ใช่ LAN IP
-  `192.168.1.104` ที่ใช้ทดสอบอยู่ตอนนี้)
+- อัปเดต `eas.json`'s `preview` profile's `EXPO_PUBLIC_API_BASE_URL` ให้เป็น
+  โดเมนจริง (ตอนนี้ชี้ไป Cloudflare Tunnel ชั่วคราว
+  `https://shaw-ccd-also-documentation.trycloudflare.com` สำหรับทดสอบอยู่ —
+  URL แบบนี้เปลี่ยนทุกครั้งที่ restart tunnel ใช้ต่อ production ไม่ได้)
+- `eas.json` มี `production` profile โครงไว้แล้ว (`{"autoIncrement": true}`)
+  แต่ยังไม่มี `EXPO_PUBLIC_API_BASE_URL` — ต้องเติมโดเมนจริงก่อน build/submit
+  ขึ้น store จริง
 
 ### 1.4 จำกัด CORS
 `apps/backend/src/main.ts` บรรทัด 13 มีคอมเมนต์เตือนตัวเองไว้แล้วว่า:
