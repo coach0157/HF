@@ -51,6 +51,16 @@ function ChatStackNavigator() {
   );
 }
 
+// Hidden-tab options for screens reachable only via explicit navigate().
+// `tabBarButton: () => null` alone still leaves an empty flex slot per
+// hidden tab in bottom-tabs v7 (user-reported on a real device: visible
+// gaps between สแกน QR/SOS/แชท and truncated labels from 8-way width
+// splitting), so the item itself is also taken out of layout.
+const hiddenTabOptions = {
+  tabBarButton: () => null,
+  tabBarItemStyle: { display: "none" as const },
+};
+
 const Tab = createBottomTabNavigator<GuardTabParamList>();
 
 export function GuardTabNavigator() {
@@ -90,7 +100,7 @@ export function GuardTabNavigator() {
         component={ManualEntryScreen}
         options={{
           title: "บันทึกด้วยมือ",
-          tabBarButton: () => null,
+          ...hiddenTabOptions,
         }}
       />
       <Tab.Screen
@@ -98,7 +108,7 @@ export function GuardTabNavigator() {
         component={ExitConfirmScreen}
         options={{
           title: "ยืนยันแขกออก",
-          tabBarButton: () => null,
+          ...hiddenTabOptions,
         }}
       />
       <Tab.Screen
@@ -128,7 +138,7 @@ export function GuardTabNavigator() {
         component={PatrolLogScreen}
         options={{
           title: "บันทึกตรวจรอบ",
-          tabBarButton: () => null,
+          ...hiddenTabOptions,
         }}
       />
       <Tab.Screen
